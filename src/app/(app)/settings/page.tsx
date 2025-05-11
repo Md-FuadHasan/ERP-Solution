@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import type React from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,8 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CompanyDetailsForm } from '@/components/forms/company-details-form';
-import { TaxSettingsForm } from '@/components/forms/tax-settings-form';
+import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
+import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { CompanyProfile, Manager } from '@/types';
 import { MOCK_COMPANY_PROFILE, MOCK_MANAGERS } from '@/types'; // Using mock data
@@ -44,13 +45,18 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
 
-  const handleCompanyDetailsSubmit = (data: Partial<CompanyProfile>) => {
+  const handleCompanyDetailsSubmit = (data: CompanyDetailsFormValues) => {
     setCompanyProfile(prev => ({ ...prev, ...data }));
     toast({ title: "Company Details Updated", description: "Your company information has been saved." });
   };
 
-  const handleTaxSettingsSubmit = (data: Pick<CompanyProfile, 'taxRate' | 'vatRate' | 'excessTaxRate'>) => {
-    setCompanyProfile(prev => ({ ...prev, ...data }));
+  const handleTaxSettingsSubmit = (data: TaxSettingsFormValues) => {
+    setCompanyProfile(prev => ({ 
+      ...prev, 
+      taxRate: data.taxRate, 
+      vatRate: data.vatRate,
+      excessTaxRate: data.excessTaxRate 
+    }));
     toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
   };
 

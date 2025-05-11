@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, type ControllerRenderProps } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -14,8 +14,8 @@ import { CalendarIcon, PlusCircle, Trash2, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus } from '@/types';
-import { ALL_INVOICE_STATUSES, MOCK_CUSTOMERS } from '@/types'; // Using mock customers for dropdown
-import { useEffect } from 'react';
+import { ALL_INVOICE_STATUSES } from '@/types';
+import type React from 'react';
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required.").max(200),
@@ -23,7 +23,7 @@ const invoiceItemSchema = z.object({
   unitPrice: z.coerce.number().min(0.01, "Unit price must be positive."),
 });
 
-const invoiceFormSchema = z.object({
+export const invoiceFormSchema = z.object({
   id: z.string().min(1, "Invoice number is required.").max(50),
   customerId: z.string().min(1, "Customer is required."),
   issueDate: z.date({ required_error: "Issue date is required."}),
@@ -33,7 +33,7 @@ const invoiceFormSchema = z.object({
   // Subtotal, tax, total will be calculated
 });
 
-type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
+export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 
 interface InvoiceFormProps {
   initialData?: Invoice | null;
@@ -125,7 +125,7 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
           <FormField
             control={form.control}
             name="issueDate"
-            render={({ field }) => (
+            render={({ field }: { field: ControllerRenderProps<InvoiceFormValues, 'issueDate'> }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Issue Date</FormLabel>
                 <Popover>
@@ -154,7 +154,7 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
           <FormField
             control={form.control}
             name="dueDate"
-            render={({ field }) => (
+            render={({ field }: { field: ControllerRenderProps<InvoiceFormValues, 'dueDate'> }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Due Date</FormLabel>
                 <Popover>

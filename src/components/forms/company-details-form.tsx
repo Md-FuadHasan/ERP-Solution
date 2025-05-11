@@ -16,7 +16,7 @@ const companyDetailsFormSchema = z.object({
   address: z.string().min(5, "Address is required.").max(255),
 });
 
-type CompanyDetailsFormValues = z.infer<typeof companyDetailsFormSchema>;
+export type CompanyDetailsFormValues = z.infer<typeof companyDetailsFormSchema>;
 
 interface CompanyDetailsFormProps {
   initialData: CompanyProfile; // Assuming initialData always exists for settings

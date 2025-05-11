@@ -15,7 +15,7 @@ const taxSettingsFormSchema = z.object({
   excessTaxRate: z.coerce.number().min(0, "Excess tax rate cannot be negative.").max(100, "Rate cannot exceed 100%.").optional(),
 });
 
-type TaxSettingsFormValues = z.infer<typeof taxSettingsFormSchema>;
+export type TaxSettingsFormValues = z.infer<typeof taxSettingsFormSchema>;
 
 interface TaxSettingsFormProps {
   initialData: CompanyProfile;

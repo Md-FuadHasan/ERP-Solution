@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, Eye } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { InvoiceForm } from '@/components/forms/invoice-form';
+import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { Invoice, Customer } from '@/types';
@@ -88,7 +88,7 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleSubmit = (data: Omit<Invoice, 'items' | 'subtotal' | 'taxAmount' | 'vatAmount' | 'totalAmount'> & { items: Omit<Invoice['items'][0], 'id' | 'total'>[] } ) => {
+  const handleSubmit = (data: InvoiceFormValues) => {
     // Recalculate totals based on form items, taxRate and vatRate would come from settings
     const companyTaxRate = MOCK_CUSTOMERS.length > 0 ? 0.10 : 0; // Example, pull from settings
     const companyVatRate = MOCK_CUSTOMERS.length > 0 ? 0.05 : 0; // Example
@@ -106,15 +106,17 @@ export default function InvoicesPage() {
     const customerName = customers.find(c => c.id === data.customerId)?.name;
 
     const invoiceData: Invoice = {
-      ...data,
+      id: data.id,
+      customerId: data.customerId,
+      status: data.status,
       customerName,
       items: processedItems,
       subtotal,
       taxAmount,
       vatAmount,
       totalAmount,
-      issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
-      dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
+      issueDate: format(data.issueDate, 'yyyy-MM-dd'), // data.issueDate is a Date object from InvoiceFormValues
+      dueDate: format(data.dueDate, 'yyyy-MM-dd'),   // data.dueDate is a Date object from InvoiceFormValues
     };
 
 
