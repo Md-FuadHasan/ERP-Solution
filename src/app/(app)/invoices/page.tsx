@@ -36,6 +36,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export default function InvoicesPage() {
@@ -224,7 +225,7 @@ export default function InvoicesPage() {
                     </Button>
                      <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice">
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={() => handleDeleteInvoice(invoice)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -237,7 +238,7 @@ export default function InvoicesPage() {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
                           <AlertDialogAction onClick={() => confirmDelete()} className="bg-destructive hover:bg-destructive/90">
                             Delete
                           </AlertDialogAction>
@@ -281,8 +282,25 @@ export default function InvoicesPage() {
           />
         </DialogContent>
       </Dialog>
-
-      {/* AlertDialog for delete confirmation is managed by individual row triggers now */}
+      
+      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the invoice
+              "{invoiceToDelete?.id}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+
