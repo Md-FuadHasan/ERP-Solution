@@ -1,9 +1,10 @@
+
 'use client';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BarChart, LineChart, PieChartIcon, DollarSign, Users, FileText, AlertTriangle } from 'lucide-react';
+import { BarChart as LucideBarChart, LineChart as LucideLineChart, PieChartIcon, DollarSign, Users, FileText, AlertTriangle } from 'lucide-react'; // Aliased lucide-react imports to avoid confusion
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import { Bar, Line, Pie, ResponsiveContainer, Cell, Legend, Tooltip as RechartsTooltip, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart } from 'recharts';
+import { BarChart as RechartsBarChartComponent, Bar, Line, Pie, Cell, Legend, Tooltip as RechartsTooltip, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart } from 'recharts';
 import type { ChartDataPoint } from '@/types';
 import { MOCK_INVOICES } from '@/types'; // Import mock data
 
@@ -39,6 +40,12 @@ export default function DashboardPage() {
   const chartConfig = {
     outstanding: { label: "Outstanding", color: "hsl(var(--chart-1))" },
     payments: { label: "Payments", color: "hsl(var(--chart-2))" },
+    // Add configurations for pie chart segments if needed for legend/tooltip customization via ChartContainer
+    Draft: { label: "Draft", color: PIE_COLORS[0] },
+    Sent: { label: "Sent", color: PIE_COLORS[1] },
+    Paid: { label: "Paid", color: PIE_COLORS[2] },
+    Overdue: { label: "Overdue", color: PIE_COLORS[3] },
+    Cancelled: { label: "Cancelled", color: PIE_COLORS[4] },
   };
 
   return (
@@ -95,18 +102,16 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="h-[350px] p-2">
             <ChartContainer config={chartConfig} className="h-full w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={outstandingInvoicesData}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                  <RechartsTooltip
-                    cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
-                    content={<ChartTooltipContent hideLabel />}
-                  />
-                  <Bar dataKey="value" fill="var(--color-outstanding)" radius={4} />
-                </RechartsBarChart>
-              </ResponsiveContainer>
+              <RechartsBarChartComponent data={outstandingInvoicesData}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                <RechartsTooltip
+                  cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
+                  content={<ChartTooltipContent hideLabel />}
+                />
+                <Bar dataKey="value" fill="var(--color-outstanding)" radius={4} />
+              </RechartsBarChartComponent>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -118,17 +123,15 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="h-[350px] flex items-center justify-center p-2">
              <ChartContainer config={chartConfig} className="h-full w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                        <RechartsTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
-                        <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" label>
-                            {invoiceStatusData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <ChartLegend content={<ChartLegendContent />} />
-                    </RechartsPieChart>
-                </ResponsiveContainer>
+                <RechartsPieChart>
+                    <RechartsTooltip content={<ChartTooltipContent nameKey="name" />} />
+                    <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" label>
+                        {invoiceStatusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <ChartLegend content={<ChartLegendContent />} />
+                </RechartsPieChart>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -137,5 +140,9 @@ export default function DashboardPage() {
   );
 }
 
-// Renaming default Recharts BarChart to avoid conflict if we use their default Bar component
-const RechartsBarChart = BarChart;
+// Removed the alias: const RechartsBarChart = BarChart;
+// It was causing BarChart from lucide-react to be used instead of recharts' BarChart.
+// RechartsBarChartComponent is now directly imported and used.
+// ResponsiveContainer was removed as ChartContainer already provides it.
+
+    
