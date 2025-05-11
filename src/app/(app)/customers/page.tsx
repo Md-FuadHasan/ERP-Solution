@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -18,10 +19,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { CustomerForm } from '@/components/forms/customer-form';
+import { CustomerForm, type CustomerFormValues } from '@/components/forms/customer-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Customer, Invoice } from '@/types';
+import type { Customer } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -38,8 +39,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
-import { useData } from '@/context/DataContext'; // Import useData hook
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { useData } from '@/context/DataContext'; 
+import { Skeleton } from '@/components/ui/skeleton'; 
 
 export default function CustomersPage() {
   const { 
@@ -49,7 +50,7 @@ export default function CustomersPage() {
     deleteCustomer, 
     isLoading, 
     getInvoicesByCustomerId 
-  } = useData(); // Use DataContext
+  } = useData(); 
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -106,13 +107,13 @@ export default function CustomersPage() {
     setIsFormModalOpen(true);
   };
 
-  const handleDeleteCustomerTrigger = (customer: Customer) => {
+  const handleDeleteCustomer = (customer: Customer) => {
     setCustomerToDelete(customer);
   };
 
   const confirmDelete = () => {
     if (customerToDelete) {
-      deleteCustomer(customerToDelete.id); // Use context action
+      deleteCustomer(customerToDelete.id); 
       toast({ title: "Customer Deleted", description: `${customerToDelete.name} has been removed.` });
       setCustomerToDelete(null);
     }
@@ -129,17 +130,36 @@ export default function CustomersPage() {
   };
 
 
-  const handleSubmit = (data: Omit<Customer, 'id' | 'createdAt'>) => {
+  const handleSubmit = (data: CustomerFormValues) => {
     if (editingCustomer) {
-      updateCustomer({ ...editingCustomer, ...data }); // Use context action
+      updateCustomer({ ...editingCustomer, ...data }); 
       toast({ title: "Customer Updated", description: `${data.name} details have been updated.` });
     } else {
+      let customerId = data.id;
+      if (!customerId) {
+        customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
+        // Basic check for uniqueness, in a real app, this would be more robust
+        while (customers.find(c => c.id === customerId)) {
+            customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
+        }
+      } else {
+        // Check if user provided ID already exists
+        if (customers.find(c => c.id === customerId)) {
+          toast({
+            title: "Error: Customer ID exists",
+            description: `Customer ID ${customerId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const newCustomer: Customer = {
         ...data,
-        id: `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*100))}`,
+        id: customerId,
         createdAt: new Date().toISOString(),
       };
-      addCustomer(newCustomer); // Use context action
+      addCustomer(newCustomer); 
       toast({ title: "Customer Added", description: `${data.name} has been successfully added.` });
     }
     setIsFormModalOpen(false);
@@ -219,22 +239,25 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary">
                       <Edit className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerTrigger(customer);}} className="hover:text-destructive">
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={(e) => {
+                            e.stopPropagation(); 
+                            handleDeleteCustomer(customer);
+                          }}>
                            <Trash2 className="h-4 w-4" />
-                         </Button>
+                        </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent>
+                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the customer
-                            "{customerToDelete?.name}" and all associated data.
+                            "{customerToDelete?.name}" and all associated data (including invoices).
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -255,11 +278,11 @@ export default function CustomersPage() {
         <DataPlaceholder
           title="No Customers Found"
           message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
-          action={!searchTerm && (
+          action={!searchTerm ? (
             <Button onClick={handleAddCustomer}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
             </Button>
-          )}
+          ) : undefined}
         />
       )}
 
@@ -378,13 +401,14 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* This AlertDialog is for confirming customer deletion */}
       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the customer
-              "{customerToDelete?.name}" and all associated data.
+              "{customerToDelete?.name}" and all associated data (including invoices).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -398,3 +422,6 @@ export default function CustomersPage() {
     </>
   );
 }
+
+
+    

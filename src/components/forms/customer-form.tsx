@@ -4,12 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Customer } from '@/types';
 
 const customerFormSchema = z.object({
+  id: z.string().max(50).optional(), // Customer ID is optional for auto-generation
   name: z.string().min(2, { message: "Name must be at least 2 characters." }).max(100),
   email: z.string().email({ message: "Invalid email address." }).max(100),
   phone: z.string().min(7, { message: "Phone number seems too short." }).max(20),
@@ -17,7 +18,7 @@ const customerFormSchema = z.object({
   shippingAddress: z.string().max(255).optional(),
 });
 
-type CustomerFormValues = z.infer<typeof customerFormSchema>;
+export type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
 interface CustomerFormProps {
   initialData?: Customer | null;
@@ -30,12 +31,14 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
     defaultValues: initialData ? {
+      id: initialData.id,
       name: initialData.name,
       email: initialData.email,
       phone: initialData.phone,
       billingAddress: initialData.billingAddress,
       shippingAddress: initialData.shippingAddress || '',
     } : {
+      id: '', // Default to empty for new customers
       name: '',
       email: '',
       phone: '',
@@ -47,6 +50,25 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Customer ID</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Leave blank for auto-generation" 
+                  {...field} 
+                  readOnly={!!initialData} // ID is read-only when editing
+                  disabled={!!initialData} // Also disable to prevent focus
+                />
+              </FormControl>
+              {!initialData && <FormDescription>Optional. If left blank, a unique ID will be generated.</FormDescription>}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="name"
