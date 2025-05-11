@@ -23,8 +23,8 @@ import {
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Invoice, Customer, PaymentProcessingStatus } from '@/types';
-import { MOCK_INVOICES, MOCK_CUSTOMERS } from '@/types'; // Using mock data
+import type { Invoice, Customer } from '@/types';
+import { MOCK_INVOICES, MOCK_CUSTOMERS, MOCK_COMPANY_PROFILE } from '@/types'; // Using mock data
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -222,9 +222,28 @@ export default function InvoicesPage() {
                     <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(invoice)} className="hover:text-primary" title="View/Edit Invoice">
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteInvoice(invoice)} className="hover:text-destructive" title="Delete Invoice">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                     <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete invoice
+                            "{invoice.id}".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => confirmDelete()} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
@@ -263,23 +282,7 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete invoice
-              "{invoiceToDelete?.id}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* AlertDialog for delete confirmation is managed by individual row triggers now */}
     </>
   );
 }
