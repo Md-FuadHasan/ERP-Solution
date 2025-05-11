@@ -37,30 +37,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load data from localStorage on initial mount
   useEffect(() => {
+    setIsLoading(true); // Explicitly set loading to true at the start of the effect
     try {
       const storedCustomers = localStorage.getItem(LOCAL_STORAGE_KEYS.CUSTOMERS);
       if (storedCustomers) {
         setCustomers(JSON.parse(storedCustomers));
       } else {
-        setCustomers(MOCK_CUSTOMERS); // Initialize with mock if nothing in localStorage
+        setCustomers(MOCK_CUSTOMERS); 
       }
 
       const storedInvoices = localStorage.getItem(LOCAL_STORAGE_KEYS.INVOICES);
       if (storedInvoices) {
         setInvoices(JSON.parse(storedInvoices));
       } else {
-        setInvoices(MOCK_INVOICES); // Initialize with mock
+        setInvoices(MOCK_INVOICES); 
       }
 
       const storedProfile = localStorage.getItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE);
       if (storedProfile) {
         setCompanyProfile(JSON.parse(storedProfile));
       } else {
-        setCompanyProfile(MOCK_COMPANY_PROFILE); // Initialize with mock
+        setCompanyProfile(MOCK_COMPANY_PROFILE); 
       }
     } catch (error) {
-      console.error("Failed to load data from localStorage", error);
-      // Fallback to mocks if localStorage parsing fails
+      console.error("Failed to load data from localStorage, using mocks:", error);
       setCustomers(MOCK_CUSTOMERS);
       setInvoices(MOCK_INVOICES);
       setCompanyProfile(MOCK_COMPANY_PROFILE);
@@ -72,21 +72,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Save customers to localStorage whenever they change
   useEffect(() => {
     if (!isLoading) {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+      } catch (error) {
+        console.error("Failed to save customers to localStorage:", error);
+        // Optionally, inform the user or implement a fallback
+      }
     }
   }, [customers, isLoading]);
 
   // Save invoices to localStorage whenever they change
   useEffect(() => {
     if (!isLoading) {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+      } catch (error) {
+        console.error("Failed to save invoices to localStorage:", error);
+      }
     }
   }, [invoices, isLoading]);
 
   // Save company profile to localStorage whenever it changes
   useEffect(() => {
     if (!isLoading) {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(companyProfile));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(companyProfile));
+      } catch (error) {
+        console.error("Failed to save company profile to localStorage:", error);
+      }
     }
   }, [companyProfile, isLoading]);
 
@@ -103,7 +116,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteCustomer = useCallback((customerId: string) => {
     setCustomers((prev) => prev.filter((c) => c.id !== customerId));
-    // Optionally, also delete or handle associated invoices
     setInvoices((prevInvoices) => prevInvoices.filter(inv => inv.customerId !== customerId));
   }, []);
 
@@ -163,3 +175,5 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
+    
