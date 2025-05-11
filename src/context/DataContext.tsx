@@ -1,81 +1,73 @@
+
 'use client';
-
 import type React from 'react';
-import { createContext, useContext, useState, useEffect, useCallback }
-  from 'react';
-import type { Invoice, Customer, CompanyProfile, PaymentRecord } from '@/types';
-import { MOCK_INVOICES, MOCK_CUSTOMERS, MOCK_COMPANY_PROFILE } from '@/types';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { Customer, Invoice, CompanyProfile, PaymentRecord } from '@/types';
+import { MOCK_CUSTOMERS, MOCK_INVOICES, MOCK_COMPANY_PROFILE } from '@/types';
 
-interface DataContextState {
-  invoices: Invoice[];
+interface DataContextType {
   customers: Customer[];
+  invoices: Invoice[];
   companyProfile: CompanyProfile;
   isLoading: boolean;
-  addInvoice: (invoice: Invoice) => void;
-  updateInvoice: (invoice: Invoice) => void;
-  deleteInvoice: (invoiceId: string) => void;
   addCustomer: (customer: Customer) => void;
   updateCustomer: (customer: Customer) => void;
   deleteCustomer: (customerId: string) => void;
+  addInvoice: (invoice: Invoice) => void;
+  updateInvoice: (invoice: Invoice) => void;
+  deleteInvoice: (invoiceId: string) => void;
   updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
-  getCustomerById: (customerId: string) => Customer | undefined;
   getInvoicesByCustomerId: (customerId: string) => Invoice[];
+  getCustomerById: (customerId: string) => Customer | undefined;
 }
 
-const DataContext = createContext<DataContextState | undefined>(undefined);
+const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEYS = {
-  INVOICES: 'invoiceflow_invoices',
   CUSTOMERS: 'invoiceflow_customers',
-  COMPANY_PROFILE: 'invoiceflow_companyProfile',
+  INVOICES: 'invoiceflow_invoices',
+  COMPANY_PROFILE: 'invoiceflow_company_profile',
 };
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(MOCK_COMPANY_PROFILE);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load data from localStorage on initial mount
   useEffect(() => {
     try {
-      const storedInvoices = localStorage.getItem(LOCAL_STORAGE_KEYS.INVOICES);
-      if (storedInvoices) {
-        setInvoices(JSON.parse(storedInvoices));
-      } else {
-        setInvoices(MOCK_INVOICES); // Initialize with mock if nothing in localStorage
-      }
-
       const storedCustomers = localStorage.getItem(LOCAL_STORAGE_KEYS.CUSTOMERS);
       if (storedCustomers) {
         setCustomers(JSON.parse(storedCustomers));
       } else {
-        setCustomers(MOCK_CUSTOMERS);
+        setCustomers(MOCK_CUSTOMERS); // Initialize with mock if nothing in localStorage
       }
 
-      const storedCompanyProfile = localStorage.getItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE);
-      if (storedCompanyProfile) {
-        setCompanyProfile(JSON.parse(storedCompanyProfile));
+      const storedInvoices = localStorage.getItem(LOCAL_STORAGE_KEYS.INVOICES);
+      if (storedInvoices) {
+        setInvoices(JSON.parse(storedInvoices));
       } else {
-        setCompanyProfile(MOCK_COMPANY_PROFILE);
+        setInvoices(MOCK_INVOICES); // Initialize with mock
+      }
+
+      const storedProfile = localStorage.getItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE);
+      if (storedProfile) {
+        setCompanyProfile(JSON.parse(storedProfile));
+      } else {
+        setCompanyProfile(MOCK_COMPANY_PROFILE); // Initialize with mock
       }
     } catch (error) {
       console.error("Failed to load data from localStorage", error);
-      // Fallback to mocks if localStorage fails
-      setInvoices(MOCK_INVOICES);
+      // Fallback to mocks if localStorage parsing fails
       setCustomers(MOCK_CUSTOMERS);
+      setInvoices(MOCK_INVOICES);
       setCompanyProfile(MOCK_COMPANY_PROFILE);
     } finally {
       setIsLoading(false);
     }
   }, []);
-
-  // Save invoices to localStorage whenever they change
-  useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
-    }
-  }, [invoices, isLoading]);
 
   // Save customers to localStorage whenever they change
   useEffect(() => {
@@ -84,7 +76,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [customers, isLoading]);
 
-  // Save companyProfile to localStorage whenever it changes
+  // Save invoices to localStorage whenever they change
+  useEffect(() => {
+    if (!isLoading) {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    }
+  }, [invoices, isLoading]);
+
+  // Save company profile to localStorage whenever it changes
   useEffect(() => {
     if (!isLoading) {
       localStorage.setItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(companyProfile));
@@ -92,66 +91,72 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [companyProfile, isLoading]);
 
 
-  const addInvoice = useCallback((invoice: Invoice) => {
-    setInvoices((prevInvoices) => [invoice, ...prevInvoices]);
-  }, []);
-
-  const updateInvoice = useCallback((updatedInvoice: Invoice) => {
-    setInvoices((prevInvoices) =>
-      prevInvoices.map((inv) => (inv.id === updatedInvoice.id ? updatedInvoice : inv))
-    );
-  }, []);
-
-  const deleteInvoice = useCallback((invoiceId: string) => {
-    setInvoices((prevInvoices) => prevInvoices.filter((inv) => inv.id !== invoiceId));
-  }, []);
-
   const addCustomer = useCallback((customer: Customer) => {
-    setCustomers((prevCustomers) => [customer, ...prevCustomers]);
+    setCustomers((prev) => [customer, ...prev]);
   }, []);
 
   const updateCustomer = useCallback((updatedCustomer: Customer) => {
-    setCustomers((prevCustomers) =>
-      prevCustomers.map((cust) => (cust.id === updatedCustomer.id ? updatedCustomer : cust))
+    setCustomers((prev) =>
+      prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c))
     );
   }, []);
 
   const deleteCustomer = useCallback((customerId: string) => {
-    setCustomers((prevCustomers) => prevCustomers.filter((cust) => cust.id !== customerId));
+    setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+    // Optionally, also delete or handle associated invoices
+    setInvoices((prevInvoices) => prevInvoices.filter(inv => inv.customerId !== customerId));
+  }, []);
+
+  const addInvoice = useCallback((invoice: Invoice) => {
+    setInvoices((prev) => [invoice, ...prev]);
+  }, []);
+
+  const updateInvoice = useCallback((updatedInvoice: Invoice) => {
+    setInvoices((prev) =>
+      prev.map((i) => (i.id === updatedInvoice.id ? updatedInvoice : i))
+    );
+  }, []);
+
+  const deleteInvoice = useCallback((invoiceId: string) => {
+    setInvoices((prev) => prev.filter((i) => i.id !== invoiceId));
   }, []);
 
   const updateCompanyProfile = useCallback((profileUpdate: Partial<CompanyProfile>) => {
-    setCompanyProfile((prevProfile) => ({ ...prevProfile, ...profileUpdate }));
+    setCompanyProfile((prev) => ({ ...prev, ...profileUpdate }));
   }, []);
 
-  const getCustomerById = useCallback((customerId: string) => {
-    return customers.find(c => c.id === customerId);
-  }, [customers]);
-
   const getInvoicesByCustomerId = useCallback((customerId: string) => {
-    return invoices.filter(inv => inv.customerId === customerId);
+    return invoices.filter(invoice => invoice.customerId === customerId);
   }, [invoices]);
 
-  const contextValue = {
-    invoices,
-    customers,
-    companyProfile,
-    isLoading,
-    addInvoice,
-    updateInvoice,
-    deleteInvoice,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    updateCompanyProfile,
-    getCustomerById,
-    getInvoicesByCustomerId,
-  };
+  const getCustomerById = useCallback((customerId: string) => {
+    return customers.find(customer => customer.id === customerId);
+  }, [customers]);
 
-  return <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider
+      value={{
+        customers,
+        invoices,
+        companyProfile,
+        isLoading,
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
+        addInvoice,
+        updateInvoice,
+        deleteInvoice,
+        updateCompanyProfile,
+        getInvoicesByCustomerId,
+        getCustomerById,
+      }}
+    >
+      {children}
+    </DataContext.Provider>
+  );
 };
 
-export const useData = (): DataContextState => {
+export const useData = (): DataContextType => {
   const context = useContext(DataContext);
   if (context === undefined) {
     throw new Error('useData must be used within a DataProvider');
