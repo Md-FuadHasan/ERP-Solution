@@ -15,28 +15,55 @@ export default function DashboardPage() {
   const { invoices, customers, isLoading } = useData(); // Use DataContext
 
   const dashboardMetrics = useMemo(() => {
-    const totalOutstanding = invoices.filter(inv => inv.status === 'Sent' || inv.status === 'Overdue').reduce((sum, inv) => sum + inv.remainingBalance, 0);
-    const recentPaymentsCount = invoices.filter(inv => inv.status === 'Paid').length; // Simplified
-    const overdueAmount = invoices.filter(inv => inv.status === 'Overdue').reduce((sum, inv) => sum + inv.remainingBalance, 0);
+    const totalOutstanding = invoices
+      .filter(inv => inv.status === 'Sent' || inv.status === 'Overdue')
+      .reduce((sum, inv) => sum + inv.remainingBalance, 0);
+    
+    const recentPaymentsCount = invoices.filter(inv => inv.status === 'Paid').length;
+    
+    const overdueAmount = invoices
+      .filter(inv => inv.status === 'Overdue')
+      .reduce((sum, inv) => sum + inv.remainingBalance, 0);
+      
     const totalCustomersCount = customers.length;
 
-    // For Outstanding Invoices Chart (example: monthly trend, needs real date logic)
-    // This is placeholder logic and would need to be adapted for actual monthly aggregation
-    const outstandingInvoicesData: ChartDataPoint[] = [
-      { name: 'Jan', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 0).reduce((s, i) => s + i.remainingBalance, 0) || 1200 },
-      { name: 'Feb', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 1).reduce((s, i) => s + i.remainingBalance, 0) || 2100 },
-      { name: 'Mar', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 2).reduce((s, i) => s + i.remainingBalance, 0) || 1500 },
-      { name: 'Apr', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 3).reduce((s, i) => s + i.remainingBalance, 0) || 2780 },
-      { name: 'May', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 4).reduce((s, i) => s + i.remainingBalance, 0) || 1890 },
-      { name: 'Jun', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 5).reduce((s, i) => s + i.remainingBalance, 0) || 2390 },
-      { name: 'Jul', value: invoices.filter(i => i.status !== 'Paid' && new Date(i.issueDate).getMonth() === 6).reduce((s, i) => s + i.remainingBalance, 0) || 3490 * 0.6 },
-    ];
-    
+    // Calculate Outstanding Invoices Data for the Bar Chart
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = new Date().getFullYear();
+    const outstandingInvoicesData: ChartDataPoint[] = months.map((monthName, index) => {
+      const monthValue = invoices
+        .filter(inv => {
+          const issueDate = new Date(inv.issueDate);
+          return (
+            (inv.status === 'Sent' || inv.status === 'Overdue') && // Consistent with totalOutstanding
+            issueDate.getMonth() === index &&
+            issueDate.getFullYear() === currentYear
+          );
+        })
+        .reduce((sum, inv) => sum + inv.remainingBalance, 0);
+      return { name: monthName, value: monthValue };
+    }).slice(0, 7); // Display first 7 months or adjust as needed
+
+    // Calculate Invoice Status Data for the Pie Chart
     const invoiceStatusCounts = invoices.reduce((acc, inv) => {
       acc[inv.status] = (acc[inv.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+
     const invoiceStatusData: ChartDataPoint[] = Object.entries(invoiceStatusCounts).map(([name, value]) => ({ name, value }));
+    
+    // If there are no invoices, provide empty/zeroed data for charts to prevent errors
+    if (invoices.length === 0) {
+        return {
+            totalOutstanding: 0,
+            recentPaymentsCount: 0,
+            overdueAmount: 0,
+            totalCustomersCount: customers.length, // customers might exist even with no invoices
+            outstandingInvoicesData: months.slice(0,7).map(m => ({name: m, value: 0})),
+            invoiceStatusData: [],
+        };
+    }
+
 
     return {
       totalOutstanding,
@@ -111,7 +138,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${dashboardMetrics.totalOutstanding.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            {/* Placeholder for dynamic change text */}
             <p className="text-xs text-muted-foreground">Based on current data</p> 
           </CardContent>
         </Card>
@@ -151,17 +177,17 @@ export default function DashboardPage() {
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Outstanding Invoices Trend</CardTitle>
-            <CardDescription>Monthly trend of outstanding invoice amounts (example).</CardDescription>
+            <CardDescription>Monthly trend of outstanding invoice amounts for the current year.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] p-2">
             <ChartContainer config={chartConfig} className="h-full w-full">
               <RechartsBarChartComponent data={dashboardMetrics.outstandingInvoicesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `$${value/1000}k`} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => value === 0 ? '$0' : `$${value/1000}k`} />
                 <RechartsTooltip
                   cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
-                  content={<ChartTooltipContent />} // Simplified
+                  content={<ChartTooltipContent formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]} />}
                 />
                 <Bar dataKey="value" fill="var(--color-outstanding)" radius={4} name="Outstanding Amount"/>
               </RechartsBarChartComponent>
@@ -178,7 +204,8 @@ export default function DashboardPage() {
              <ChartContainer config={chartConfig} className="h-full w-full">
                 <RechartsPieChart>
                     <RechartsTooltip content={<ChartTooltipContent nameKey="name" />} />
-                    <Pie data={dashboardMetrics.invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+                    <Pie data={dashboardMetrics.invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
+                        if (value === 0) return null; // Don't render label for zero-value slices
                         const RADIAN = Math.PI / 180;
                         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -193,7 +220,7 @@ export default function DashboardPage() {
                             <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                         ))}
                     </Pie>
-                    <ChartLegend content={<ChartLegendContent />} />
+                    {dashboardMetrics.invoiceStatusData.length > 0 && <ChartLegend content={<ChartLegendContent />} />}
                 </RechartsPieChart>
             </ChartContainer>
           </CardContent>
