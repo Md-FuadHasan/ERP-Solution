@@ -15,7 +15,7 @@ import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord } from '@/types';
-import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES } from '@/types';
+import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, MOCK_COMPANY_PROFILE } from '@/types';
 import type React from 'react';
 import { useEffect } from 'react';
 
@@ -422,3 +422,4 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
     </Form>
   );
 }
+
