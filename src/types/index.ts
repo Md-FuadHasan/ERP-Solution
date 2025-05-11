@@ -20,6 +20,13 @@ export interface InvoiceItem {
 export type PaymentProcessingStatus = 'Unpaid' | 'Partially Paid' | 'Fully Paid';
 export const ALL_PAYMENT_PROCESSING_STATUSES: PaymentProcessingStatus[] = ['Unpaid', 'Partially Paid', 'Fully Paid'];
 
+export interface PaymentRecord {
+  id: string;
+  paymentDate: string; // ISO string
+  amount: number;
+  status: 'Full Payment' | 'Partial Payment'; // Status of this specific payment
+}
+
 export interface Invoice {
   id: string; // Editable invoice number
   customerId: string;
@@ -35,6 +42,7 @@ export interface Invoice {
   paymentProcessingStatus: PaymentProcessingStatus;
   amountPaid: number;
   remainingBalance: number;
+  paymentHistory?: PaymentRecord[];
 }
 
 export interface CompanyProfile {
@@ -83,28 +91,32 @@ export const MOCK_INVOICES: Invoice[] = [
     issueDate: '2024-07-01', dueDate: '2024-07-31', 
     items: [{ id: 'item1', description: 'Web Development', quantity: 1, unitPrice: 1200, total: 1200 }],
     subtotal: 1200, taxAmount: 120, vatAmount: 60, totalAmount: 1380, status: 'Paid',
-    paymentProcessingStatus: 'Fully Paid', amountPaid: 1380, remainingBalance: 0
+    paymentProcessingStatus: 'Fully Paid', amountPaid: 1380, remainingBalance: 0,
+    paymentHistory: [{ id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1380, status: 'Full Payment' }]
   },
   { 
     id: 'INV-2024-002', customerId: 'CUST002', customerName: 'Beta Innovations',
     issueDate: '2024-07-05', dueDate: '2024-08-04', 
     items: [{ id: 'item1', description: 'Cloud Consulting', quantity: 10, unitPrice: 300, total: 3000 }],
     subtotal: 3000, taxAmount: 300, vatAmount: 150, totalAmount: 3450, status: 'Sent',
-    paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2450
+    paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2450,
+    paymentHistory: [{ id: 'PAY-HIST-002', paymentDate: '2024-07-20T14:30:00Z', amount: 1000, status: 'Partial Payment' }]
   },
   { 
     id: 'INV-2024-003', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-06-10', dueDate: '2024-07-10', 
     items: [{ id: 'item1', description: 'Graphic Design', quantity: 5, unitPrice: 150, total: 750 }],
     subtotal: 750, taxAmount: 75, vatAmount: 37.5, totalAmount: 862.5, status: 'Overdue',
-    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 862.5
+    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 862.5,
+    paymentHistory: []
   },
    { 
     id: 'INV-2024-004', customerId: 'CUST003', customerName: 'Gamma Services',
     issueDate: '2024-07-15', dueDate: '2024-08-15', 
     items: [{ id: 'item1', description: 'SEO Optimization', quantity: 1, unitPrice: 500, total: 500 }],
     subtotal: 500, taxAmount: 50, vatAmount: 25, totalAmount: 575, status: 'Draft',
-    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 575
+    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 575,
+    paymentHistory: []
   },
 ];
 

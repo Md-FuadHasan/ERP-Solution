@@ -11,10 +11,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, PlusCircle, Trash2, DollarSign } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES } from '@/types';
 import type React from 'react';
 import { useEffect } from 'react';
@@ -34,6 +34,7 @@ export const invoiceFormSchema = z.object({
   status: z.enum(ALL_INVOICE_STATUSES),
   paymentProcessingStatus: z.enum(ALL_PAYMENT_PROCESSING_STATUSES),
   partialAmountPaid: z.coerce.number().positive("Amount must be positive if provided.").optional(),
+  // paymentHistory is not part of the form schema itself, it's managed by the page
 }).superRefine((data, ctx) => {
   if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
     ctx.addIssue({
@@ -87,8 +88,10 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
 
   // Calculate totals for display
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice || 0), 0);
-  const taxRate = 0.10; // 10%, ideally from company settings
-  const vatRate = 0.05; // 5%, ideally from company settings
+  // Ideally these rates come from company profile in props or context
+  const taxRate = initialData?.taxAmount && subtotal > 0 ? initialData.taxAmount / subtotal : ( MOCK_COMPANY_PROFILE.taxRate ? Number(MOCK_COMPANY_PROFILE.taxRate)/100 : 0.10);
+  const vatRate = initialData?.vatAmount && subtotal > 0 ? initialData.vatAmount / subtotal : ( MOCK_COMPANY_PROFILE.vatRate ? Number(MOCK_COMPANY_PROFILE.vatRate)/100 : 0.05);
+
   const taxAmount = subtotal * taxRate;
   const vatAmount = subtotal * vatRate;
   const totalAmount = subtotal + taxAmount + vatAmount;
@@ -103,9 +106,9 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
 
   useEffect(() => {
     if (watchedPaymentProcessingStatus === 'Fully Paid') {
-      form.setValue('partialAmountPaid', undefined); // Clear partial amount if fully paid
+      form.setValue('partialAmountPaid', undefined); 
     } else if (watchedPaymentProcessingStatus === 'Unpaid') {
-      form.setValue('partialAmountPaid', undefined); // Clear partial amount if unpaid
+      form.setValue('partialAmountPaid', undefined); 
     }
   }, [watchedPaymentProcessingStatus, form]);
 
@@ -121,7 +124,7 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
               <FormItem>
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. INV-2024-001" {...field} />
+                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -225,7 +228,7 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {ALL_INVOICE_STATUSES.filter(s => s !== 'Paid').map((status) => ( // User cannot manually set to 'Paid' here
+                    {ALL_INVOICE_STATUSES.filter(s => s !== 'Paid').map((status) => ( 
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
@@ -370,13 +373,42 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
           <hr className="my-2 border-border" />
            <div className="flex justify-between text-md">
             <span>Amount Paid:</span>
-            <span className={displayAmountPaid > 0 ? "text-green-600" : ""}>${displayAmountPaid.toFixed(2)}</span>
+            <span className={displayAmountPaid > 0 ? "text-green-600 dark:text-green-400" : ""}>${displayAmountPaid.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-md font-semibold text-primary">
             <span>Remaining Balance:</span>
             <span>${displayRemainingBalance.toFixed(2)}</span>
           </div>
         </div>
+
+        {initialData?.paymentHistory && initialData.paymentHistory.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-primary"/>
+                <h4 className="text-md font-semibold text-foreground">Payment History</h4>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <ul className="space-y-3">
+                {initialData.paymentHistory.map((record) => (
+                  <li key={record.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm border-b border-border/50 pb-3 last:border-b-0 last:pb-0">
+                    <div>
+                      <p className="font-medium text-card-foreground">
+                        {record.status}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(record.paymentDate), "MMM dd, yyyy 'at' hh:mm a")}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-primary mt-1 sm:mt-0">
+                      ${record.amount.toFixed(2)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>

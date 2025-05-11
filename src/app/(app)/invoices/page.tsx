@@ -23,8 +23,8 @@ import {
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Invoice, Customer } from '@/types';
-import { MOCK_INVOICES, MOCK_CUSTOMERS, MOCK_COMPANY_PROFILE } from '@/types'; // Using mock data
+import type { Invoice, Customer, PaymentRecord } from '@/types';
+import { MOCK_INVOICES, MOCK_CUSTOMERS, MOCK_COMPANY_PROFILE } from '@/types'; 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -63,11 +63,6 @@ export default function InvoicesPage() {
     setEditingInvoice(null);
     setIsModalOpen(true);
   };
-
-  const handleEditInvoice = (invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    setIsModalOpen(true);
-  };
   
   const handleViewInvoice = (invoice: Invoice) => {
     setEditingInvoice(invoice);
@@ -92,7 +87,7 @@ export default function InvoicesPage() {
 
     const processedItems = data.items.map((item, index) => ({
       ...item,
-      id: editingInvoice?.items[index]?.id || `item-${Date.now()}-${index}`,
+      id: editingInvoice?.items[index]?.id || `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2,5)}`,
       total: item.quantity * item.unitPrice,
     }));
 
@@ -113,23 +108,40 @@ export default function InvoicesPage() {
           description: `Partial payment amount must be greater than $0 and less than total amount $${totalAmount.toFixed(2)}.`,
           variant: "destructive",
         });
-        return; // Abort submission
+        return; 
       }
     }
 
     const calculatedRemainingBalance = totalAmount - calculatedAmountPaid;
     
     let finalStatus = data.status;
-    if (calculatedRemainingBalance <= 0 && totalAmount > 0) { // Ensure it's not a $0 invoice marked as paid
+    if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
       finalStatus = 'Paid';
     } else if (data.status === 'Paid' && calculatedRemainingBalance > 0) {
-      // If user somehow selected 'Paid' but it's not fully paid, revert to 'Sent' or 'Draft'
       finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Sent'; 
     }
 
+    let updatedPaymentHistory: PaymentRecord[] = editingInvoice?.paymentHistory ? [...editingInvoice.paymentHistory] : [];
+    const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
+    const paymentAmountForThisRecord = calculatedAmountPaid - previousTotalAmountPaid;
+
+    if (paymentAmountForThisRecord > 0) {
+        const paymentRecordStatus: PaymentRecord['status'] = 
+            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid)
+            ? 'Full Payment' 
+            : 'Partial Payment';
+
+        const newPaymentRecord: PaymentRecord = {
+            id: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            paymentDate: new Date().toISOString(),
+            amount: paymentAmountForThisRecord,
+            status: paymentRecordStatus,
+        };
+        updatedPaymentHistory.push(newPaymentRecord);
+    }
 
     const invoiceData: Invoice = {
-      id: data.id,
+      id: data.id, // ID comes from form (pre-filled or from initialData)
       customerId: data.customerId,
       customerName,
       items: processedItems,
@@ -143,12 +155,13 @@ export default function InvoicesPage() {
       paymentProcessingStatus: data.paymentProcessingStatus,
       amountPaid: calculatedAmountPaid,
       remainingBalance: calculatedRemainingBalance,
+      paymentHistory: updatedPaymentHistory,
     };
 
     if (editingInvoice) {
       setInvoices(
         invoices.map((inv) =>
-          inv.id === editingInvoice.id ? { ...invoiceData, id: editingInvoice.id } : inv
+          inv.id === editingInvoice.id ? invoiceData : inv
         )
       );
       toast({ title: "Invoice Updated", description: `Invoice ${invoiceData.id} details have been updated.` });
@@ -283,7 +296,8 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
       
-      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
+      {/* This AlertDialog is now separate and triggered by setting invoiceToDelete */}
+      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => { if (!isOpen) setInvoiceToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -303,4 +317,3 @@ export default function InvoicesPage() {
     </>
   );
 }
-
