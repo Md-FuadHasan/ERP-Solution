@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Changed from GeistSans to Inter
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { DataProvider } from '@/context/DataContext'; // Added DataProvider import
 
-const inter = Inter({ // Changed from geistSans to inter
-  variable: '--font-inter', // Changed variable name
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
 });
 
@@ -21,10 +22,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}> {/* Updated font variable */}
-        <SidebarProvider defaultOpen={true}>
-          {children}
-        </SidebarProvider>
+      <body className={`${inter.variable} antialiased`}>
+        <DataProvider> {/* Added DataProvider */}
+          <SidebarProvider defaultOpen={true}>
+            {children}
+          </SidebarProvider>
+        </DataProvider> {/* Closed DataProvider */}
         <Toaster />
       </body>
     </html>

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -22,8 +21,7 @@ import {
 import { CustomerForm } from '@/components/forms/customer-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Customer, Invoice } from '@/types'; // Added Invoice
-import { MOCK_CUSTOMERS, MOCK_INVOICES } from '@/types'; // Added MOCK_INVOICES
+import type { Customer, Invoice } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -40,9 +38,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
+import { useData } from '@/context/DataContext'; // Import useData hook
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const { 
+    customers, 
+    addCustomer, 
+    updateCustomer, 
+    deleteCustomer, 
+    isLoading, 
+    getInvoicesByCustomerId 
+  } = useData(); // Use DataContext
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -65,14 +73,14 @@ export default function CustomersPage() {
 
   const customerInvoices = useMemo(() => {
     if (!selectedCustomerForDetails) return [];
-    return MOCK_INVOICES.filter(inv => inv.customerId === selectedCustomerForDetails.id);
-  }, [selectedCustomerForDetails]);
+    return getInvoicesByCustomerId(selectedCustomerForDetails.id);
+  }, [selectedCustomerForDetails, getInvoicesByCustomerId]);
 
   const customerAggregates = useMemo(() => {
     if (!selectedCustomerForDetails) {
       return { totalInvoices: 0, totalPurchased: 0, totalPaid: 0, remainingBalance: 0 };
     }
-    const invoices = MOCK_INVOICES.filter(inv => inv.customerId === selectedCustomerForDetails.id);
+    const invoices = getInvoicesByCustomerId(selectedCustomerForDetails.id);
     if (invoices.length === 0) {
          return { totalInvoices: 0, totalPurchased: 0, totalPaid: 0, remainingBalance: 0 };
     }
@@ -85,7 +93,7 @@ export default function CustomersPage() {
       totalPaid,
       remainingBalance
     };
-  }, [selectedCustomerForDetails]);
+  }, [selectedCustomerForDetails, getInvoicesByCustomerId]);
 
 
   const handleAddCustomer = () => {
@@ -98,13 +106,13 @@ export default function CustomersPage() {
     setIsFormModalOpen(true);
   };
 
-  const handleDeleteCustomer = (customer: Customer) => {
+  const handleDeleteCustomerTrigger = (customer: Customer) => {
     setCustomerToDelete(customer);
   };
 
   const confirmDelete = () => {
     if (customerToDelete) {
-      setCustomers(customers.filter((c) => c.id !== customerToDelete.id));
+      deleteCustomer(customerToDelete.id); // Use context action
       toast({ title: "Customer Deleted", description: `${customerToDelete.name} has been removed.` });
       setCustomerToDelete(null);
     }
@@ -117,18 +125,13 @@ export default function CustomersPage() {
 
   const closeCustomerDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    // setTimeout to allow animation to finish before clearing data, prevents visual glitch
     setTimeout(() => setSelectedCustomerForDetails(null), 300);
   };
 
 
   const handleSubmit = (data: Omit<Customer, 'id' | 'createdAt'>) => {
     if (editingCustomer) {
-      setCustomers(
-        customers.map((c) =>
-          c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c
-        )
-      );
+      updateCustomer({ ...editingCustomer, ...data }); // Use context action
       toast({ title: "Customer Updated", description: `${data.name} details have been updated.` });
     } else {
       const newCustomer: Customer = {
@@ -136,12 +139,42 @@ export default function CustomersPage() {
         id: `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*100))}`,
         createdAt: new Date().toISOString(),
       };
-      setCustomers([newCustomer, ...customers]);
+      addCustomer(newCustomer); // Use context action
       toast({ title: "Customer Added", description: `${data.name} has been successfully added.` });
     }
     setIsFormModalOpen(false);
     setEditingCustomer(null);
   };
+
+  if (isLoading) {
+     return (
+      <>
+        <PageHeader
+          title="Customers"
+          description="Manage your customer profiles and contact information."
+          actions={
+            <Button onClick={handleAddCustomer} disabled>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
+            </Button>
+          }
+        />
+        <div className="mb-6">
+          <Skeleton className="h-10 w-full md:w-80" />
+        </div>
+        <div className="rounded-lg border shadow-sm bg-card p-4">
+          <Skeleton className="h-8 w-1/4 mb-4" />
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -192,7 +225,7 @@ export default function CustomersPage() {
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteCustomer(customer);}} className="hover:text-destructive">
+                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerTrigger(customer);}} className="hover:text-destructive">
                            <Trash2 className="h-4 w-4" />
                          </Button>
                       </AlertDialogTrigger>
@@ -249,7 +282,6 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Customer Details Modal */}
       <Dialog open={isDetailsModalOpen} onOpenChange={closeCustomerDetailsModal}>
         <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
@@ -346,7 +378,6 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog (already existed) */}
       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

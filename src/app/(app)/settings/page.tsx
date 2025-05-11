@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type React from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +18,7 @@ import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { CompanyProfile, Manager } from '@/types';
-import { MOCK_COMPANY_PROFILE, MOCK_MANAGERS } from '@/types'; // Using mock data
+import { MOCK_MANAGERS } from '@/types'; // Managers are still local for now
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -31,32 +31,61 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
+import { useData } from '@/context/DataContext'; // Import useData hook
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Database } from 'lucide-react';
 
 export default function SettingsPage() {
-  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(MOCK_COMPANY_PROFILE);
-  const [managers, setManagers] = useState<Manager[]>(MOCK_MANAGERS);
+  const { companyProfile, updateCompanyProfile, isLoading: isDataLoading } = useData();
+  
+  // Managers state remains local to this page for now, as it's not part of DataContext yet.
+  // If managers needed global state, they'd be added to DataContext.
+  const [managers, setManagers] = useState<Manager[]>([]); 
   const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
-  // Simple form state for adding/editing manager
   const [managerName, setManagerName] = useState('');
   const [managerEmail, setManagerEmail] = useState('');
   const [managerRole, setManagerRole] = useState('');
+  const [localLoading, setLocalLoading] = useState(true);
+
 
   const { toast } = useToast();
+  
+  // Initialize managers from localStorage or mock if not in DataContext
+  useEffect(() => {
+    try {
+      const storedManagers = localStorage.getItem('invoiceflow_managers');
+      if (storedManagers) {
+        setManagers(JSON.parse(storedManagers));
+      } else {
+        setManagers(MOCK_MANAGERS);
+      }
+    } catch (error) {
+      console.error("Failed to load managers from localStorage", error);
+      setManagers(MOCK_MANAGERS);
+    } finally {
+      setLocalLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!localLoading) {
+        localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
+    }
+  }, [managers, localLoading]);
+
 
   const handleCompanyDetailsSubmit = (data: CompanyDetailsFormValues) => {
-    setCompanyProfile(prev => ({ ...prev, ...data }));
+    updateCompanyProfile(data); // Use context action
     toast({ title: "Company Details Updated", description: "Your company information has been saved." });
   };
 
   const handleTaxSettingsSubmit = (data: TaxSettingsFormValues) => {
-    setCompanyProfile(prev => ({ 
-      ...prev, 
+    updateCompanyProfile({ 
       taxRate: data.taxRate, 
       vatRate: data.vatRate,
       excessTaxRate: data.excessTaxRate 
-    }));
+    }); // Use context action
     toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
   };
 
@@ -77,7 +106,6 @@ export default function SettingsPage() {
   };
 
   const handleDeleteManager = (managerId: string) => {
-    // Add confirmation dialog here in real app
     setManagers(managers.filter(m => m.id !== managerId));
     toast({ title: "Manager Removed", description: "The manager has been removed from the system."});
   };
@@ -100,6 +128,23 @@ export default function SettingsPage() {
     setIsUserManagerModalOpen(false);
   };
 
+  if (isDataLoading || localLoading) {
+    return (
+      <>
+        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
+        <Tabs defaultValue="company" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
+            {SETTINGS_TABS.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2" disabled>
+                <tab.icon className="h-4 w-4" /> {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+        </Tabs>
+      </>
+    )
+  }
 
   return (
     <>
@@ -199,27 +244,25 @@ export default function SettingsPage() {
               <CardDescription>Settings for connecting to local storage or SQL database systems.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3 rounded-md border border-yellow-400 bg-yellow-50 p-4 text-yellow-700">
-                <AlertTriangle className="h-6 w-6 text-yellow-500" />
+              <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300">
+                 <Database className="h-6 w-6 text-green-500 dark:text-green-400" />
                 <div>
-                  <p className="font-medium">Advanced Feature Placeholder</p>
+                  <p className="font-medium">Using Local Storage</p>
                   <p className="text-sm">
-                    Connecting to a local SQL database system is an advanced configuration. 
-                    This section will provide options to set up database connection strings and synchronization preferences in a future update.
+                    Currently, all application data (invoices, customers, settings) is being stored in your browser's local storage.
+                    Changes are persisted across sessions on this device.
                   </p>
                 </div>
               </div>
               <p className="text-muted-foreground">
-                Currently, all data is managed within the application's session or mock storage for demonstration purposes.
-                Future versions will allow connecting to persistent storage solutions like PostgreSQL, MySQL, or SQL Server.
+                Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.
               </p>
-               <Button disabled>Configure Database Connection (Coming Soon)</Button>
+               <Button disabled>Configure Cloud Database (Coming Soon)</Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Manager Add/Edit Dialog */}
       <Dialog open={isUserManagerModalOpen} onOpenChange={setIsUserManagerModalOpen}>
         <DialogContent>
           <DialogHeader>

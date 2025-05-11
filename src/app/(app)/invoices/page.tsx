@@ -1,6 +1,5 @@
-
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +23,6 @@ import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { Invoice, Customer, PaymentRecord } from '@/types';
-import { MOCK_INVOICES, MOCK_CUSTOMERS, MOCK_COMPANY_PROFILE } from '@/types'; 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -38,11 +36,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { getStatusBadgeVariant } from '@/lib/invoiceUtils'; // Import the utility function
+import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
+import { useData } from '@/context/DataContext'; // Import useData hook
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES);
-  const [customers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const { 
+    invoices, 
+    customers, 
+    companyProfile, 
+    addInvoice, 
+    updateInvoice, 
+    deleteInvoice, 
+    isLoading 
+  } = useData(); // Use DataContext
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -76,15 +84,15 @@ export default function InvoicesPage() {
 
   const confirmDelete = () => {
     if (invoiceToDelete) {
-      setInvoices(invoices.filter((inv) => inv.id !== invoiceToDelete.id));
+      deleteInvoice(invoiceToDelete.id); // Use context action
       toast({ title: "Invoice Deleted", description: `Invoice ${invoiceToDelete.id} has been removed.` });
       setInvoiceToDelete(null);
     }
   };
 
   const handleSubmit = (data: InvoiceFormValues) => {
-    const companyTaxRate = MOCK_COMPANY_PROFILE.taxRate ? Number(MOCK_COMPANY_PROFILE.taxRate) / 100 : 0.10;
-    const companyVatRate = MOCK_COMPANY_PROFILE.vatRate ? Number(MOCK_COMPANY_PROFILE.vatRate) / 100 : 0.05;
+    const companyTaxRate = companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0.10;
+    const companyVatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.05;
 
     const processedItems = data.items.map((item, index) => ({
       ...item,
@@ -160,20 +168,45 @@ export default function InvoicesPage() {
     };
 
     if (editingInvoice) {
-      setInvoices(
-        invoices.map((inv) =>
-          inv.id === editingInvoice.id ? invoiceData : inv
-        )
-      );
+      updateInvoice(invoiceData); // Use context action
       toast({ title: "Invoice Updated", description: `Invoice ${invoiceData.id} details have been updated.` });
     } else {
-      setInvoices([invoiceData, ...invoices]);
+      addInvoice(invoiceData); // Use context action
       toast({ title: "Invoice Created", description: `Invoice ${invoiceData.id} has been successfully created.` });
     }
     setIsModalOpen(false);
     setEditingInvoice(null);
   };
   
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader
+          title="Invoices"
+          description="Create, track, and manage your invoices."
+          actions={
+            <Button onClick={handleAddInvoice} disabled>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
+            </Button>
+          }
+        />
+        <div className="mb-6">
+          <Skeleton className="h-10 w-full md:w-80" />
+        </div>
+        <div className="rounded-lg border shadow-sm bg-card p-4">
+          <Skeleton className="h-8 w-1/4 mb-4" />
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 flex-1" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -214,7 +247,7 @@ export default function InvoicesPage() {
               {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.id}</TableCell>
-                  <TableCell>{invoice.customerName || invoice.customerId}</TableCell>
+                  <TableCell>{invoice.customerName || customers.find(c=>c.id === invoice.customerId)?.name || invoice.customerId}</TableCell>
                   <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
@@ -229,9 +262,8 @@ export default function InvoicesPage() {
                     </Button>
                      <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        {/* AlertDialogTrigger needs to wrap a single child, ensure Button is direct child */}
                         <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
-                            e.stopPropagation(); // Prevents row click if any
+                            e.stopPropagation(); 
                             handleDeleteInvoice(invoice);
                           }}>
                           <Trash2 className="h-4 w-4" />
@@ -285,6 +317,7 @@ export default function InvoicesPage() {
           <InvoiceForm
             initialData={editingInvoice}
             customers={customers}
+            companyProfile={companyProfile}
             onSubmit={handleSubmit}
             onCancel={() => { setIsModalOpen(false); setEditingInvoice(null); }}
           />

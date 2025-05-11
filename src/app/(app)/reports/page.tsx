@@ -5,34 +5,43 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { summarizeInvoiceData, type SummarizeInvoiceDataInput, type SummarizeInvoiceDataOutput } from '@/ai/flows/summarize-invoice-data';
-import { MOCK_INVOICES } from '@/types'; // Using mock invoices for summary
 import { Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useData } from '@/context/DataContext'; // Import useData hook
 
 export default function ReportsPage() {
+  const { invoices, isLoading: isDataLoading } = useData(); // Use DataContext
   const [summary, setSummary] = useState<SummarizeInvoiceDataOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
   const handleGenerateReport = async () => {
-    setIsLoading(true);
+    if (isDataLoading || invoices.length === 0) {
+      toast({
+        title: "No Data",
+        description: "Please wait for data to load or add some invoices first.",
+        variant: "default",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
     setSummary(null);
 
-    // Prepare sample data for the AI flow.
-    // In a real app, you'd fetch relevant data or allow user selection.
-    const sampleInvoiceDataForAI = MOCK_INVOICES.map(inv => ({
+    const sampleInvoiceDataForAI = invoices.map(inv => ({
         invoiceId: inv.id,
         customerName: inv.customerName,
         issueDate: inv.issueDate,
         dueDate: inv.dueDate,
         totalAmount: inv.totalAmount,
         status: inv.status,
-        // Add paymentDate if available from a more detailed mock or real data
+        amountPaid: inv.amountPaid,
+        remainingBalance: inv.remainingBalance,
     }));
 
     const input: SummarizeInvoiceDataInput = {
-      invoiceData: JSON.stringify(sampleInvoiceDataForAI, null, 2), // Pretty print JSON for readability if needed by model
+      invoiceData: JSON.stringify(sampleInvoiceDataForAI, null, 2),
     };
 
     try {
@@ -50,7 +59,7 @@ export default function ReportsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -70,11 +79,16 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleGenerateReport} disabled={isLoading}>
-              {isLoading ? (
+            <Button onClick={handleGenerateReport} disabled={isGenerating || isDataLoading}>
+              {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating...
+                </>
+              ) : isDataLoading ? (
+                 <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading Data...
                 </>
               ) : (
                 <>
@@ -86,7 +100,7 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {isLoading && (
+        {(isGenerating || (isDataLoading && !summary)) && ( // Show skeleton if generating or initial data load
           <Card>
             <CardHeader>
               <CardTitle>Generated Report</CardTitle>
@@ -100,7 +114,7 @@ export default function ReportsPage() {
           </Card>
         )}
 
-        {summary && !isLoading && (
+        {summary && !isGenerating && !isDataLoading && (
           <Card>
             <CardHeader>
               <CardTitle>Generated Report</CardTitle>
@@ -113,6 +127,17 @@ export default function ReportsPage() {
                 className="min-h-[200px] text-sm leading-relaxed bg-muted/30"
                 rows={15}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {!isGenerating && !summary && !isDataLoading && invoices.length === 0 && (
+           <Card>
+            <CardHeader>
+              <CardTitle>No Data for Report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>There are no invoices to generate a report from. Please add some invoices first.</p>
             </CardContent>
           </Card>
         )}

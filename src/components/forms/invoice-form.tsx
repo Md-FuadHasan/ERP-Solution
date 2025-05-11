@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,8 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord } from '@/types';
-import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, MOCK_COMPANY_PROFILE } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile } from '@/types';
+import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES } from '@/types';
 import type React from 'react';
 import { useEffect } from 'react';
 
@@ -34,7 +33,6 @@ export const invoiceFormSchema = z.object({
   status: z.enum(ALL_INVOICE_STATUSES),
   paymentProcessingStatus: z.enum(ALL_PAYMENT_PROCESSING_STATUSES),
   partialAmountPaid: z.coerce.number().positive("Amount must be positive if provided.").optional(),
-  // paymentHistory is not part of the form schema itself, it's managed by the page
 }).superRefine((data, ctx) => {
   if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
     ctx.addIssue({
@@ -50,12 +48,13 @@ export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
+  companyProfile: CompanyProfile; // Added companyProfile prop
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
+export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: initialData ? {
@@ -86,11 +85,14 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
   const watchedPaymentProcessingStatus = form.watch("paymentProcessingStatus");
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
 
-  // Calculate totals for display
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice || 0), 0);
-  // Ideally these rates come from company profile in props or context
-  const taxRate = initialData?.taxAmount && subtotal > 0 ? initialData.taxAmount / subtotal : ( MOCK_COMPANY_PROFILE.taxRate ? Number(MOCK_COMPANY_PROFILE.taxRate)/100 : 0.10);
-  const vatRate = initialData?.vatAmount && subtotal > 0 ? initialData.vatAmount / subtotal : ( MOCK_COMPANY_PROFILE.vatRate ? Number(MOCK_COMPANY_PROFILE.vatRate)/100 : 0.05);
+  
+  const taxRate = initialData?.taxAmount && subtotal > 0 
+    ? initialData.taxAmount / subtotal 
+    : (companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10);
+  const vatRate = initialData?.vatAmount && subtotal > 0 
+    ? initialData.vatAmount / subtotal 
+    : (companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05);
 
   const taxAmount = subtotal * taxRate;
   const vatAmount = subtotal * vatRate;
@@ -422,4 +424,3 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
     </Form>
   );
 }
-
