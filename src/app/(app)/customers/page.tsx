@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -22,8 +22,8 @@ import {
 import { CustomerForm } from '@/components/forms/customer-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Customer } from '@/types';
-import { MOCK_CUSTOMERS } from '@/types'; // Using mock data
+import type { Customer, Invoice } from '@/types'; // Added Invoice
+import { MOCK_CUSTOMERS, MOCK_INVOICES } from '@/types'; // Added MOCK_INVOICES
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -34,14 +34,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+
+  const [selectedCustomerForDetails, setSelectedCustomerForDetails] = useState<Customer | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -55,14 +63,39 @@ export default function CustomersPage() {
     );
   }, [customers, searchTerm]);
 
+  const customerInvoices = useMemo(() => {
+    if (!selectedCustomerForDetails) return [];
+    return MOCK_INVOICES.filter(inv => inv.customerId === selectedCustomerForDetails.id);
+  }, [selectedCustomerForDetails]);
+
+  const customerAggregates = useMemo(() => {
+    if (!selectedCustomerForDetails) {
+      return { totalInvoices: 0, totalPurchased: 0, totalPaid: 0, remainingBalance: 0 };
+    }
+    const invoices = MOCK_INVOICES.filter(inv => inv.customerId === selectedCustomerForDetails.id);
+    if (invoices.length === 0) {
+         return { totalInvoices: 0, totalPurchased: 0, totalPaid: 0, remainingBalance: 0 };
+    }
+    const totalPurchased = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+    const remainingBalance = invoices.reduce((sum, inv) => sum + inv.remainingBalance, 0);
+    return {
+      totalInvoices: invoices.length,
+      totalPurchased,
+      totalPaid,
+      remainingBalance
+    };
+  }, [selectedCustomerForDetails]);
+
+
   const handleAddCustomer = () => {
     setEditingCustomer(null);
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
   const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
   const handleDeleteCustomer = (customer: Customer) => {
@@ -76,6 +109,18 @@ export default function CustomersPage() {
       setCustomerToDelete(null);
     }
   };
+
+  const handleViewCustomerDetails = (customer: Customer) => {
+    setSelectedCustomerForDetails(customer);
+    setIsDetailsModalOpen(true);
+  };
+
+  const closeCustomerDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    // setTimeout to allow animation to finish before clearing data, prevents visual glitch
+    setTimeout(() => setSelectedCustomerForDetails(null), 300);
+  };
+
 
   const handleSubmit = (data: Omit<Customer, 'id' | 'createdAt'>) => {
     if (editingCustomer) {
@@ -94,7 +139,7 @@ export default function CustomersPage() {
       setCustomers([newCustomer, ...customers]);
       toast({ title: "Customer Added", description: `${data.name} has been successfully added.` });
     }
-    setIsModalOpen(false);
+    setIsFormModalOpen(false);
     setEditingCustomer(null);
   };
 
@@ -133,16 +178,40 @@ export default function CustomersPage() {
               {filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell className="font-medium">{customer.id}</TableCell>
-                  <TableCell>{customer.name}</TableCell>
+                  <TableCell 
+                    className="cursor-pointer hover:text-primary hover:underline"
+                    onClick={() => handleViewCustomerDetails(customer)}
+                  >
+                    {customer.name}
+                  </TableCell>
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer)} className="hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteCustomer(customer);}} className="hover:text-destructive">
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the customer
+                            "{customerToDelete?.name}" and all associated data.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
@@ -161,8 +230,8 @@ export default function CustomersPage() {
         />
       )}
 
-      <Dialog open={isModalOpen} onOpenChange={(isOpen) => {
-          setIsModalOpen(isOpen);
+      <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
+          setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingCustomer(null);
       }}>
         <DialogContent className="sm:max-w-2xl">
@@ -175,11 +244,109 @@ export default function CustomersPage() {
           <CustomerForm
             initialData={editingCustomer}
             onSubmit={handleSubmit}
-            onCancel={() => { setIsModalOpen(false); setEditingCustomer(null); }}
+            onCancel={() => { setIsFormModalOpen(false); setEditingCustomer(null); }}
           />
         </DialogContent>
       </Dialog>
 
+      {/* Customer Details Modal */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={closeCustomerDetailsModal}>
+        <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Customer Profile: {selectedCustomerForDetails?.name}</DialogTitle>
+            <DialogDescription>
+              Financial overview and invoice history for {selectedCustomerForDetails?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCustomerForDetails && (
+            <div className="space-y-6 flex-grow overflow-y-auto pr-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+                    <ReceiptText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{customerAggregates.totalInvoices}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Purchased</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${customerAggregates.totalPurchased.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+                    <Coins className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${customerAggregates.totalPaid.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Balance Due</CardTitle>
+                    <Scale className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${customerAggregates.remainingBalance > 0 ? 'text-destructive' : ''}`}>
+                      ${customerAggregates.remainingBalance.toFixed(2)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-semibold mb-2 text-foreground">Invoice History</h4>
+                {customerInvoices.length > 0 ? (
+                  <div className="rounded-md border bg-card">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice ID</TableHead>
+                          <TableHead>Issue Date</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {customerInvoices.map((invoice) => (
+                          <TableRow key={invoice.id}>
+                            <TableCell className="font-medium">{invoice.id}</TableCell>
+                            <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
+                            <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                            <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <DataPlaceholder
+                    title="No Invoices Found"
+                    message={`${selectedCustomerForDetails.name} does not have any invoices yet.`}
+                    icon={ReceiptText}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+           <div className="mt-auto pt-4 flex justify-end">
+                <Button variant="outline" onClick={closeCustomerDetailsModal}>Close</Button>
+            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog (already existed) */}
       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

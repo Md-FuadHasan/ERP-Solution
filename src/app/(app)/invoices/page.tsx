@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { getStatusBadgeVariant } from '@/lib/invoiceUtils'; // Import the utility function
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES);
@@ -141,7 +142,7 @@ export default function InvoicesPage() {
     }
 
     const invoiceData: Invoice = {
-      id: data.id, // ID comes from form (pre-filled or from initialData)
+      id: data.id, 
       customerId: data.customerId,
       customerName,
       items: processedItems,
@@ -173,16 +174,6 @@ export default function InvoicesPage() {
     setEditingInvoice(null);
   };
   
-  const getStatusBadgeVariant = (status: Invoice['status']): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'Paid': return 'default';
-      case 'Sent': return 'secondary';
-      case 'Overdue': return 'destructive';
-      case 'Draft': return 'outline';
-      case 'Cancelled': return 'outline';
-      default: return 'outline';
-    }
-  };
 
   return (
     <>
@@ -238,7 +229,11 @@ export default function InvoicesPage() {
                     </Button>
                      <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={() => handleDeleteInvoice(invoice)}>
+                        {/* AlertDialogTrigger needs to wrap a single child, ensure Button is direct child */}
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
+                            e.stopPropagation(); // Prevents row click if any
+                            handleDeleteInvoice(invoice);
+                          }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -296,7 +291,6 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
       
-      {/* This AlertDialog is now separate and triggered by setting invoiceToDelete */}
       <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => { if (!isOpen) setInvoiceToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
