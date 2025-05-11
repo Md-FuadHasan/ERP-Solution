@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -35,7 +36,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export default function InvoicesPage() {
@@ -196,11 +196,9 @@ export default function InvoicesPage() {
                       <Eye className="h-4 w-4" />
                     </Button>
                     {/* User req: managers cannot delete invoices. This button should be hidden based on role */}
-                    <AlertDialogTrigger asChild>
-                       <Button variant="ghost" size="icon" onClick={() => handleDeleteInvoice(invoice)} className="hover:text-destructive" title="Delete Invoice">
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                    </AlertDialogTrigger>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteInvoice(invoice)} className="hover:text-destructive" title="Delete Invoice">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

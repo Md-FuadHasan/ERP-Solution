@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -33,7 +34,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 export default function CustomersPage() {
@@ -140,11 +140,9 @@ export default function CustomersPage() {
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <AlertDialogTrigger asChild>
-                       <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer)} className="hover:text-destructive">
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                    </AlertDialogTrigger>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCustomer(customer)} className="hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
