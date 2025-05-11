@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,9 +14,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { CalendarIcon, PlusCircle, Trash2, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus } from '@/types';
-import { ALL_INVOICE_STATUSES } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus } from '@/types';
+import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES } from '@/types';
 import type React from 'react';
+import { useEffect } from 'react';
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required.").max(200),
@@ -30,7 +32,16 @@ export const invoiceFormSchema = z.object({
   dueDate: z.date({ required_error: "Due date is required." }),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required."),
   status: z.enum(ALL_INVOICE_STATUSES),
-  // Subtotal, tax, total will be calculated
+  paymentProcessingStatus: z.enum(ALL_PAYMENT_PROCESSING_STATUSES),
+  partialAmountPaid: z.coerce.number().positive("Amount must be positive if provided.").optional(),
+}).superRefine((data, ctx) => {
+  if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Partial payment amount is required and must be positive.",
+      path: ["partialAmountPaid"],
+    });
+  }
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -50,14 +61,18 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
       ...initialData,
       issueDate: new Date(initialData.issueDate),
       dueDate: new Date(initialData.dueDate),
-      items: initialData.items.map(item => ({...item})), // Ensure items are new objects
+      items: initialData.items.map(item => ({...item})),
+      paymentProcessingStatus: initialData.paymentProcessingStatus || 'Unpaid',
+      partialAmountPaid: initialData.paymentProcessingStatus === 'Partially Paid' ? initialData.amountPaid : undefined,
     } : {
-      id: `INV-${String(Date.now()).slice(-6)}`, // Default generated ID
+      id: `INV-${String(Date.now()).slice(-6)}`,
       customerId: '',
       issueDate: new Date(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)), // Default due date 30 days from now
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
       items: [{ description: '', quantity: 1, unitPrice: 0 }],
       status: 'Draft',
+      paymentProcessingStatus: 'Unpaid',
+      partialAmountPaid: undefined,
     },
   });
 
@@ -67,15 +82,32 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
   });
   
   const watchedItems = form.watch("items");
+  const watchedPaymentProcessingStatus = form.watch("paymentProcessingStatus");
+  const watchedPartialAmountPaid = form.watch("partialAmountPaid");
 
-  // Calculate totals (example, real app might use backend or more robust client logic)
+  // Calculate totals for display
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice || 0), 0);
-  // These would come from company settings in a real app
-  const taxRate = 0.10; // 10%
-  const vatRate = 0.05; // 5%
+  const taxRate = 0.10; // 10%, ideally from company settings
+  const vatRate = 0.05; // 5%, ideally from company settings
   const taxAmount = subtotal * taxRate;
   const vatAmount = subtotal * vatRate;
   const totalAmount = subtotal + taxAmount + vatAmount;
+
+  let displayAmountPaid = 0;
+  if (watchedPaymentProcessingStatus === 'Fully Paid') {
+    displayAmountPaid = totalAmount;
+  } else if (watchedPaymentProcessingStatus === 'Partially Paid') {
+    displayAmountPaid = watchedPartialAmountPaid || 0;
+  }
+  const displayRemainingBalance = totalAmount - displayAmountPaid;
+
+  useEffect(() => {
+    if (watchedPaymentProcessingStatus === 'Fully Paid') {
+      form.setValue('partialAmountPaid', undefined); // Clear partial amount if fully paid
+    } else if (watchedPaymentProcessingStatus === 'Unpaid') {
+      form.setValue('partialAmountPaid', undefined); // Clear partial amount if unpaid
+    }
+  }, [watchedPaymentProcessingStatus, form]);
 
 
   return (
@@ -185,7 +217,7 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
             name="status"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Status</FormLabel>
+                <FormLabel>Invoice Status</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -193,13 +225,14 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {ALL_INVOICE_STATUSES.map((status) => (
+                    {ALL_INVOICE_STATUSES.filter(s => s !== 'Paid').map((status) => ( // User cannot manually set to 'Paid' here
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <FormDescription>Set to 'Paid' automatically if fully paid.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -269,6 +302,54 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
           </Button>
         </div>
 
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="paymentProcessingStatus"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Payment Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {ALL_PAYMENT_PROCESSING_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {watchedPaymentProcessingStatus === 'Partially Paid' && (
+            <FormField
+              control={form.control}
+              name="partialAmountPaid"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Partial Amount Paid</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input type="number" placeholder="Enter amount" {...field} step="0.01" className="pl-7" 
+                             value={field.value === undefined ? '' : field.value}
+                             onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
+
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
             <span>Subtotal:</span>
@@ -282,9 +363,18 @@ export function InvoiceForm({ initialData, customers, onSubmit, onCancel, isSubm
             <span>VAT ({ (vatRate * 100).toFixed(0) }%):</span>
             <span>${vatAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-lg font-semibold text-primary">
+          <div className="flex justify-between text-lg font-semibold">
             <span>Total Amount:</span>
             <span>${totalAmount.toFixed(2)}</span>
+          </div>
+          <hr className="my-2 border-border" />
+           <div className="flex justify-between text-md">
+            <span>Amount Paid:</span>
+            <span className={displayAmountPaid > 0 ? "text-green-600" : ""}>${displayAmountPaid.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-md font-semibold text-primary">
+            <span>Remaining Balance:</span>
+            <span>${displayRemainingBalance.toFixed(2)}</span>
           </div>
         </div>
 
