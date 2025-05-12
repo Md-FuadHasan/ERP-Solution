@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -148,20 +147,18 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const prevInitialDataRef = useRef(initialData);
 
   useEffect(() => {
-    const initialDataChangedOrIsNew = prevInitialDataRef.current?.id !== initialData?.id || 
-                                   (prevInitialDataRef.current === null && initialData !== null) ||
-                                   (prevInitialDataRef.current !== null && initialData === null);
+    // Reset the form with new default values derived from initialData
+    const defaultVals = getDefaultFormValues(initialData);
+    form.reset(defaultVals);
 
-    form.reset(getDefaultFormValues(initialData));
-
-    if (initialDataChangedOrIsNew) {
-        setCurrentCustomerSearchInput(""); // Clear search input on context change
-    }
+    // After form reset, synchronize the customer search input text
+    // with the customer name corresponding to defaultVals.customerId
+    const customerForSearchInput = customers.find(c => c.id === defaultVals.customerId);
+    setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
     
-    if (initialDataChangedOrIsNew) {
-      prevInitialDataRef.current = initialData;
-    }
-  }, [initialData, customers, form]); // form.reset was form in original context, fixed to form.reset
+    // Store the current initialData for comparison in the next render
+    prevInitialDataRef.current = initialData;
+  }, [initialData, customers, form]);
 
 
   useEffect(() => {
@@ -282,6 +279,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                               onSelect={() => {
                                 form.setValue("customerId", customer.id, { shouldValidate: true });
                                 setIsCustomerPopoverOpen(false);
+                                setCurrentCustomerSearchInput(customer.name); 
                               }}
                             >
                               <Check
