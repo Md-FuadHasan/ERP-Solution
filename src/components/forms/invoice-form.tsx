@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,9 +17,10 @@ import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const invoiceItemSchema = z.object({
+  id: z.string().optional(), // id is managed internally
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
   unitPrice: z.coerce.number().min(0.01, "Unit price must be positive."),
@@ -92,7 +94,7 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
       customerId: invoice.customerId,
       issueDate: new Date(invoice.issueDate),
       dueDate: new Date(invoice.dueDate),
-      items: invoice.items.map(item => ({...item, unitType: item.unitType || 'PCS'})),
+      items: invoice.items.map(item => ({...item, id: item.id || `item-${Date.now()}`, unitType: item.unitType || 'PCS'})),
       status: invoice.status,
       paymentProcessingStatus: invoice.paymentProcessingStatus || (invoice.remainingBalance <= 0 && invoice.totalAmount > 0 ? 'Fully Paid' : invoice.amountPaid > 0 ? 'Partially Paid' : 'Unpaid'),
       partialAmountPaid: undefined,
@@ -108,7 +110,7 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
     customerId: '',
     issueDate: new Date(),
     dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-    items: [{ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
+    items: [{ id: `item-${Date.now()}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
     status: 'Draft',
     paymentProcessingStatus: 'Unpaid',
     partialAmountPaid: undefined,
@@ -139,19 +141,21 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
-  const [isCustomerSearchFocused, setIsCustomerSearchFocused] = useState(false);
-
+  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
 
   useEffect(() => {
+    const defaultVals = getDefaultFormValues(initialData);
+    form.reset(defaultVals);
+
     if (initialData && initialData.customerId) {
       const currentCustomer = customers.find(c => c.id === initialData.customerId);
       setCustomerSearch(currentCustomer?.name || initialData.customerName || '');
     } else {
       setCustomerSearch('');
     }
-    form.reset(getDefaultFormValues(initialData));
+    
     setCustomerSuggestions([]);
-    setIsCustomerSearchFocused(false);
+    setIsCustomerPopoverOpen(false);
   }, [initialData, customers, form]);
 
 
@@ -174,7 +178,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
       form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
     } else if (currentMethod === 'Bank Transfer') {
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
-    } else if (currentMethod === undefined) { 
+    } else if (currentMethod === undefined || currentMethod === null || currentMethod === '') { 
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
       form.setValue('bankName', '', { shouldValidate: false });
       form.setValue('bankAccountNumber', '', { shouldValidate: false });
@@ -182,27 +186,31 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
     }
   }, [watchedPaymentMethod, form]);
 
-
-  const handleCustomerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomerSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const searchTerm = e.target.value;
     setCustomerSearch(searchTerm);
-    if (searchTerm) {
-      setCustomerSuggestions(
-        customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    if (searchTerm.trim()) {
+      const filteredSuggestions = customers.filter(
+        c => c.name.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+             c.id.toLowerCase().includes(searchTerm.toLowerCase().trim())
       );
+      setCustomerSuggestions(filteredSuggestions);
+      setIsCustomerPopoverOpen(filteredSuggestions.length > 0);
     } else {
       setCustomerSuggestions([]);
+      setIsCustomerPopoverOpen(false);
+      form.setValue('customerId', '', { shouldValidate: true }); // Clear if search is empty
     }
-  };
+  }, [customers, form]);
 
-  const handleCustomerSelect = (customer: Customer) => {
+  const handleCustomerSelect = useCallback((customer: Customer) => {
     form.setValue('customerId', customer.id, { shouldValidate: true });
     setCustomerSearch(customer.name);
     setCustomerSuggestions([]);
-    setIsCustomerSearchFocused(false); 
-  };
+    setIsCustomerPopoverOpen(false);
+  }, [form]);
 
-  const itemsToCalc = watchedItems; 
+  const itemsToCalc = watchedItems || []; 
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
   
   const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10;
@@ -231,54 +239,69 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
               <FormItem>
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData && !!initialData.id} />
+                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData?.id} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <FormField
+         <FormField
             control={form.control}
             name="customerId"
-            render={({ field }) => ( 
+            render={({ field }) => ( // field is implicitly used by form.setValue
               <FormItem>
                 <FormLabel>Customer</FormLabel>
-                <Popover 
-                  open={isCustomerSearchFocused && customerSuggestions.length > 0} 
-                  onOpenChange={(open) => {
-                    if (!open) {
-                      setIsCustomerSearchFocused(false); 
-                    }
-                  }}
-                >
+                <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Input 
-                      placeholder="Type to search customer..." 
+                    <Input
+                      placeholder="Type to search customer..."
                       value={customerSearch}
                       onChange={handleCustomerSearchChange}
-                      onFocus={() => setIsCustomerSearchFocused(true)}
+                      onFocus={() => {
+                        if (customerSearch.trim()) {
+                           const filteredSuggestions = customers.filter(
+                             c => c.name.toLowerCase().includes(customerSearch.toLowerCase().trim()) ||
+                                  c.id.toLowerCase().includes(customerSearch.toLowerCase().trim())
+                           );
+                           if (filteredSuggestions.length > 0) {
+                             setCustomerSuggestions(filteredSuggestions);
+                             setIsCustomerPopoverOpen(true);
+                           }
+                        } else if (customers.length > 0) { // If empty and focused, show all if not too many or based on some logic
+                           // setCustomerSuggestions(customers.slice(0,5)); // Example: show first 5
+                           // setIsCustomerPopoverOpen(true);
+                        }
+                      }}
                       className="pr-8"
                       autoComplete="off"
                     />
                   </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-[--radix-popover-trigger-width] p-0" 
-                    onOpenAutoFocus={(e) => e.preventDefault()} 
+                  <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0"
+                    align="start" // Ensures popover aligns with the start of the trigger
                   >
-                    <ul className="max-h-60 overflow-y-auto">
-                      {customerSuggestions.map(cust => (
-                        <li 
-                          key={cust.id} 
-                          onClick={() => handleCustomerSelect(cust)}
-                          className="p-2 hover:bg-accent cursor-pointer text-sm"
-                        >
-                          {cust.name} ({cust.id})
-                        </li>
-                      ))}
-                    </ul>
+                    {isCustomerPopoverOpen && (
+                      <ul className="max-h-60 overflow-y-auto">
+                        {customerSuggestions.length > 0 ? (
+                          customerSuggestions.map(cust => (
+                            <li
+                              key={cust.id}
+                              onClick={() => handleCustomerSelect(cust)}
+                              className="p-2 hover:bg-accent cursor-pointer text-sm"
+                            >
+                              {cust.name} ({cust.id})
+                            </li>
+                          ))
+                        ) : (
+                          <li className="p-2 text-sm text-muted-foreground">
+                            {customerSearch.trim() ? 'No customers found.' : (customers.length > 0 ? 'Type to search...' : 'No customers available.')}
+                          </li>
+                        )}
+                      </ul>
+                    )}
                   </PopoverContent>
                 </Popover>
-                <FormMessage /> 
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -372,8 +395,8 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
 
         <div className="space-y-4">
           <FormLabel>Invoice Items</FormLabel>
-          {fields.map((field, index) => (
-            <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
+          {fields.map((itemField, index) => (
+            <div key={itemField.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
               <FormField
                 control={form.control}
                 name={`items.${index}.description`}
@@ -447,7 +470,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
               </Button>
             </div>
           ))}
-          <Button type="button" variant="outline" onClick={() => append({ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
+          <Button type="button" variant="outline" onClick={() => append({ id: `item-${Date.now()}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Item
           </Button>
         </div>
@@ -664,7 +687,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : (initialData && invoices.some(i => i.id === initialData.id) ? 'Save Changes' : 'Create Invoice')}
+            {isSubmitting ? 'Saving...' : (initialData?.id && customers.length > 0 && invoices.some(i => i.id === initialData.id) ? 'Save Changes' : 'Create Invoice')}
           </Button>
         </div>
       </form>
@@ -675,4 +698,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
 // Helper to check if the initialData invoice is actually present in the main invoices list (from context)
 // This helps determine if it's a true edit of an existing persisted invoice vs. a new invoice pre-filled from params.
 // This is not used in the current code but can be useful for more complex logic.
-const invoices: Invoice[] = []; // This would need to be passed in or accessed from context if used.
+// NOTE: `invoices` here is a local const, not from context. This would need to be passed or accessed if logic changes.
+const invoices: Invoice[] = []; 
+
+    
