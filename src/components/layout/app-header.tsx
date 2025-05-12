@@ -8,12 +8,12 @@ import Link from 'next/link';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export function AppHeader() {
-  const { toggleSidebar } = useSidebar();
+  // const { toggleSidebar } = useSidebar(); // toggleSidebar is handled by SidebarTrigger internally
   const isMobile = useIsMobile();
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur md:px-6">
-      {isMobile && <SidebarTrigger onClick={toggleSidebar} />}
+      {isMobile && <SidebarTrigger />} {/* SidebarTrigger handles its own onClick to toggle */}
       {!isMobile && <div className="w-8" /> /* Placeholder for desktop sidebar trigger space if sidebar is icon-only */}
       
       <div className="flex-1">
