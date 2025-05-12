@@ -11,13 +11,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+
 
 const invoiceItemSchema = z.object({
   id: z.string().optional(), // id is managed internally
@@ -82,7 +84,7 @@ interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
   companyProfile: CompanyProfile;
-  invoices: Invoice[]; // Added to determine if editing an existing invoice
+  invoices: Invoice[]; 
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -140,46 +142,26 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
   const watchedPaymentMethod = form.watch("paymentMethod");
 
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  const [currentCustomerSearchInput, setCurrentCustomerSearchInput] = useState('');
   
   const prevInitialDataRef = useRef(initialData);
 
   useEffect(() => {
-    // Always reset the RHF form values if initialData changes.
+    const initialDataChangedOrIsNew = prevInitialDataRef.current?.id !== initialData?.id || 
+                                   (prevInitialDataRef.current === null && initialData !== null) ||
+                                   (prevInitialDataRef.current !== null && initialData === null);
+
     form.reset(getDefaultFormValues(initialData));
 
-    const initialDataChangedOrIsNew = prevInitialDataRef.current?.id !== initialData?.id || 
-                                   (prevInitialDataRef.current === null && initialData !== null) || // from null to something
-                                   (prevInitialDataRef.current !== null && initialData === null); // from something to null
-
-
-    if (initialData?.customerId) {
-      const customer = customers.find(c => c.id === initialData.customerId);
-      const newSearchText = customer?.name || initialData.customerName || initialData.customerId || '';
-      setCustomerSearch(newSearchText);
-      // If context changed to an invoice with a customer, reset suggestions
-      if (initialDataChangedOrIsNew) {
-        setCustomerSuggestions([]);
-        setIsCustomerPopoverOpen(false);
-      }
-    } else { 
-      // New invoice context (no initialData.customerId)
-      if (initialDataChangedOrIsNew) { 
-        // Only clear search if the context truly changed to "new invoice"
-        setCustomerSearch('');
-        setCustomerSuggestions([]);
-        setIsCustomerPopoverOpen(false);
-      }
-      // If only `customers` list updated while in "new invoice" mode, `customerSearch` (user input) is preserved.
+    if (initialDataChangedOrIsNew) {
+        setCurrentCustomerSearchInput(""); // Clear search input on context change
     }
-
-    // Update the ref after processing.
+    
     if (initialDataChangedOrIsNew) {
       prevInitialDataRef.current = initialData;
     }
-  }, [initialData, customers, form.reset]);
+  }, [initialData, customers, form]); // form.reset was form in original context, fixed to form.reset
 
 
   useEffect(() => {
@@ -209,29 +191,6 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     }
   }, [watchedPaymentMethod, form]);
 
-  const handleCustomerSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchTerm = e.target.value;
-    setCustomerSearch(searchTerm);
-    if (searchTerm.trim()) {
-      const filteredSuggestions = customers.filter(
-        c => c.name.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
-             c.id.toLowerCase().includes(searchTerm.toLowerCase().trim())
-      );
-      setCustomerSuggestions(filteredSuggestions);
-      setIsCustomerPopoverOpen(filteredSuggestions.length > 0);
-    } else {
-      setCustomerSuggestions([]);
-      setIsCustomerPopoverOpen(false);
-      form.setValue('customerId', '', { shouldValidate: true }); // Clear if search is empty
-    }
-  }, [customers, form]);
-
-  const handleCustomerSelect = useCallback((customer: Customer) => {
-    form.setValue('customerId', customer.id, { shouldValidate: true });
-    setCustomerSearch(customer.name);
-    setCustomerSuggestions([]);
-    setIsCustomerPopoverOpen(false);
-  }, [form]);
 
   const itemsToCalc = watchedItems || []; 
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
@@ -251,6 +210,17 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   }
 
   const isEditingExistingInvoice = initialData?.id && invoices.some(i => i.id === initialData.id);
+
+  const filteredCustomers = useMemo(() => {
+    if (!currentCustomerSearchInput.trim()) {
+      return customers;
+    }
+    return customers.filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(currentCustomerSearchInput.toLowerCase().trim()) ||
+        customer.id.toLowerCase().includes(currentCustomerSearchInput.toLowerCase().trim())
+    );
+  }, [customers, currentCustomerSearchInput]);
 
 
   return (
@@ -273,52 +243,59 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
          <FormField
             control={form.control}
             name="customerId"
-            render={({ field }) => ( 
-              <FormItem>
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
                 <FormLabel>Customer</FormLabel>
                 <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Input
-                      placeholder="Type to search customer..."
-                      value={customerSearch}
-                      onChange={handleCustomerSearchChange}
-                      onFocus={() => {
-                        if (customerSearch.trim() && customerSuggestions.length > 0) {
-                             setIsCustomerPopoverOpen(true);
-                        } else if (!customerSearch.trim() && customers.length > 0) {
-                            // Optionally show some initial suggestions on focus if search is empty
-                            // setCustomerSuggestions(customers.slice(0,5)); 
-                            // setIsCustomerPopoverOpen(true);
-                        }
-                      }}
-                      className="pr-8"
-                      autoComplete="off"
-                    />
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isCustomerPopoverOpen}
+                        className={cn(
+                          "w-full justify-between",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value
+                          ? customers.find((customer) => customer.id === field.value)?.name
+                          : "Select customer..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[--radix-popover-trigger-width] p-0"
-                    align="start" 
-                    // Ensure onOpenAutoFocus isn't stealing focus and closing immediately. Usually not an issue.
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                  >
-                    {customerSuggestions.length > 0 ? (
-                      <ul className="max-h-60 overflow-y-auto">
-                        {customerSuggestions.map(cust => (
-                          <li
-                            key={cust.id}
-                            onClick={() => handleCustomerSelect(cust)}
-                            className="p-2 hover:bg-accent cursor-pointer text-sm"
-                          >
-                            {cust.name} ({cust.id})
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                       customerSearch.trim() && isCustomerPopoverOpen && // Only show "no customers found" if popover is meant to be open due to search
-                        <div className="p-2 text-sm text-muted-foreground">
-                           No customers found.
-                        </div>
-                    )}
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search customer by name or ID..."
+                        value={currentCustomerSearchInput}
+                        onValueChange={setCurrentCustomerSearchInput}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredCustomers.map((customer) => (
+                            <CommandItem
+                              value={customer.id}
+                              key={customer.id}
+                              onSelect={() => {
+                                form.setValue("customerId", customer.id, { shouldValidate: true });
+                                setIsCustomerPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  customer.id === field.value ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {customer.name} ({customer.id})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
