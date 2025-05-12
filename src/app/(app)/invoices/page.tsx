@@ -61,11 +61,12 @@ export default function InvoicesPage() {
 
   const filteredInvoices = useMemo(() => {
     if (!searchTerm) return invoices;
+    const lowerSearchTerm = searchTerm.toLowerCase();
     return invoices.filter(
       (invoice) =>
-        invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
+        invoice.id.toLowerCase().includes(lowerSearchTerm) ||
+        (invoice.customerName && invoice.customerName.toLowerCase().includes(lowerSearchTerm)) ||
+        invoice.customerId.toLowerCase().includes(lowerSearchTerm)
     );
   }, [invoices, searchTerm]);
 
@@ -227,7 +228,7 @@ export default function InvoicesPage() {
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search by Invoice ID or Customer..."
+          placeholder="Search by Invoice ID, Customer Name, or Customer ID..."
         />
       </div>
 
@@ -348,6 +349,3 @@ export default function InvoicesPage() {
     </>
   );
 }
-
-
-    
