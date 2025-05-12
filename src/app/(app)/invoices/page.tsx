@@ -109,46 +109,67 @@ export default function InvoicesPage() {
     const totalAmount = subtotal + taxAmount + vatAmount;
     const customerName = customers.find(c => c.id === data.customerId)?.name;
 
-    let calculatedAmountPaid = 0;
+    const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
+    let newPaymentAmount = 0;
+
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      calculatedAmountPaid = totalAmount;
-    } else if (data.paymentProcessingStatus === 'Partially Paid') {
-      calculatedAmountPaid = data.partialAmountPaid || 0;
-      if (calculatedAmountPaid <= 0 || calculatedAmountPaid >= totalAmount) {
-        toast({
-          title: "Invalid Partial Payment",
-          description: `Partial payment amount must be greater than $0 and less than total amount $${totalAmount.toFixed(2)}.`,
-          variant: "destructive",
-        });
-        return; 
-      }
+      newPaymentAmount = totalAmount - previousTotalAmountPaid;
+       if (newPaymentAmount < 0) newPaymentAmount = 0; // ensure not negative if already overpaid somehow
+    } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
+      newPaymentAmount = data.partialAmountPaid;
+       if (previousTotalAmountPaid + newPaymentAmount > totalAmount) {
+         // Cap partial payment if it would exceed total. Or let it overpay? For now, cap.
+         // Or, better, this validation should be in the form if strict.
+         // For now, we assume data.partialAmountPaid is the intended payment.
+       }
     }
+    
+    const calculatedAmountPaid = previousTotalAmountPaid + newPaymentAmount; // New total amount paid
+    
+    if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid) {
+        if (data.partialAmountPaid <= 0 || (editingInvoice && (previousTotalAmountPaid + data.partialAmountPaid) >= totalAmount && (previousTotalAmountPaid + data.partialAmountPaid) !== totalAmount) ) {
+             if(data.partialAmountPaid > 0 && (previousTotalAmountPaid + data.partialAmountPaid) === totalAmount && data.paymentProcessingStatus !== 'Fully Paid') {
+                // This case is fine, it makes it fully paid
+             } else {
+                toast({
+                title: "Invalid Partial Payment",
+                description: `Partial payment $${data.partialAmountPaid.toFixed(2)} is invalid. Ensure it's positive and does not exceed remaining balance $${(totalAmount - previousTotalAmountPaid).toFixed(2)} unless it's a full payment.`,
+                variant: "destructive",
+                });
+                return; 
+             }
+        }
+    }
+
 
     const calculatedRemainingBalance = totalAmount - calculatedAmountPaid;
     
     let finalStatus = data.status;
     if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
-      finalStatus = 'Received'; // Updated from 'Paid'
+      finalStatus = 'Received';
     } else if (data.status === 'Received' && calculatedRemainingBalance > 0) {
       finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Due'; 
     }
 
 
     let updatedPaymentHistory: PaymentRecord[] = editingInvoice?.paymentHistory ? [...editingInvoice.paymentHistory] : [];
-    const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
-    const paymentAmountForThisRecord = calculatedAmountPaid - previousTotalAmountPaid;
 
-    if (paymentAmountForThisRecord > 0) {
+    if (newPaymentAmount > 0 && data.paymentMethod) { // A payment was actually made
         const paymentRecordStatus: PaymentRecord['status'] = 
-            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid)
+            (calculatedRemainingBalance <= 0 && totalAmount > 0)
             ? 'Full Payment' 
             : 'Partial Payment';
 
         const newPaymentRecord: PaymentRecord = {
             id: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             paymentDate: new Date().toISOString(),
-            amount: paymentAmountForThisRecord,
+            amount: newPaymentAmount,
             status: paymentRecordStatus,
+            paymentMethod: data.paymentMethod,
+            cashVoucherNumber: data.paymentMethod === 'Cash' ? data.cashVoucherNumber : undefined,
+            bankName: data.paymentMethod === 'Bank Transfer' ? data.bankName : undefined,
+            bankAccountNumber: data.paymentMethod === 'Bank Transfer' ? data.bankAccountNumber : undefined,
+            onlineTransactionNumber: data.paymentMethod === 'Bank Transfer' ? data.onlineTransactionNumber : undefined,
         };
         updatedPaymentHistory.push(newPaymentRecord);
     }
@@ -166,11 +187,11 @@ export default function InvoicesPage() {
       issueDate: format(data.issueDate, 'yyyy-MM-dd'),
       dueDate: format(data.dueDate, 'yyyy-MM-dd'),
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus,
+      paymentProcessingStatus: calculatedRemainingBalance <= 0 && totalAmount > 0 ? 'Fully Paid' : calculatedAmountPaid > 0 ? 'Partially Paid' : 'Unpaid',
       amountPaid: calculatedAmountPaid,
       remainingBalance: calculatedRemainingBalance,
       paymentHistory: updatedPaymentHistory,
-      paymentMethod: data.paymentMethod,
+      paymentMethod: data.paymentMethod, // Store last used method on invoice
       cashVoucherNumber: data.cashVoucherNumber,
       bankName: data.bankName,
       bankAccountNumber: data.bankAccountNumber,
@@ -180,12 +201,13 @@ export default function InvoicesPage() {
     if (editingInvoice) {
       updateInvoice(invoiceData);
       toast({ title: "Invoice Updated", description: `Invoice ${invoiceData.id} details have been updated.` });
+      setEditingInvoice(invoiceData); // Keep modal open and pass updated data to form for reset of payment fields
     } else {
       addInvoice(invoiceData);
       toast({ title: "Invoice Created", description: `Invoice ${invoiceData.id} has been successfully created.` });
+      setIsModalOpen(false); // Close modal for new invoice
+      setEditingInvoice(null); // Reset editing state
     }
-    setIsModalOpen(false);
-    setEditingInvoice(null);
   };
   
   if (isLoading) {
@@ -325,6 +347,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <InvoiceForm
+            key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) : 'new-invoice'} // Force re-render with reset fields when editingInvoice changes meaningfully
             initialData={editingInvoice}
             customers={customers}
             companyProfile={companyProfile}

@@ -11,13 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, Package, PackageCheck } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required.").max(200),
@@ -36,10 +36,10 @@ export const invoiceFormSchema = z.object({
   paymentProcessingStatus: z.enum(ALL_PAYMENT_PROCESSING_STATUSES),
   partialAmountPaid: z.coerce.number().positive("Amount must be positive if provided.").optional(),
   paymentMethod: z.enum(ALL_PAYMENT_METHODS).optional(),
-  cashVoucherNumber: z.string().max(50).optional(),
-  bankName: z.string().max(100).optional(),
-  bankAccountNumber: z.string().max(50).optional(),
-  onlineTransactionNumber: z.string().max(100).optional(),
+  cashVoucherNumber: z.string().max(50).optional().nullable(),
+  bankName: z.string().max(100).optional().nullable(),
+  bankAccountNumber: z.string().max(50).optional().nullable(),
+  onlineTransactionNumber: z.string().max(100).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
     ctx.addIssue({
@@ -48,14 +48,7 @@ export const invoiceFormSchema = z.object({
       path: ["partialAmountPaid"],
     });
   }
-  if (data.paymentMethod === 'Cash' && !data.cashVoucherNumber) {
-    // Making cash voucher optional for now, can be made required if needed
-    // ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cash Voucher Number is required.", path: ["cashVoucherNumber"] });
-  }
-  if (data.paymentMethod === 'Bank Transfer' && (!data.bankName || !data.bankAccountNumber /*|| !data.onlineTransactionNumber*/)) {
-     // Making these optional for now, can be made required
-    // ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank Name and Account Number are required for Bank Transfer.", path: ["bankName"] });
-  }
+  // Validations for payment method specific fields can be added here if they become strictly required
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -69,36 +62,47 @@ interface InvoiceFormProps {
   isSubmitting?: boolean;
 }
 
-export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
-  const form = useForm<InvoiceFormValues>({
-    resolver: zodResolver(invoiceFormSchema),
-    defaultValues: initialData ? {
-      ...initialData,
-      issueDate: new Date(initialData.issueDate),
-      dueDate: new Date(initialData.dueDate),
-      items: initialData.items.map(item => ({...item, unitType: item.unitType || 'PCS'})),
-      paymentProcessingStatus: initialData.paymentProcessingStatus || 'Unpaid',
-      partialAmountPaid: initialData.paymentProcessingStatus === 'Partially Paid' ? initialData.amountPaid : undefined,
-      paymentMethod: initialData.paymentMethod,
-      cashVoucherNumber: initialData.cashVoucherNumber || '',
-      bankName: initialData.bankName || '',
-      bankAccountNumber: initialData.bankAccountNumber || '',
-      onlineTransactionNumber: initialData.onlineTransactionNumber || '',
-    } : {
-      id: `INV-${String(Date.now()).slice(-6)}`,
-      customerId: '',
-      issueDate: new Date(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-      items: [{ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
-      status: 'Draft',
-      paymentProcessingStatus: 'Unpaid',
+const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
+  if (invoice) {
+    return {
+      id: invoice.id,
+      customerId: invoice.customerId,
+      issueDate: new Date(invoice.issueDate),
+      dueDate: new Date(invoice.dueDate),
+      items: invoice.items.map(item => ({...item, unitType: item.unitType || 'PCS'})),
+      status: invoice.status,
+      paymentProcessingStatus: invoice.paymentProcessingStatus || (invoice.remainingBalance <= 0 && invoice.totalAmount > 0 ? 'Fully Paid' : invoice.amountPaid > 0 ? 'Partially Paid' : 'Unpaid'),
+      // Payment entry fields are cleared for new entries
       partialAmountPaid: undefined,
-      paymentMethod: undefined,
+      paymentMethod: undefined, 
       cashVoucherNumber: '',
       bankName: '',
       bankAccountNumber: '',
       onlineTransactionNumber: '',
-    },
+    };
+  }
+  return {
+    id: `INV-${String(Date.now()).slice(-6)}`,
+    customerId: '',
+    issueDate: new Date(),
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+    items: [{ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
+    status: 'Draft',
+    paymentProcessingStatus: 'Unpaid',
+    partialAmountPaid: undefined,
+    paymentMethod: undefined,
+    cashVoucherNumber: '',
+    bankName: '',
+    bankAccountNumber: '',
+    onlineTransactionNumber: '',
+  };
+};
+
+
+export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
+  const form = useForm<InvoiceFormValues>({
+    resolver: zodResolver(invoiceFormSchema),
+    defaultValues: getDefaultFormValues(initialData),
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -111,44 +115,87 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
   const watchedPaymentMethod = form.watch("paymentMethod");
 
-  const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice || 0), 0);
+  // Use state for customer search input and suggestions
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    if (initialData && initialData.customerId) {
+      const currentCustomer = customers.find(c => c.id === initialData.customerId);
+      setCustomerSearch(currentCustomer?.name || '');
+    } else {
+      setCustomerSearch('');
+    }
+    form.reset(getDefaultFormValues(initialData));
+  }, [initialData, form, customers]);
+
+
+  useEffect(() => {
+    if (watchedPaymentProcessingStatus === 'Fully Paid' || watchedPaymentProcessingStatus === 'Unpaid') {
+      if (form.getValues('partialAmountPaid') !== undefined) { // only set if different to avoid loop
+         form.setValue('partialAmountPaid', undefined, {shouldValidate: true});
+      }
+    }
+  }, [watchedPaymentProcessingStatus, form]);
+
+   useEffect(() => {
+    const currentMethod = form.getValues('paymentMethod');
+    if (currentMethod === 'Cash') {
+      form.setValue('bankName', '', { shouldValidate: false });
+      form.setValue('bankAccountNumber', '', { shouldValidate: false });
+      form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
+    } else if (currentMethod === 'Bank Transfer') {
+      form.setValue('cashVoucherNumber', '', { shouldValidate: false });
+    } else if (currentMethod === undefined) { // When payment method is cleared
+      form.setValue('cashVoucherNumber', '', { shouldValidate: false });
+      form.setValue('bankName', '', { shouldValidate: false });
+      form.setValue('bankAccountNumber', '', { shouldValidate: false });
+      form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
+    }
+  }, [watchedPaymentMethod, form]);
+
+
+  const handleCustomerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const searchTerm = e.target.value;
+    setCustomerSearch(searchTerm);
+    if (searchTerm) {
+      setCustomerSuggestions(
+        customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    } else {
+      setCustomerSuggestions([]);
+    }
+  };
+
+  const handleCustomerSelect = (customer: Customer) => {
+    form.setValue('customerId', customer.id, { shouldValidate: true });
+    setCustomerSearch(customer.name);
+    setCustomerSuggestions([]);
+  };
+
+
+  // Recalculate totals based on form state if no initialData, or initialData if available (for display)
+  const itemsToCalc = watchedItems; 
+  const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
   
   const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10;
   const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05;
 
-  const taxAmount = subtotal * taxRate;
-  const vatAmount = subtotal * vatRate;
-  const totalAmount = subtotal + taxAmount + vatAmount;
-
-  let displayAmountPaid = 0;
+  const taxAmountDisplay = subtotalDisplay * taxRate;
+  const vatAmountDisplay = subtotalDisplay * vatRate;
+  const totalAmountDisplay = subtotalDisplay + taxAmountDisplay + vatAmountDisplay;
+  
+  // Display amounts based on current form inputs for payment, but backed by initialData for history.
+  let displayAmountPaid = initialData?.amountPaid || 0;
   if (watchedPaymentProcessingStatus === 'Fully Paid') {
-    displayAmountPaid = totalAmount;
-  } else if (watchedPaymentProcessingStatus === 'Partially Paid') {
-    displayAmountPaid = watchedPartialAmountPaid || 0;
+    // If user intends to mark as fully paid with current save, this amount will be total after save.
+    // For display before save, if initialData exists, it's its amountPaid.
+    // If a new partial payment is entered, that's what we're adding.
+    displayAmountPaid = totalAmountDisplay; // This assumes the current save will make it fully paid
+  } else if (watchedPaymentProcessingStatus === 'Partially Paid' && watchedPartialAmountPaid && watchedPartialAmountPaid > 0) {
+    displayAmountPaid = (initialData?.amountPaid || 0) + watchedPartialAmountPaid;
   }
-  const displayRemainingBalance = totalAmount - displayAmountPaid;
-
-  useEffect(() => {
-    if (watchedPaymentProcessingStatus === 'Fully Paid' || watchedPaymentProcessingStatus === 'Unpaid') {
-      form.setValue('partialAmountPaid', undefined); 
-    }
-  }, [watchedPaymentProcessingStatus, form]);
-
-  // Clear bank/cash details if payment method changes
-   useEffect(() => {
-    if (watchedPaymentMethod === 'Cash') {
-      form.setValue('bankName', '');
-      form.setValue('bankAccountNumber', '');
-      form.setValue('onlineTransactionNumber', '');
-    } else if (watchedPaymentMethod === 'Bank Transfer') {
-      form.setValue('cashVoucherNumber', '');
-    } else {
-      form.setValue('cashVoucherNumber', '');
-      form.setValue('bankName', '');
-      form.setValue('bankAccountNumber', '');
-      form.setValue('onlineTransactionNumber', '');
-    }
-  }, [watchedPaymentMethod, form]);
+  const displayRemainingBalance = totalAmountDisplay - displayAmountPaid;
 
 
   return (
@@ -174,20 +221,34 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Customer</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} ({customer.id})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input 
+                    placeholder="Type to search customer..." 
+                    value={customerSearch}
+                    onChange={handleCustomerSearchChange}
+                    className="pr-8" // Make space for a clear button or dropdown icon if needed
+                  />
+                  {customerSuggestions.length > 0 && (
+                    <Popover open={customerSuggestions.length > 0} onOpenChange={() => setCustomerSuggestions([])}>
+                       <PopoverTrigger asChild>
+                         <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 hidden">Suggestions</Button>
+                       </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <ul className="max-h-60 overflow-y-auto">
+                          {customerSuggestions.map(cust => (
+                            <li 
+                              key={cust.id} 
+                              onClick={() => handleCustomerSelect(cust)}
+                              className="p-2 hover:bg-accent cursor-pointer text-sm"
+                            >
+                              {cust.name} ({cust.id})
+                            </li>
+                          ))}
+                        </ul>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -259,7 +320,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Invoice Status</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -316,7 +377,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                 render={({ field }) => (
                   <FormItem className="w-full md:w-32">
                     <FormLabel className="sr-only">Unit Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || 'PCS'}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || 'PCS'}>
                       <FormControl>
                         <SelectTrigger className="text-sm">
                           <SelectValue placeholder="Unit" />
@@ -349,7 +410,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
               />
               <div className="text-right md:text-left w-full md:w-24 pt-1 md:pt-0 md:pl-2">
                 <span className="font-medium text-sm">
-                  ${(watchedItems[index]?.quantity * watchedItems[index]?.unitPrice || 0).toFixed(2)}
+                  ${((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0)).toFixed(2)}
                 </span>
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:bg-destructive/10 self-center md:self-auto">
@@ -368,8 +429,8 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             name="paymentProcessingStatus"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Payment Collection Status</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormLabel>Payment Collection Status (for this save)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select payment status" />
@@ -383,6 +444,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     ))}
                   </SelectContent>
                 </Select>
+                 <FormDescription>Select if making a payment with this save.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -393,7 +455,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
               name="partialAmountPaid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Partial Amount Paid</FormLabel>
+                  <FormLabel>Partial Amount Being Paid Now</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -416,8 +478,8 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                 name="paymentMethod"
                 render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Payment Method (for this payment)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
                     <FormControl>
                         <SelectTrigger>
                         <SelectValue placeholder="Select payment method" />
@@ -443,7 +505,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     <FormItem>
                         <FormLabel>Cash Voucher Number</FormLabel>
                         <FormControl>
-                        <Input placeholder="Enter voucher number" {...field} />
+                        <Input placeholder="Enter voucher number" {...field} value={field.value || ''} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -461,7 +523,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     <FormItem>
                         <FormLabel>Bank Name</FormLabel>
                         <FormControl>
-                        <Input placeholder="Enter bank name" {...field} />
+                        <Input placeholder="Enter bank name" {...field} value={field.value || ''} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -474,7 +536,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     <FormItem>
                         <FormLabel>Bank Account Number</FormLabel>
                         <FormControl>
-                        <Input placeholder="Enter account number" {...field} />
+                        <Input placeholder="Enter account number" {...field} value={field.value || ''}/>
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -487,7 +549,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     <FormItem>
                         <FormLabel>Online Transaction Number</FormLabel>
                         <FormControl>
-                        <Input placeholder="Enter transaction number" {...field} />
+                        <Input placeholder="Enter transaction number" {...field} value={field.value || ''}/>
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -500,28 +562,28 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>${subtotalDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span>Tax ({ (taxRate * 100).toFixed(0) }%):</span>
-            <span>${taxAmount.toFixed(2)}</span>
+            <span>${taxAmountDisplay.toFixed(2)}</span>
           </div>
            <div className="flex justify-between">
             <span>VAT ({ (vatRate * 100).toFixed(0) }%):</span>
-            <span>${vatAmount.toFixed(2)}</span>
+            <span>${vatAmountDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-semibold">
             <span>Total Amount:</span>
-            <span>${totalAmount.toFixed(2)}</span>
+            <span>${totalAmountDisplay.toFixed(2)}</span>
           </div>
           <hr className="my-2 border-border" />
            <div className="flex justify-between text-md">
-            <span>Amount Paid:</span>
-            <span className={displayAmountPaid > 0 ? "text-green-600 dark:text-green-400" : ""}>${displayAmountPaid.toFixed(2)}</span>
+            <span>Total Amount Paid (All Time):</span>
+            <span className={(initialData?.amountPaid || 0) > 0 ? "text-green-600 dark:text-green-400" : ""}>${(initialData?.amountPaid || 0).toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-md font-semibold text-primary">
-            <span>Remaining Balance:</span>
-            <span>${displayRemainingBalance.toFixed(2)}</span>
+            <span>Overall Remaining Balance:</span>
+            <span>${(initialData?.remainingBalance || totalAmountDisplay).toFixed(2)}</span>
           </div>
         </div>
 
@@ -531,17 +593,27 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                 <History className="h-5 w-5 text-primary"/>
                 <h4 className="text-md font-semibold text-foreground">Payment History</h4>
             </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <div className="rounded-lg border bg-card p-4 shadow-sm max-h-60 overflow-y-auto">
               <ul className="space-y-3">
                 {initialData.paymentHistory.map((record) => (
                   <li key={record.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm border-b border-border/50 pb-3 last:border-b-0 last:pb-0">
                     <div>
                       <p className="font-medium text-card-foreground">
-                        {record.status}
+                        {record.status} {record.paymentMethod ? `(${record.paymentMethod})` : ''}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(record.paymentDate), "MMM dd, yyyy 'at' hh:mm a")}
                       </p>
+                      {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
+                        <p className="text-xs text-muted-foreground">Voucher: {record.cashVoucherNumber}</p>
+                      )}
+                      {record.paymentMethod === 'Bank Transfer' && (
+                        <>
+                          {record.bankName && <p className="text-xs text-muted-foreground">Bank: {record.bankName}</p>}
+                          {record.bankAccountNumber && <p className="text-xs text-muted-foreground">Acc: {record.bankAccountNumber}</p>}
+                          {record.onlineTransactionNumber && <p className="text-xs text-muted-foreground">TxN: {record.onlineTransactionNumber}</p>}
+                        </>
+                      )}
                     </div>
                     <p className="font-semibold text-primary mt-1 sm:mt-0">
                       ${record.amount.toFixed(2)}

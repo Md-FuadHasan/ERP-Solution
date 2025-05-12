@@ -10,7 +10,7 @@ export interface Customer {
 }
 
 export interface InvoiceItem {
-  id: string;
+  id:string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -21,15 +21,20 @@ export interface InvoiceItem {
 export type PaymentProcessingStatus = 'Unpaid' | 'Partially Paid' | 'Fully Paid';
 export const ALL_PAYMENT_PROCESSING_STATUSES: PaymentProcessingStatus[] = ['Unpaid', 'Partially Paid', 'Fully Paid'];
 
+export type PaymentMethod = 'Cash' | 'Bank Transfer';
+export const ALL_PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'Bank Transfer'];
+
 export interface PaymentRecord {
   id: string;
   paymentDate: string; // ISO string
   amount: number;
   status: 'Full Payment' | 'Partial Payment'; // Status of this specific payment
+  paymentMethod?: PaymentMethod;
+  cashVoucherNumber?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  onlineTransactionNumber?: string;
 }
-
-export type PaymentMethod = 'Cash' | 'Bank Transfer';
-export const ALL_PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'Bank Transfer'];
 
 export interface Invoice {
   id: string; // Editable invoice number
@@ -47,11 +52,11 @@ export interface Invoice {
   amountPaid: number;
   remainingBalance: number;
   paymentHistory?: PaymentRecord[];
-  paymentMethod?: PaymentMethod;
-  cashVoucherNumber?: string;
-  bankName?: string;
-  bankAccountNumber?: string;
-  onlineTransactionNumber?: string;
+  paymentMethod?: PaymentMethod; // Last payment method used
+  cashVoucherNumber?: string; // Last cash voucher used
+  bankName?: string; // Last bank name used
+  bankAccountNumber?: string; // Last bank account used
+  onlineTransactionNumber?: string; // Last transaction number used
 }
 
 export interface CompanyProfile {
@@ -102,7 +107,10 @@ export const MOCK_INVOICES: Invoice[] = [
     items: [{ id: 'item1', description: 'Web Development', quantity: 1, unitPrice: 1200, total: 1200, unitType: 'PCS' }],
     subtotal: 1200, taxAmount: 120, vatAmount: 60, totalAmount: 1380, status: 'Received',
     paymentProcessingStatus: 'Fully Paid', amountPaid: 1380, remainingBalance: 0,
-    paymentHistory: [{ id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1380, status: 'Full Payment' }],
+    paymentHistory: [{ 
+      id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1380, status: 'Full Payment',
+      paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
+    }],
     paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
   },
   { 
@@ -111,7 +119,10 @@ export const MOCK_INVOICES: Invoice[] = [
     items: [{ id: 'item1', description: 'Cloud Consulting', quantity: 10, unitPrice: 300, total: 3000, unitType: 'Cartons' }],
     subtotal: 3000, taxAmount: 300, vatAmount: 150, totalAmount: 3450, status: 'Due',
     paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2450,
-    paymentHistory: [{ id: 'PAY-HIST-002', paymentDate: '2024-07-20T14:30:00Z', amount: 1000, status: 'Partial Payment' }],
+    paymentHistory: [{ 
+      id: 'PAY-HIST-002', paymentDate: '2024-07-20T14:30:00Z', amount: 1000, status: 'Partial Payment',
+      paymentMethod: 'Cash', cashVoucherNumber: 'CVN00123'
+    }],
     paymentMethod: 'Cash', cashVoucherNumber: 'CVN00123'
   },
   { 
