@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 const invoiceItemSchema = z.object({
   id: z.string().optional(), // id is managed internally
@@ -143,21 +143,43 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  
+  const prevInitialDataRef = useRef(initialData);
 
   useEffect(() => {
-    const defaultVals = getDefaultFormValues(initialData);
-    form.reset(defaultVals);
+    // Always reset the RHF form values if initialData changes.
+    form.reset(getDefaultFormValues(initialData));
 
-    if (initialData && initialData.customerId) {
-      const currentCustomer = customers.find(c => c.id === initialData.customerId);
-      setCustomerSearch(currentCustomer?.name || initialData.customerName || '');
-    } else {
-      setCustomerSearch('');
+    const initialDataChangedOrIsNew = prevInitialDataRef.current?.id !== initialData?.id || 
+                                   (prevInitialDataRef.current === null && initialData !== null) || // from null to something
+                                   (prevInitialDataRef.current !== null && initialData === null); // from something to null
+
+
+    if (initialData?.customerId) {
+      const customer = customers.find(c => c.id === initialData.customerId);
+      const newSearchText = customer?.name || initialData.customerName || initialData.customerId || '';
+      setCustomerSearch(newSearchText);
+      // If context changed to an invoice with a customer, reset suggestions
+      if (initialDataChangedOrIsNew) {
+        setCustomerSuggestions([]);
+        setIsCustomerPopoverOpen(false);
+      }
+    } else { 
+      // New invoice context (no initialData.customerId)
+      if (initialDataChangedOrIsNew) { 
+        // Only clear search if the context truly changed to "new invoice"
+        setCustomerSearch('');
+        setCustomerSuggestions([]);
+        setIsCustomerPopoverOpen(false);
+      }
+      // If only `customers` list updated while in "new invoice" mode, `customerSearch` (user input) is preserved.
     }
-    
-    setCustomerSuggestions([]);
-    setIsCustomerPopoverOpen(false);
-  }, [initialData, customers, form]);
+
+    // Update the ref after processing.
+    if (initialDataChangedOrIsNew) {
+      prevInitialDataRef.current = initialData;
+    }
+  }, [initialData, customers, form.reset]);
 
 
   useEffect(() => {
@@ -242,7 +264,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
               <FormItem>
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData?.id} />
+                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData?.id && isEditingExistingInvoice} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -251,7 +273,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
          <FormField
             control={form.control}
             name="customerId"
-            render={({ field }) => ( // field is implicitly used by form.setValue
+            render={({ field }) => ( 
               <FormItem>
                 <FormLabel>Customer</FormLabel>
                 <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
@@ -261,18 +283,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                       value={customerSearch}
                       onChange={handleCustomerSearchChange}
                       onFocus={() => {
-                        if (customerSearch.trim()) {
-                           const filteredSuggestions = customers.filter(
-                             c => c.name.toLowerCase().includes(customerSearch.toLowerCase().trim()) ||
-                                  c.id.toLowerCase().includes(customerSearch.toLowerCase().trim())
-                           );
-                           if (filteredSuggestions.length > 0) {
-                             setCustomerSuggestions(filteredSuggestions);
+                        if (customerSearch.trim() && customerSuggestions.length > 0) {
                              setIsCustomerPopoverOpen(true);
-                           }
-                        } else if (customers.length > 0) { 
-                           // setCustomerSuggestions(customers.slice(0,5)); // Example: show first 5
-                           // setIsCustomerPopoverOpen(true);
+                        } else if (!customerSearch.trim() && customers.length > 0) {
+                            // Optionally show some initial suggestions on focus if search is empty
+                            // setCustomerSuggestions(customers.slice(0,5)); 
+                            // setIsCustomerPopoverOpen(true);
                         }
                       }}
                       className="pr-8"
@@ -282,25 +298,26 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                   <PopoverContent
                     className="w-[--radix-popover-trigger-width] p-0"
                     align="start" 
+                    // Ensure onOpenAutoFocus isn't stealing focus and closing immediately. Usually not an issue.
+                    onOpenAutoFocus={(e) => e.preventDefault()}
                   >
-                    {isCustomerPopoverOpen && (
+                    {customerSuggestions.length > 0 ? (
                       <ul className="max-h-60 overflow-y-auto">
-                        {customerSuggestions.length > 0 ? (
-                          customerSuggestions.map(cust => (
-                            <li
-                              key={cust.id}
-                              onClick={() => handleCustomerSelect(cust)}
-                              className="p-2 hover:bg-accent cursor-pointer text-sm"
-                            >
-                              {cust.name} ({cust.id})
-                            </li>
-                          ))
-                        ) : (
-                          <li className="p-2 text-sm text-muted-foreground">
-                            {customerSearch.trim() ? 'No customers found.' : (customers.length > 0 ? 'Type to search...' : 'No customers available.')}
+                        {customerSuggestions.map(cust => (
+                          <li
+                            key={cust.id}
+                            onClick={() => handleCustomerSelect(cust)}
+                            className="p-2 hover:bg-accent cursor-pointer text-sm"
+                          >
+                            {cust.name} ({cust.id})
                           </li>
-                        )}
+                        ))}
                       </ul>
+                    ) : (
+                       customerSearch.trim() && isCustomerPopoverOpen && // Only show "no customers found" if popover is meant to be open due to search
+                        <div className="p-2 text-sm text-muted-foreground">
+                           No customers found.
+                        </div>
                     )}
                   </PopoverContent>
                 </Popover>
@@ -697,3 +714,4 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     </Form>
   );
 }
+
