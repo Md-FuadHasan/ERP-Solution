@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -147,16 +148,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const prevInitialDataRef = useRef(initialData);
 
   useEffect(() => {
-    // Reset the form with new default values derived from initialData
     const defaultVals = getDefaultFormValues(initialData);
     form.reset(defaultVals);
 
-    // After form reset, synchronize the customer search input text
-    // with the customer name corresponding to defaultVals.customerId
     const customerForSearchInput = customers.find(c => c.id === defaultVals.customerId);
     setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
     
-    // Store the current initialData for comparison in the next render
     prevInitialDataRef.current = initialData;
   }, [initialData, customers, form]);
 
@@ -243,7 +240,17 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Customer</FormLabel>
-                <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                <Popover 
+                  open={isCustomerPopoverOpen} 
+                  onOpenChange={(open) => {
+                    setIsCustomerPopoverOpen(open);
+                    if (open) {
+                      const selectedCustomerId = form.getValues("customerId");
+                      const customer = customers.find(c => c.id === selectedCustomerId);
+                      setCurrentCustomerSearchInput(customer ? customer.name : "");
+                    }
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
