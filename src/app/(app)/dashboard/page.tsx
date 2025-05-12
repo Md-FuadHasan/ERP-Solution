@@ -1,3 +1,4 @@
+
 // src/app/(app)/dashboard/page.tsx
 'use client';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,7 +18,7 @@ import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { useData } from '@/context/DataContext'; // Corrected import path
+import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -38,7 +39,8 @@ export default function DashboardPage() {
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
     const totalOutstanding = totalRevenue - totalPaid;
     const activeCustomers = new Set(invoices.map(inv => inv.customerId)).size;
-    const overdueInvoices = invoices.filter(inv => inv.status === 'Overdue' && inv.remainingBalance > 0).length;
+    // 'Due' status now covers 'Sent' and 'Overdue' for this calculation
+    const dueInvoicesCount = invoices.filter(inv => inv.status === 'Due' && inv.remainingBalance > 0).length;
 
     return {
       totalRevenue,
@@ -46,7 +48,7 @@ export default function DashboardPage() {
       totalOutstanding,
       activeCustomers,
       totalInvoices: invoices.length,
-      overdueInvoices,
+      dueInvoicesCount, // Changed from overdueInvoices
     };
   }, [invoices]);
 
@@ -54,13 +56,14 @@ export default function DashboardPage() {
     const statusCounts = invoices.reduce((acc, inv) => {
       acc[inv.status] = (acc[inv.status] || 0) + 1;
       return acc;
-    }, {} as Record<InvoiceStatus, number>); // Use InvoiceStatus type here
+    }, {} as Record<InvoiceStatus, number>);
     return Object.entries(statusCounts).map(([name, value], index) => ({ name, value, fill: COLORS[index % COLORS.length] }));
   }, [invoices]);
 
   const monthlyRevenueData: ChartDataPoint[] = useMemo(() => {
     const revenueByMonth: Record<string, number> = {};
-    invoices.filter(inv => inv.status === 'Paid').forEach(inv => {
+    // 'Received' status now indicates paid invoices
+    invoices.filter(inv => inv.status === 'Received').forEach(inv => {
       const month = format(new Date(inv.issueDate), 'MMM yy');
       revenueByMonth[month] = (revenueByMonth[month] || 0) + inv.amountPaid;
     });
@@ -78,9 +81,9 @@ export default function DashboardPage() {
 
   const outstandingInvoicesData: (ChartDataPoint & { customerName?: string; dueDate?: string; status?: InvoiceStatus })[] = useMemo(() => {
      return invoices
-      .filter(inv => inv.remainingBalance > 0 && (inv.status === 'Sent' || inv.status === 'Overdue'))
-      .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()) // Most recent due dates first
-      .slice(0, 5) // Top 5
+      .filter(inv => inv.remainingBalance > 0 && inv.status === 'Due') // Filter by 'Due' status
+      .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()) 
+      .slice(0, 5) 
       .map(inv => ({
         name: inv.id,
         value: inv.remainingBalance,
@@ -113,7 +116,7 @@ export default function DashboardPage() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Revenue Over Time</CardTitle>
-              <CardDescription>Last 6 months paid invoice amounts.</CardDescription>
+              <CardDescription>Last 6 months received invoice amounts.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
               <Skeleton className="h-[350px] w-full" />
@@ -161,7 +164,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Received</CardTitle> {/* Changed from Total Paid */}
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -178,7 +181,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">${stats.totalOutstanding.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{stats.overdueInvoices} overdue invoices</p>
+            <p className="text-xs text-muted-foreground">{stats.dueInvoicesCount} due invoices</p> {/* Changed from overdueInvoices */}
           </CardContent>
         </Card>
         <Card>
@@ -197,12 +200,13 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Over Time</CardTitle>
-            <CardDescription>Last 6 months paid invoice amounts.</CardDescription>
+            <CardDescription>Last 6 months received invoice amounts.</CardDescription> {/* Changed from paid */}
           </CardHeader>
           <CardContent className="pl-2">
           <ChartContainer config={{
                 revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
               }} className="h-[350px] w-full">
+             <ResponsiveContainer width="100%" height="100%">
               <RechartsBarChart data={monthlyRevenueData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
@@ -213,6 +217,7 @@ export default function DashboardPage() {
                 />
                 <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} name="Revenue" />
               </RechartsBarChart>
+             </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -224,15 +229,16 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="flex justify-center items-center h-[350px]">
              <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square h-full">
+              <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <RechartsTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
                 <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} 
                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                         const RADIAN = Math.PI / 180;
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.6; // Adjust label position
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.6; 
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        if (percent * 100 < 5) return null; // Hide small percentage labels
+                        if (percent * 100 < 5) return null; 
                         return (
                           <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-medium">
                             {`${(percent * 100).toFixed(0)}%`}
@@ -246,6 +252,7 @@ export default function DashboardPage() {
                 </Pie>
                  <ChartLegend content={<ChartLegendContent nameKey="name" />} />
               </PieChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -296,3 +303,4 @@ export default function DashboardPage() {
     </>
   );
 }
+

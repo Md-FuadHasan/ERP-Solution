@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,11 +11,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, PlusCircle, Trash2, DollarSign, History } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, Package, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile } from '@/types';
-import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
+import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
 import { useEffect } from 'react';
 
@@ -22,6 +23,7 @@ const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
   unitPrice: z.coerce.number().min(0.01, "Unit price must be positive."),
+  unitType: z.enum(['Cartons', 'PCS']).default('PCS'),
 });
 
 export const invoiceFormSchema = z.object({
@@ -33,6 +35,11 @@ export const invoiceFormSchema = z.object({
   status: z.enum(ALL_INVOICE_STATUSES),
   paymentProcessingStatus: z.enum(ALL_PAYMENT_PROCESSING_STATUSES),
   partialAmountPaid: z.coerce.number().positive("Amount must be positive if provided.").optional(),
+  paymentMethod: z.enum(ALL_PAYMENT_METHODS).optional(),
+  cashVoucherNumber: z.string().max(50).optional(),
+  bankName: z.string().max(100).optional(),
+  bankAccountNumber: z.string().max(50).optional(),
+  onlineTransactionNumber: z.string().max(100).optional(),
 }).superRefine((data, ctx) => {
   if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
     ctx.addIssue({
@@ -41,6 +48,14 @@ export const invoiceFormSchema = z.object({
       path: ["partialAmountPaid"],
     });
   }
+  if (data.paymentMethod === 'Cash' && !data.cashVoucherNumber) {
+    // Making cash voucher optional for now, can be made required if needed
+    // ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cash Voucher Number is required.", path: ["cashVoucherNumber"] });
+  }
+  if (data.paymentMethod === 'Bank Transfer' && (!data.bankName || !data.bankAccountNumber /*|| !data.onlineTransactionNumber*/)) {
+     // Making these optional for now, can be made required
+    // ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank Name and Account Number are required for Bank Transfer.", path: ["bankName"] });
+  }
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -48,7 +63,7 @@ export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
-  companyProfile: CompanyProfile; // Added companyProfile prop
+  companyProfile: CompanyProfile;
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -61,18 +76,28 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
       ...initialData,
       issueDate: new Date(initialData.issueDate),
       dueDate: new Date(initialData.dueDate),
-      items: initialData.items.map(item => ({...item})),
+      items: initialData.items.map(item => ({...item, unitType: item.unitType || 'PCS'})),
       paymentProcessingStatus: initialData.paymentProcessingStatus || 'Unpaid',
       partialAmountPaid: initialData.paymentProcessingStatus === 'Partially Paid' ? initialData.amountPaid : undefined,
+      paymentMethod: initialData.paymentMethod,
+      cashVoucherNumber: initialData.cashVoucherNumber || '',
+      bankName: initialData.bankName || '',
+      bankAccountNumber: initialData.bankAccountNumber || '',
+      onlineTransactionNumber: initialData.onlineTransactionNumber || '',
     } : {
       id: `INV-${String(Date.now()).slice(-6)}`,
       customerId: '',
       issueDate: new Date(),
       dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-      items: [{ description: '', quantity: 1, unitPrice: 0 }],
+      items: [{ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
       status: 'Draft',
       paymentProcessingStatus: 'Unpaid',
       partialAmountPaid: undefined,
+      paymentMethod: undefined,
+      cashVoucherNumber: '',
+      bankName: '',
+      bankAccountNumber: '',
+      onlineTransactionNumber: '',
     },
   });
 
@@ -84,15 +109,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   const watchedItems = form.watch("items");
   const watchedPaymentProcessingStatus = form.watch("paymentProcessingStatus");
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
+  const watchedPaymentMethod = form.watch("paymentMethod");
 
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice || 0), 0);
   
-  const taxRate = initialData?.taxAmount && subtotal > 0 
-    ? initialData.taxAmount / subtotal 
-    : (companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10);
-  const vatRate = initialData?.vatAmount && subtotal > 0 
-    ? initialData.vatAmount / subtotal 
-    : (companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05);
+  const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10;
+  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05;
 
   const taxAmount = subtotal * taxRate;
   const vatAmount = subtotal * vatRate;
@@ -107,12 +129,26 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   const displayRemainingBalance = totalAmount - displayAmountPaid;
 
   useEffect(() => {
-    if (watchedPaymentProcessingStatus === 'Fully Paid') {
-      form.setValue('partialAmountPaid', undefined); 
-    } else if (watchedPaymentProcessingStatus === 'Unpaid') {
+    if (watchedPaymentProcessingStatus === 'Fully Paid' || watchedPaymentProcessingStatus === 'Unpaid') {
       form.setValue('partialAmountPaid', undefined); 
     }
   }, [watchedPaymentProcessingStatus, form]);
+
+  // Clear bank/cash details if payment method changes
+   useEffect(() => {
+    if (watchedPaymentMethod === 'Cash') {
+      form.setValue('bankName', '');
+      form.setValue('bankAccountNumber', '');
+      form.setValue('onlineTransactionNumber', '');
+    } else if (watchedPaymentMethod === 'Bank Transfer') {
+      form.setValue('cashVoucherNumber', '');
+    } else {
+      form.setValue('cashVoucherNumber', '');
+      form.setValue('bankName', '');
+      form.setValue('bankAccountNumber', '');
+      form.setValue('onlineTransactionNumber', '');
+    }
+  }, [watchedPaymentMethod, form]);
 
 
   return (
@@ -230,14 +266,14 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {ALL_INVOICE_STATUSES.filter(s => s !== 'Paid').map((status) => ( 
+                    {ALL_INVOICE_STATUSES.map((status) => ( 
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>Set to 'Paid' automatically if fully paid.</FormDescription>
+                <FormDescription>Set to 'Received' automatically if fully paid.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -247,73 +283,92 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
         <div className="space-y-4">
           <FormLabel>Invoice Items</FormLabel>
           {fields.map((field, index) => (
-            <div key={field.id} className="flex flex-col md:flex-row items-start gap-4 rounded-md border p-4">
+            <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
               <FormField
                 control={form.control}
                 name={`items.${index}.description`}
                 render={({ field }) => (
-                  <FormItem className="flex-grow">
+                  <FormItem className="flex-grow w-full md:w-auto">
                     <FormLabel className="sr-only">Description</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Item description" {...field} className="min-h-[40px] md:min-h-[60px]" />
+                      <Textarea placeholder="Item Description" {...field} className="min-h-[40px] text-sm" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex flex-row md:flex-col gap-4 md:gap-0 md:space-y-2 w-full md:w-auto">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.quantity`}
-                  render={({ field }) => (
-                    <FormItem className="flex-grow md:flex-grow-0 md:w-24">
-                      <FormLabel className="sr-only">Quantity</FormLabel>
+              <FormField
+                control={form.control}
+                name={`items.${index}.quantity`}
+                render={({ field }) => (
+                  <FormItem className="w-full md:w-24">
+                    <FormLabel className="sr-only">Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Quantity" {...field} step="0.01" className="text-sm"/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name={`items.${index}.unitType`}
+                render={({ field }) => (
+                  <FormItem className="w-full md:w-32">
+                    <FormLabel className="sr-only">Unit Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || 'PCS'}>
                       <FormControl>
-                        <Input type="number" placeholder="Qty" {...field} step="0.01" />
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.unitPrice`}
-                  render={({ field }) => (
-                    <FormItem className="flex-grow md:flex-grow-0 md:w-32">
-                      <FormLabel className="sr-only">Unit Price</FormLabel>
-                      <FormControl>
-                         <div className="relative">
-                          <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-7"/>
+                      <SelectContent>
+                        <SelectItem value="PCS">PCS</SelectItem>
+                        <SelectItem value="Cartons">Cartons</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`items.${index}.unitPrice`}
+                render={({ field }) => (
+                  <FormItem className="w-full md:w-32">
+                    <FormLabel className="sr-only">Unit Price</FormLabel>
+                    <FormControl>
+                        <div className="relative">
+                        <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-6 text-sm"/>
                         </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-               <div className="text-right md:text-left md:w-32 pt-2 md:pt-7">
-                <span className="font-medium">
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="text-right md:text-left w-full md:w-24 pt-1 md:pt-0 md:pl-2">
+                <span className="font-medium text-sm">
                   ${(watchedItems[index]?.quantity * watchedItems[index]?.unitPrice || 0).toFixed(2)}
                 </span>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="mt-2 md:mt-6 text-destructive hover:bg-destructive/10">
+              <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:bg-destructive/10 self-center md:self-auto">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
-          <Button type="button" variant="outline" onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}>
+          <Button type="button" variant="outline" onClick={() => append({ description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Item
           </Button>
         </div>
-
+        
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
             name="paymentProcessingStatus"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Payment Status</FormLabel>
+                <FormLabel>Payment Collection Status</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -354,6 +409,93 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             />
           )}
         </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Payment Method</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                        </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                        {ALL_PAYMENT_METHODS.map((method) => (
+                        <SelectItem key={method} value={method}>
+                            {method}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            {watchedPaymentMethod === 'Cash' && (
+                <FormField
+                    control={form.control}
+                    name="cashVoucherNumber"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Cash Voucher Number</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Enter voucher number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            )}
+        </div>
+        
+        {watchedPaymentMethod === 'Bank Transfer' && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <FormField
+                    control={form.control}
+                    name="bankName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Bank Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Enter bank name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="bankAccountNumber"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Bank Account Number</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Enter account number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="onlineTransactionNumber"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Online Transaction Number</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Enter transaction number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            </div>
+        )}
+
 
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
@@ -424,3 +566,4 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
     </Form>
   );
 }
+

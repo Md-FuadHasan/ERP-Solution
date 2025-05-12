@@ -138,12 +138,10 @@ export default function CustomersPage() {
       let customerId = data.id;
       if (!customerId) {
         customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
-        // Basic check for uniqueness, in a real app, this would be more robust
         while (customers.find(c => c.id === customerId)) {
             customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
         }
       } else {
-        // Check if user provided ID already exists
         if (customers.find(c => c.id === customerId && (!editingCustomer || editingCustomer.id !== customerId))) {
           toast({
             title: "Error: Customer ID exists",
@@ -401,7 +399,6 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* This AlertDialog is for confirming customer deletion */}
       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -422,8 +419,3 @@ export default function CustomersPage() {
     </>
   );
 }
-
-
-    
-
-    

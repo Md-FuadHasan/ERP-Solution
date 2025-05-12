@@ -38,8 +38,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
-import { useData } from '@/context/DataContext'; // Import useData hook
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { useData } from '@/context/DataContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InvoicesPage() {
   const { 
@@ -50,7 +50,7 @@ export default function InvoicesPage() {
     updateInvoice, 
     deleteInvoice, 
     isLoading 
-  } = useData(); // Use DataContext
+  } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function InvoicesPage() {
 
   const confirmDelete = () => {
     if (invoiceToDelete) {
-      deleteInvoice(invoiceToDelete.id); // Use context action
+      deleteInvoice(invoiceToDelete.id);
       toast({ title: "Invoice Deleted", description: `Invoice ${invoiceToDelete.id} has been removed.` });
       setInvoiceToDelete(null);
     }
@@ -100,6 +100,7 @@ export default function InvoicesPage() {
       ...item,
       id: editingInvoice?.items[index]?.id || `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2,5)}`,
       total: item.quantity * item.unitPrice,
+      unitType: item.unitType || 'PCS',
     }));
 
     const subtotal = processedItems.reduce((acc, item) => acc + item.total, 0);
@@ -127,10 +128,9 @@ export default function InvoicesPage() {
     
     let finalStatus = data.status;
     if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
-      finalStatus = 'Paid';
-    } else if (data.status === 'Paid' && calculatedRemainingBalance > 0) {
-      // If user sets to 'Paid' but balance is >0, revert to 'Sent' or 'Draft'
-      finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Sent'; 
+      finalStatus = 'Received'; // Updated from 'Paid'
+    } else if (data.status === 'Received' && calculatedRemainingBalance > 0) {
+      finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Due'; 
     }
 
 
@@ -138,16 +138,16 @@ export default function InvoicesPage() {
     const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
     const paymentAmountForThisRecord = calculatedAmountPaid - previousTotalAmountPaid;
 
-    if (paymentAmountForThisRecord > 0) { // Only add a record if new payment is made
+    if (paymentAmountForThisRecord > 0) {
         const paymentRecordStatus: PaymentRecord['status'] = 
-            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid) // Check if this payment makes it fully paid
+            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid)
             ? 'Full Payment' 
             : 'Partial Payment';
 
         const newPaymentRecord: PaymentRecord = {
             id: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             paymentDate: new Date().toISOString(),
-            amount: paymentAmountForThisRecord, // The amount of *this* specific payment
+            amount: paymentAmountForThisRecord,
             status: paymentRecordStatus,
         };
         updatedPaymentHistory.push(newPaymentRecord);
@@ -167,16 +167,21 @@ export default function InvoicesPage() {
       dueDate: format(data.dueDate, 'yyyy-MM-dd'),
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus,
-      amountPaid: calculatedAmountPaid, // This is the *total* amount paid so far
+      amountPaid: calculatedAmountPaid,
       remainingBalance: calculatedRemainingBalance,
       paymentHistory: updatedPaymentHistory,
+      paymentMethod: data.paymentMethod,
+      cashVoucherNumber: data.cashVoucherNumber,
+      bankName: data.bankName,
+      bankAccountNumber: data.bankAccountNumber,
+      onlineTransactionNumber: data.onlineTransactionNumber,
     };
 
     if (editingInvoice) {
-      updateInvoice(invoiceData); // Use context action
+      updateInvoice(invoiceData);
       toast({ title: "Invoice Updated", description: `Invoice ${invoiceData.id} details have been updated.` });
     } else {
-      addInvoice(invoiceData); // Use context action
+      addInvoice(invoiceData);
       toast({ title: "Invoice Created", description: `Invoice ${invoiceData.id} has been successfully created.` });
     }
     setIsModalOpen(false);
@@ -349,3 +354,4 @@ export default function InvoicesPage() {
     </>
   );
 }
+
