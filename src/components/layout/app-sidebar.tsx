@@ -18,7 +18,7 @@ import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { open, setOpen, isMobile, state } = useSidebar();
+  const { open, setOpen, isMobile, state, setOpenMobile } = useSidebar();
 
   const collapsed = state === 'collapsed' && !isMobile;
 
@@ -28,7 +28,7 @@ export function AppSidebar() {
         {/* Conditional rendering for header content based on mobile/desktop and collapsed state */}
         {isMobile ? (
           <div className="flex items-center justify-start p-3"> {/* Mobile sheet header: Logo only */}
-            <Link href="/dashboard">
+            <Link href="/dashboard" onClick={() => setOpenMobile(false)}>
               <Logo className="h-8 w-auto text-sidebar-foreground" />
             </Link>
           </div>
@@ -63,6 +63,11 @@ export function AppSidebar() {
                   isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
                   tooltip={collapsed ? item.label : undefined}
                   className={`w-full ${collapsed ? 'justify-center' : ''}`}
+                  onClick={() => {
+                    if (isMobile) {
+                      setOpenMobile(false);
+                    }
+                  }}
                 >
                   <item.icon className={collapsed ? '' : 'mr-2'} />
                   {/* Label is shown if not collapsed (desktop expanded) or if mobile (collapsed is false) */}
