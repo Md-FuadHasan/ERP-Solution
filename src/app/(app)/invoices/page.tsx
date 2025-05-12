@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -127,27 +128,30 @@ export default function InvoicesPage() {
     if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
       finalStatus = 'Paid';
     } else if (data.status === 'Paid' && calculatedRemainingBalance > 0) {
+      // If user sets to 'Paid' but balance is >0, revert to 'Sent' or 'Draft'
       finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Sent'; 
     }
+
 
     let updatedPaymentHistory: PaymentRecord[] = editingInvoice?.paymentHistory ? [...editingInvoice.paymentHistory] : [];
     const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
     const paymentAmountForThisRecord = calculatedAmountPaid - previousTotalAmountPaid;
 
-    if (paymentAmountForThisRecord > 0) {
+    if (paymentAmountForThisRecord > 0) { // Only add a record if new payment is made
         const paymentRecordStatus: PaymentRecord['status'] = 
-            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid)
+            (calculatedRemainingBalance <= 0 && totalAmount > 0 && calculatedAmountPaid >= previousTotalAmountPaid) // Check if this payment makes it fully paid
             ? 'Full Payment' 
             : 'Partial Payment';
 
         const newPaymentRecord: PaymentRecord = {
             id: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             paymentDate: new Date().toISOString(),
-            amount: paymentAmountForThisRecord,
+            amount: paymentAmountForThisRecord, // The amount of *this* specific payment
             status: paymentRecordStatus,
         };
         updatedPaymentHistory.push(newPaymentRecord);
     }
+
 
     const invoiceData: Invoice = {
       id: data.id, 
@@ -162,7 +166,7 @@ export default function InvoicesPage() {
       dueDate: format(data.dueDate, 'yyyy-MM-dd'),
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus,
-      amountPaid: calculatedAmountPaid,
+      amountPaid: calculatedAmountPaid, // This is the *total* amount paid so far
       remainingBalance: calculatedRemainingBalance,
       paymentHistory: updatedPaymentHistory,
     };
@@ -307,7 +311,7 @@ export default function InvoicesPage() {
           setIsModalOpen(isOpen);
           if (!isOpen) setEditingInvoice(null);
       }}>
-        <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
@@ -344,3 +348,6 @@ export default function InvoicesPage() {
     </>
   );
 }
+
+
+    

@@ -144,7 +144,7 @@ export default function CustomersPage() {
         }
       } else {
         // Check if user provided ID already exists
-        if (customers.find(c => c.id === customerId)) {
+        if (customers.find(c => c.id === customerId && (!editingCustomer || editingCustomer.id !== customerId))) {
           toast({
             title: "Error: Customer ID exists",
             description: `Customer ID ${customerId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
@@ -290,7 +290,7 @@ export default function CustomersPage() {
           setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingCustomer(null);
       }}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
             <DialogDescription>
@@ -306,7 +306,7 @@ export default function CustomersPage() {
       </Dialog>
 
       <Dialog open={isDetailsModalOpen} onOpenChange={closeCustomerDetailsModal}>
-        <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Customer Profile: {selectedCustomerForDetails?.name}</DialogTitle>
             <DialogDescription>
@@ -423,5 +423,7 @@ export default function CustomersPage() {
   );
 }
 
+
+    
 
     
