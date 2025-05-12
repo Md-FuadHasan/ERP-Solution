@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, TrendingDown, Zap } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, TrendingDown, Zap, UserPlus } from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
@@ -39,8 +39,8 @@ export default function DashboardPage() {
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
     const totalOutstanding = totalRevenue - totalPaid;
     const activeCustomers = new Set(invoices.map(inv => inv.customerId)).size;
-    // 'Due' status now covers 'Sent' and 'Overdue' for this calculation
     const dueInvoicesCount = invoices.filter(inv => inv.status === 'Due' && inv.remainingBalance > 0).length;
+    const totalCustomerCount = customers.length;
 
     return {
       totalRevenue,
@@ -48,9 +48,10 @@ export default function DashboardPage() {
       totalOutstanding,
       activeCustomers,
       totalInvoices: invoices.length,
-      dueInvoicesCount, // Changed from overdueInvoices
+      dueInvoicesCount,
+      totalCustomerCount,
     };
-  }, [invoices]);
+  }, [invoices, customers]); // Added customers to dependency array
 
   const invoiceStatusData: ChartDataPoint[] = useMemo(() => {
     const statusCounts = invoices.reduce((acc, inv) => {
@@ -62,7 +63,6 @@ export default function DashboardPage() {
 
   const monthlyRevenueData: ChartDataPoint[] = useMemo(() => {
     const revenueByMonth: Record<string, number> = {};
-    // 'Received' status now indicates paid invoices
     invoices.filter(inv => inv.status === 'Received').forEach(inv => {
       const month = format(new Date(inv.issueDate), 'MMM yy');
       revenueByMonth[month] = (revenueByMonth[month] || 0) + inv.amountPaid;
@@ -76,12 +76,12 @@ export default function DashboardPage() {
         const dateB = new Date(`${bMonth} 1, 20${bYear}`);
         return dateA.getTime() - dateB.getTime();
       })
-      .slice(-6); // last 6 months
+      .slice(-6); 
   }, [invoices]);
 
   const outstandingInvoicesData: (ChartDataPoint & { customerName?: string; dueDate?: string; status?: InvoiceStatus })[] = useMemo(() => {
      return invoices
-      .filter(inv => inv.remainingBalance > 0 && inv.status === 'Due') // Filter by 'Due' status
+      .filter(inv => inv.remainingBalance > 0 && inv.status === 'Due') 
       .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()) 
       .slice(0, 5) 
       .map(inv => ({
@@ -99,7 +99,7 @@ export default function DashboardPage() {
       <>
         <PageHeader title="Dashboard" description="Overview of your invoicing activities." />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(5)].map((_, i) => ( // Increased skeleton array to 5 for the new card
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-5 w-2/3" />
@@ -151,7 +151,7 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Overview of your invoicing activities. Last refreshed: ${lastRefreshed ? format(lastRefreshed, 'PPpp') : 'Loading...'}`}
       />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6"> {/* Consider xl:grid-cols-5 if cards are narrow, or let it wrap */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Received</CardTitle> {/* Changed from Total Paid */}
+            <CardTitle className="text-sm font-medium">Total Received</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -181,7 +181,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">${stats.totalOutstanding.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{stats.dueInvoicesCount} due invoices</p> {/* Changed from overdueInvoices */}
+            <p className="text-xs text-muted-foreground">{stats.dueInvoicesCount} due invoices</p>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCustomerCount}</div>
+            <p className="text-xs text-muted-foreground">All registered customer profiles</p>
           </CardContent>
         </Card>
         <Card>
@@ -191,7 +201,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeCustomers}</div>
-            <p className="text-xs text-muted-foreground">Based on current invoices</p>
+            <p className="text-xs text-muted-foreground">Customers with invoices</p>
           </CardContent>
         </Card>
       </div>
@@ -200,7 +210,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Over Time</CardTitle>
-            <CardDescription>Last 6 months received invoice amounts.</CardDescription> {/* Changed from paid */}
+            <CardDescription>Last 6 months received invoice amounts.</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
           <ChartContainer config={{
