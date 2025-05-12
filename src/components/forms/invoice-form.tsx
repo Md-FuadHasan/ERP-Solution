@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -48,7 +47,31 @@ export const invoiceFormSchema = z.object({
       path: ["partialAmountPaid"],
     });
   }
-  // Validations for payment method specific fields can be added here if they become strictly required
+  if ((data.paymentProcessingStatus === 'Partially Paid' || data.paymentProcessingStatus === 'Fully Paid') && !data.paymentMethod) {
+    ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Payment method is required when processing a payment.",
+        path: ["paymentMethod"],
+    });
+  }
+  if (data.paymentMethod === 'Cash' && !data.cashVoucherNumber && (data.paymentProcessingStatus === 'Partially Paid' || data.paymentProcessingStatus === 'Fully Paid')) {
+     ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cash voucher number is required for cash payments.",
+        path: ["cashVoucherNumber"],
+    });
+  }
+  if (data.paymentMethod === 'Bank Transfer' && (!data.bankName || !data.bankAccountNumber || !data.onlineTransactionNumber) && (data.paymentProcessingStatus === 'Partially Paid' || data.paymentProcessingStatus === 'Fully Paid')) {
+    if (!data.bankName) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank name is required for bank transfers.", path: ["bankName"]});
+    }
+    if (!data.bankAccountNumber) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank account number is required for bank transfers.", path: ["bankAccountNumber"]});
+    }
+    if (!data.onlineTransactionNumber) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Online transaction number is required for bank transfers.", path: ["onlineTransactionNumber"]});
+    }
+  }
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -72,7 +95,6 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
       items: invoice.items.map(item => ({...item, unitType: item.unitType || 'PCS'})),
       status: invoice.status,
       paymentProcessingStatus: invoice.paymentProcessingStatus || (invoice.remainingBalance <= 0 && invoice.totalAmount > 0 ? 'Fully Paid' : invoice.amountPaid > 0 ? 'Partially Paid' : 'Unpaid'),
-      // Payment entry fields are cleared for new entries
       partialAmountPaid: undefined,
       paymentMethod: undefined, 
       cashVoucherNumber: '',
@@ -82,7 +104,7 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
     };
   }
   return {
-    id: `INV-${String(Date.now()).slice(-6)}`,
+    id: `INV-${String(Date.now()).slice(-6)}-${Math.random().toString(36).substring(2,5)}`,
     customerId: '',
     issueDate: new Date(),
     dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
@@ -115,27 +137,33 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
   const watchedPaymentMethod = form.watch("paymentMethod");
 
-  // Use state for customer search input and suggestions
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+  const [isCustomerSearchFocused, setIsCustomerSearchFocused] = useState(false);
+
 
   useEffect(() => {
     if (initialData && initialData.customerId) {
       const currentCustomer = customers.find(c => c.id === initialData.customerId);
-      setCustomerSearch(currentCustomer?.name || '');
+      setCustomerSearch(currentCustomer?.name || initialData.customerName || '');
     } else {
       setCustomerSearch('');
     }
     form.reset(getDefaultFormValues(initialData));
-  }, [initialData, form, customers]);
+    setCustomerSuggestions([]);
+    setIsCustomerSearchFocused(false);
+  }, [initialData, customers, form]);
 
 
   useEffect(() => {
     if (watchedPaymentProcessingStatus === 'Fully Paid' || watchedPaymentProcessingStatus === 'Unpaid') {
-      if (form.getValues('partialAmountPaid') !== undefined) { // only set if different to avoid loop
+      if (form.getValues('partialAmountPaid') !== undefined) { 
          form.setValue('partialAmountPaid', undefined, {shouldValidate: true});
       }
     }
+     if (watchedPaymentProcessingStatus === 'Unpaid') {
+        form.setValue('paymentMethod', undefined, {shouldValidate: true});
+     }
   }, [watchedPaymentProcessingStatus, form]);
 
    useEffect(() => {
@@ -146,7 +174,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
       form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
     } else if (currentMethod === 'Bank Transfer') {
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
-    } else if (currentMethod === undefined) { // When payment method is cleared
+    } else if (currentMethod === undefined) { 
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
       form.setValue('bankName', '', { shouldValidate: false });
       form.setValue('bankAccountNumber', '', { shouldValidate: false });
@@ -171,10 +199,9 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
     form.setValue('customerId', customer.id, { shouldValidate: true });
     setCustomerSearch(customer.name);
     setCustomerSuggestions([]);
+    setIsCustomerSearchFocused(false); 
   };
 
-
-  // Recalculate totals based on form state if no initialData, or initialData if available (for display)
   const itemsToCalc = watchedItems; 
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
   
@@ -185,17 +212,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   const vatAmountDisplay = subtotalDisplay * vatRate;
   const totalAmountDisplay = subtotalDisplay + taxAmountDisplay + vatAmountDisplay;
   
-  // Display amounts based on current form inputs for payment, but backed by initialData for history.
   let displayAmountPaid = initialData?.amountPaid || 0;
   if (watchedPaymentProcessingStatus === 'Fully Paid') {
-    // If user intends to mark as fully paid with current save, this amount will be total after save.
-    // For display before save, if initialData exists, it's its amountPaid.
-    // If a new partial payment is entered, that's what we're adding.
-    displayAmountPaid = totalAmountDisplay; // This assumes the current save will make it fully paid
+    displayAmountPaid = totalAmountDisplay; 
   } else if (watchedPaymentProcessingStatus === 'Partially Paid' && watchedPartialAmountPaid && watchedPartialAmountPaid > 0) {
     displayAmountPaid = (initialData?.amountPaid || 0) + watchedPartialAmountPaid;
   }
-  const displayRemainingBalance = totalAmountDisplay - displayAmountPaid;
 
 
   return (
@@ -209,7 +231,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
               <FormItem>
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData} />
+                  <Input placeholder="e.g. INV-2024-001" {...field} readOnly={!!initialData && !!initialData.id} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -218,38 +240,45 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
           <FormField
             control={form.control}
             name="customerId"
-            render={({ field }) => (
+            render={({ field }) => ( 
               <FormItem>
                 <FormLabel>Customer</FormLabel>
-                <div className="relative">
-                  <Input 
-                    placeholder="Type to search customer..." 
-                    value={customerSearch}
-                    onChange={handleCustomerSearchChange}
-                    className="pr-8" // Make space for a clear button or dropdown icon if needed
-                  />
-                  {customerSuggestions.length > 0 && (
-                    <Popover open={customerSuggestions.length > 0} onOpenChange={() => setCustomerSuggestions([])}>
-                       <PopoverTrigger asChild>
-                         <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 hidden">Suggestions</Button>
-                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <ul className="max-h-60 overflow-y-auto">
-                          {customerSuggestions.map(cust => (
-                            <li 
-                              key={cust.id} 
-                              onClick={() => handleCustomerSelect(cust)}
-                              className="p-2 hover:bg-accent cursor-pointer text-sm"
-                            >
-                              {cust.name} ({cust.id})
-                            </li>
-                          ))}
-                        </ul>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-                <FormMessage />
+                <Popover 
+                  open={isCustomerSearchFocused && customerSuggestions.length > 0} 
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setIsCustomerSearchFocused(false); 
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Input 
+                      placeholder="Type to search customer..." 
+                      value={customerSearch}
+                      onChange={handleCustomerSearchChange}
+                      onFocus={() => setIsCustomerSearchFocused(true)}
+                      className="pr-8"
+                      autoComplete="off"
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="w-[--radix-popover-trigger-width] p-0" 
+                    onOpenAutoFocus={(e) => e.preventDefault()} 
+                  >
+                    <ul className="max-h-60 overflow-y-auto">
+                      {customerSuggestions.map(cust => (
+                        <li 
+                          key={cust.id} 
+                          onClick={() => handleCustomerSelect(cust)}
+                          className="p-2 hover:bg-accent cursor-pointer text-sm"
+                        >
+                          {cust.name} ({cust.id})
+                        </li>
+                      ))}
+                    </ul>
+                  </PopoverContent>
+                </Popover>
+                <FormMessage /> 
               </FormItem>
             )}
           />
@@ -472,90 +501,94 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <FormField
-                control={form.control}
-                name="paymentMethod"
-                render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Payment Method (for this payment)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
-                    <FormControl>
-                        <SelectTrigger>
-                        <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                        {ALL_PAYMENT_METHODS.map((method) => (
-                        <SelectItem key={method} value={method}>
-                            {method}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
-                    </Select>
-                    <FormMessage />
-                </FormItem>
+        {(watchedPaymentProcessingStatus === 'Partially Paid' || watchedPaymentProcessingStatus === 'Fully Paid') && (
+         <>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <FormField
+                    control={form.control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Payment Method (for this payment)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select payment method" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {ALL_PAYMENT_METHODS.map((method) => (
+                            <SelectItem key={method} value={method}>
+                                {method}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                {watchedPaymentMethod === 'Cash' && (
+                    <FormField
+                        control={form.control}
+                        name="cashVoucherNumber"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Cash Voucher Number</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Enter voucher number" {...field} value={field.value || ''} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                 )}
-            />
-            {watchedPaymentMethod === 'Cash' && (
-                <FormField
-                    control={form.control}
-                    name="cashVoucherNumber"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Cash Voucher Number</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Enter voucher number" {...field} value={field.value || ''} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-            )}
-        </div>
-        
-        {watchedPaymentMethod === 'Bank Transfer' && (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                <FormField
-                    control={form.control}
-                    name="bankName"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Bank Name</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Enter bank name" {...field} value={field.value || ''} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="bankAccountNumber"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Bank Account Number</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Enter account number" {...field} value={field.value || ''}/>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="onlineTransactionNumber"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Online Transaction Number</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Enter transaction number" {...field} value={field.value || ''}/>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
             </div>
+            
+            {watchedPaymentMethod === 'Bank Transfer' && (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <FormField
+                        control={form.control}
+                        name="bankName"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Bank Name</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Enter bank name" {...field} value={field.value || ''} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bankAccountNumber"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Bank Account Number</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Enter account number" {...field} value={field.value || ''}/>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="onlineTransactionNumber"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Online Transaction Number</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Enter transaction number" {...field} value={field.value || ''}/>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                </div>
+            )}
+         </>
         )}
 
 
@@ -583,7 +616,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
           </div>
           <div className="flex justify-between text-md font-semibold text-primary">
             <span>Overall Remaining Balance:</span>
-            <span>${(initialData?.remainingBalance || totalAmountDisplay).toFixed(2)}</span>
+            <span>${(initialData?.remainingBalance !== undefined ? initialData.remainingBalance : totalAmountDisplay).toFixed(2)}</span>
           </div>
         </div>
 
@@ -631,7 +664,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Invoice')}
+            {isSubmitting ? 'Saving...' : (initialData && invoices.some(i => i.id === initialData.id) ? 'Save Changes' : 'Create Invoice')}
           </Button>
         </div>
       </form>
@@ -639,3 +672,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
   );
 }
 
+// Helper to check if the initialData invoice is actually present in the main invoices list (from context)
+// This helps determine if it's a true edit of an existing persisted invoice vs. a new invoice pre-filled from params.
+// This is not used in the current code but can be useful for more complex logic.
+const invoices: Invoice[] = []; // This would need to be passed in or accessed from context if used.
