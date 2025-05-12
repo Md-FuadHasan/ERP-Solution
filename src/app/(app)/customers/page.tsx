@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -182,7 +182,7 @@ export default function CustomersPage() {
           title="Customers"
           description="Manage your customer profiles and contact information."
           actions={
-            <Button onClick={handleAddCustomer} disabled>
+            <Button onClick={handleAddCustomer} disabled className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
             </Button>
           }
@@ -190,14 +190,14 @@ export default function CustomersPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="rounded-lg border shadow-sm bg-card p-4">
+        <div className="rounded-lg border shadow-sm bg-card p-4 overflow-x-auto">
           <Skeleton className="h-8 w-1/4 mb-4" />
           {[...Array(3)].map((_, i) => (
             <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 flex-1 min-w-[100px]" />
+              <Skeleton className="h-6 flex-1 min-w-[150px]" />
+              <Skeleton className="h-6 flex-1 min-w-[150px]" />
+              <Skeleton className="h-6 w-24 min-w-[96px]" />
             </div>
           ))}
         </div>
@@ -211,7 +211,7 @@ export default function CustomersPage() {
         title="Customers"
         description="Manage your customer profiles and contact information."
         actions={
-          <Button onClick={handleAddCustomer}>
+          <Button onClick={handleAddCustomer} className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
           </Button>
         }
@@ -221,19 +221,20 @@ export default function CustomersPage() {
           value={searchTerm}
           onChange={setSearchTerm}
           placeholder="Search by name, email, or ID..."
+          className="w-full md:w-80"
         />
       </div>
 
       {filteredCustomers.length > 0 ? (
-        <div className="rounded-lg border shadow-sm bg-card">
+        <div className="rounded-lg border shadow-sm bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Customer ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="min-w-[120px]">Customer ID</TableHead>
+                <TableHead className="min-w-[180px]">Name</TableHead>
+                <TableHead className="min-w-[200px]">Email</TableHead>
+                <TableHead className="min-w-[140px]">Phone</TableHead>
+                <TableHead className="text-right min-w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -248,35 +249,37 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary" title="Edit Customer">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                            e.stopPropagation(); 
-                            handleDeleteCustomer(customer);
-                          }}>
-                           <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                       <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the customer
-                            "{customerToDelete?.name}" and all associated data (including invoices).
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end items-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                              e.stopPropagation(); 
+                              handleDeleteCustomer(customer);
+                            }}>
+                             <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                         <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the customer
+                              "{customerToDelete?.name}" and all associated data (including invoices).
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -288,7 +291,7 @@ export default function CustomersPage() {
           title="No Customers Found"
           message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
           action={!searchTerm ? (
-            <Button onClick={handleAddCustomer}>
+            <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
             </Button>
           ) : undefined}
@@ -315,15 +318,15 @@ export default function CustomersPage() {
       </Dialog>
 
       <Dialog open={isDetailsModalOpen} onOpenChange={closeCustomerDetailsModal}>
-        <DialogContent className="w-[90vw] max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Customer Profile: {selectedCustomerForDetails?.name}</DialogTitle>
             <DialogDescription>
               Financial overview and invoice history for {selectedCustomerForDetails?.email}.
             </DialogDescription>
           </DialogHeader>
           {selectedCustomerForDetails && (
-            <div className="space-y-6 flex-grow overflow-y-auto pr-2">
+            <div className="space-y-6 flex-grow overflow-y-auto p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -368,15 +371,15 @@ export default function CustomersPage() {
               <div>
                 <h4 className="text-lg font-semibold mb-2 text-foreground">Invoice History</h4>
                 {customerInvoices.length > 0 ? (
-                  <div className="rounded-md border bg-card">
+                  <div className="rounded-md border bg-card overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Invoice ID</TableHead>
-                          <TableHead>Issue Date</TableHead>
-                          <TableHead>Due Date</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead className="min-w-[120px]">Invoice ID</TableHead>
+                          <TableHead className="min-w-[120px]">Issue Date</TableHead>
+                          <TableHead className="min-w-[120px]">Due Date</TableHead>
+                          <TableHead className="min-w-[100px]">Total</TableHead>
+                          <TableHead className="min-w-[100px]">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -404,7 +407,7 @@ export default function CustomersPage() {
               </div>
             </div>
           )}
-           <DialogFooter className="mt-auto pt-4 flex flex-col sm:flex-row justify-end gap-2">
+           <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2">
                 <Button 
                   onClick={() => handleAddNewInvoiceForCustomer(selectedCustomerForDetails)} 
                   variant="default" 

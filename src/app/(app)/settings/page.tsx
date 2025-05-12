@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import type React from 'react';
@@ -132,7 +133,7 @@ export default function SettingsPage() {
         <Tabs defaultValue="company" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
             {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2" disabled>
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm" disabled>
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
@@ -149,7 +150,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="company" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
           {SETTINGS_TABS.map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm">
               <tab.icon className="h-4 w-4" /> {tab.label}
             </TabsTrigger>
           ))}
@@ -194,14 +195,14 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               {managers.length > 0 ? (
-                <div className="rounded-lg border">
+                <div className="rounded-lg border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="min-w-[150px]">Name</TableHead>
+                      <TableHead className="min-w-[200px]">Email</TableHead>
+                      <TableHead className="min-w-[120px]">Role</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -211,12 +212,14 @@ export default function SettingsPage() {
                         <TableCell>{manager.email}</TableCell>
                         <TableCell>{manager.role}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="mr-2 hover:text-primary">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                           <div className="flex justify-end items-center gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="hover:text-primary">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -225,7 +228,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <DataPlaceholder title="No Managers" message="Add managers to help manage your account." action={
-                    <Button onClick={handleAddManager}>
+                    <Button onClick={handleAddManager} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
                     </Button>
                 }/>
@@ -254,14 +257,14 @@ export default function SettingsPage() {
               <p className="text-muted-foreground">
                 Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.
               </p>
-               <Button disabled>Configure Cloud Database (Coming Soon)</Button>
+               <Button disabled className="w-full sm:w-auto">Configure Cloud Database (Coming Soon)</Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       <Dialog open={isUserManagerModalOpen} onOpenChange={setIsUserManagerModalOpen}>
-        <DialogContent>
+        <DialogContent className="w-[90vw] max-w-md">
           <DialogHeader>
             <DialogTitle>{editingManager ? 'Edit Manager' : 'Add New Manager'}</DialogTitle>
             <DialogDescription>
@@ -282,9 +285,9 @@ export default function SettingsPage() {
               <Input id="managerRole" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} placeholder="e.g., Invoice Clerk, Sales Manager" />
               <p className="text-xs text-muted-foreground mt-1">Note: Roles are descriptive. Specific permissions will be implemented later.</p>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsUserManagerModalOpen(false)}>Cancel</Button>
-              <Button type="submit">{editingManager ? 'Save Changes' : 'Add Manager'}</Button>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsUserManagerModalOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto">{editingManager ? 'Save Changes' : 'Add Manager'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

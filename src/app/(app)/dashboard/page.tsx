@@ -51,7 +51,7 @@ export default function DashboardPage() {
       dueInvoicesCount,
       totalCustomerCount,
     };
-  }, [invoices, customers]); // Added customers to dependency array
+  }, [invoices, customers]); 
 
   const invoiceStatusData: ChartDataPoint[] = useMemo(() => {
     const statusCounts = invoices.reduce((acc, inv) => {
@@ -99,7 +99,7 @@ export default function DashboardPage() {
       <>
         <PageHeader title="Dashboard" description="Overview of your invoicing activities." />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
-          {[...Array(5)].map((_, i) => ( // Increased skeleton array to 5 for the new card
+          {[...Array(5)].map((_, i) => ( 
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-5 w-2/3" />
@@ -112,14 +112,14 @@ export default function DashboardPage() {
             </Card>
           ))}
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Revenue Over Time</CardTitle>
               <CardDescription>Last 6 months received invoice amounts.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              <Skeleton className="h-[350px] w-full" />
+              <Skeleton className="h-[300px] sm:h-[350px] w-full" />
             </CardContent>
           </Card>
           <Card>
@@ -128,7 +128,7 @@ export default function DashboardPage() {
               <CardDescription>Distribution of current invoice statuses.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-[350px] w-full" />
+              <Skeleton className="h-[300px] sm:h-[350px] w-full" />
             </CardContent>
           </Card>
         </div>
@@ -137,8 +137,8 @@ export default function DashboardPage() {
             <CardTitle>Top Outstanding Invoices</CardTitle>
              <CardDescription>Top 5 invoices with remaining balances.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Skeleton className="h-40 w-full" />
+          <CardContent className="overflow-x-auto">
+            <Skeleton className="h-40 w-full min-w-[600px]" /> {/* Ensure skeleton also considers min-width for table */}
           </CardContent>
         </Card>
       </>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Overview of your invoicing activities. Last refreshed: ${lastRefreshed ? format(lastRefreshed, 'PPpp') : 'Loading...'}`}
       />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6"> {/* Consider xl:grid-cols-5 if cards are narrow, or let it wrap */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6"> 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -206,21 +206,21 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Over Time</CardTitle>
             <CardDescription>Last 6 months received invoice amounts.</CardDescription>
           </CardHeader>
-          <CardContent className="pl-2">
+          <CardContent className="pl-0 sm:pl-2"> {/* Adjust padding for smaller screens */}
           <ChartContainer config={{
                 revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
-              }} className="h-[350px] w-full">
+              }} className="h-[300px] sm:h-[350px] w-full">
              <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={monthlyRevenueData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+              <RechartsBarChart data={monthlyRevenueData} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}> {/* Adjust margins */}
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickFormatter={(value) => `$${value/1000}k`} tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize="10px" /> {/* Smaller font for XAxis */}
+                <YAxis tickFormatter={(value) => `$${value/1000}k`} tickLine={false} axisLine={false} tickMargin={8} fontSize="10px" /> {/* Smaller font for YAxis */}
                 <RechartsTooltip
                   cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
                   content={<ChartTooltipContent indicator="dot" />}
@@ -237,20 +237,21 @@ export default function DashboardPage() {
             <CardTitle>Invoice Statuses</CardTitle>
              <CardDescription>Distribution of current invoice statuses.</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center items-center h-[350px]">
-             <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square h-full">
+          <CardContent className="flex justify-center items-center h-[300px] sm:h-[350px]">
+             <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square max-h-full w-auto"> {/* Ensure responsive container for pie chart */}
               <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <RechartsTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
-                <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} 
+                <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false}  /* Adjusted outerRadius */
                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                         const RADIAN = Math.PI / 180;
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.6; 
+                        // Adjusted radius for label positioning to be more dynamic
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5; 
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
                         if (percent * 100 < 5) return null; 
                         return (
-                          <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-medium">
+                          <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] sm:text-xs font-medium">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text>
                         );
@@ -260,7 +261,7 @@ export default function DashboardPage() {
                     <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--card))" style={{filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))'}}/>
                   ))}
                 </Pie>
-                 <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                 <ChartLegend content={<ChartLegendContent nameKey="name" className="text-[10px] sm:text-xs"/>} /> {/* Smaller font for legend */}
               </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -273,9 +274,9 @@ export default function DashboardPage() {
           <CardTitle>Top Outstanding Invoices</CardTitle>
           <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto"> {/* Make table scrollable */}
           {outstandingInvoicesData.length > 0 ? (
-            <Table>
+            <Table className="min-w-[600px]"> {/* Ensure table has a min-width */}
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice ID</TableHead>

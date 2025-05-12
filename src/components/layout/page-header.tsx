@@ -1,3 +1,4 @@
+
 import type { ReactNode } from 'react';
 
 interface PageHeaderProps {
@@ -9,7 +10,7 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
+      <div className="flex-grow">
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground">
           {title}
         </h1>
@@ -17,7 +18,8 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
           <p className="mt-1 text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap shrink-0 items-center gap-2 justify-start sm:justify-end">{actions}</div>}
     </div>
   );
 }
+

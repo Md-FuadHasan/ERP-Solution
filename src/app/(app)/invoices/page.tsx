@@ -257,7 +257,7 @@ export default function InvoicesPage() {
           title="Invoices"
           description="Create, track, and manage your invoices."
           actions={
-            <Button onClick={handleAddInvoice} disabled>
+            <Button onClick={handleAddInvoice} disabled className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
             </Button>
           }
@@ -265,14 +265,14 @@ export default function InvoicesPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="rounded-lg border shadow-sm bg-card p-4">
+        <div className="rounded-lg border shadow-sm bg-card p-4 overflow-x-auto">
           <Skeleton className="h-8 w-1/4 mb-4" />
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 flex-1" />
-              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 flex-1 min-w-[100px]" />
+              <Skeleton className="h-6 flex-1 min-w-[150px]" />
+              <Skeleton className="h-6 flex-1 min-w-[100px]" />
+              <Skeleton className="h-6 w-24 min-w-[96px]" />
             </div>
           ))}
         </div>
@@ -286,7 +286,7 @@ export default function InvoicesPage() {
         title="Invoices"
         description="Create, track, and manage your invoices."
         actions={
-          <Button onClick={handleAddInvoice}>
+          <Button onClick={handleAddInvoice} className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
           </Button>
         }
@@ -296,23 +296,24 @@ export default function InvoicesPage() {
           value={searchTerm}
           onChange={setSearchTerm}
           placeholder="Search by Invoice ID, Customer Name, or Customer ID..."
+          className="w-full md:w-80"
         />
       </div>
 
       {filteredInvoices.length > 0 ? (
-        <div className="rounded-lg border shadow-sm bg-card">
+        <div className="rounded-lg border shadow-sm bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Paid</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="min-w-[150px]">Invoice ID</TableHead>
+                <TableHead className="min-w-[180px]">Customer</TableHead>
+                <TableHead className="min-w-[120px]">Issue Date</TableHead>
+                <TableHead className="min-w-[120px]">Due Date</TableHead>
+                <TableHead className="min-w-[100px]">Total</TableHead>
+                <TableHead className="min-w-[100px]">Paid</TableHead>
+                <TableHead className="min-w-[100px]">Balance</TableHead>
+                <TableHead className="min-w-[100px]">Status</TableHead>
+                <TableHead className="text-right min-w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -328,35 +329,37 @@ export default function InvoicesPage() {
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
                   </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(invoice)} className="hover:text-primary" title="View/Edit Invoice">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
-                            e.stopPropagation(); 
-                            handleDeleteInvoice(invoice);
-                          }}>
-                          <Trash2 className="h-4 w-4" />
+                  <TableCell className="text-right">
+                     <div className="flex justify-end items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(invoice)} className="hover:text-primary" title="View/Edit Invoice">
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete invoice
-                            "{invoice.id}".
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => confirmDelete()} className="bg-destructive hover:bg-destructive/90">
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                         <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
+                                e.stopPropagation(); 
+                                handleDeleteInvoice(invoice);
+                              }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete invoice
+                                "{invoice.id}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => confirmDelete()} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -368,7 +371,7 @@ export default function InvoicesPage() {
           title="No Invoices Found"
           message={searchTerm ? "Try adjusting your search term." : "Get started by creating your first invoice."}
           action={!searchTerm && (
-            <Button onClick={handleAddInvoice}>
+            <Button onClick={handleAddInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
               <PlusCircle className="mr-2 h-4 w-4" /> Create Invoice
             </Button>
           )}
@@ -376,22 +379,24 @@ export default function InvoicesPage() {
       )}
 
       <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
-        <DialogContent className="w-[90vw] max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingInvoice && invoices.some(i => i.id === editingInvoice.id) ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
               {editingInvoice && invoices.some(i => i.id === editingInvoice.id) ? `Update details for invoice ${editingInvoice.id}.` : 'Fill in the details to create a new invoice.'}
             </DialogDescription>
           </DialogHeader>
-          <InvoiceForm
-            key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) + editingInvoice.customerId : 'new-invoice'}
-            initialData={editingInvoice}
-            customers={customers}
-            companyProfile={companyProfile}
-            invoices={invoices}
-            onSubmit={handleSubmit}
-            onCancel={() => handleModalOpenChange(false)}
-          />
+          <div className="overflow-y-auto flex-grow p-6">
+            <InvoiceForm
+              key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) + editingInvoice.customerId : 'new-invoice'}
+              initialData={editingInvoice}
+              customers={customers}
+              companyProfile={companyProfile}
+              invoices={invoices}
+              onSubmit={handleSubmit}
+              onCancel={() => handleModalOpenChange(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
       
