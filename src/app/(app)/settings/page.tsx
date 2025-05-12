@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -31,15 +31,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useData } from '@/context/DataContext'; // Import useData hook
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { useData } from '@/context/DataContext'; 
+import { Skeleton } from '@/components/ui/skeleton'; 
 import { Database } from 'lucide-react';
 
 export default function SettingsPage() {
   const { companyProfile, updateCompanyProfile, isLoading: isDataLoading } = useData();
   
-  // Managers state remains local to this page for now, as it's not part of DataContext yet.
-  // If managers needed global state, they'd be added to DataContext.
   const [managers, setManagers] = useState<Manager[]>([]); 
   const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
@@ -51,7 +49,6 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   
-  // Initialize managers from localStorage or mock if not in DataContext
   useEffect(() => {
     try {
       const storedManagers = localStorage.getItem('invoiceflow_managers');
@@ -76,7 +73,7 @@ export default function SettingsPage() {
 
 
   const handleCompanyDetailsSubmit = (data: CompanyDetailsFormValues) => {
-    updateCompanyProfile(data); // Use context action
+    updateCompanyProfile(data); 
     toast({ title: "Company Details Updated", description: "Your company information has been saved." });
   };
 
@@ -85,7 +82,7 @@ export default function SettingsPage() {
       taxRate: data.taxRate, 
       vatRate: data.vatRate,
       excessTaxRate: data.excessTaxRate 
-    }); // Use context action
+    }); 
     toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
   };
 
@@ -184,14 +181,14 @@ export default function SettingsPage() {
 
         <TabsContent value="users">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-grow">
                 <CardTitle>User Management</CardTitle>
                 <CardDescription>Add, edit, or remove managers with custom roles.
                   <br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small>
                 </CardDescription>
               </div>
-              <Button onClick={handleAddManager}>
+              <Button onClick={handleAddManager} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
               </Button>
             </CardHeader>
