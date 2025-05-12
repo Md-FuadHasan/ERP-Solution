@@ -1,5 +1,6 @@
 
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
   title: string;
@@ -15,10 +16,17 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
           {title}
         </h1>
         {description && (
-          <p className="mt-1 text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap shrink-0 items-center gap-2 justify-start sm:justify-end">{actions}</div>}
+      {actions && (
+        <div className={cn(
+          "flex flex-wrap shrink-0 items-center gap-2",
+          "justify-start w-full sm:w-auto sm:justify-end" // Full width on mobile, auto on sm+
+        )}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

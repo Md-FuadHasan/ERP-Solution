@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function DashboardPage() {
-  const { invoices, customers, isLoading } = useData();
+  const { invoices, customers, isLoading, getCustomerById } = useData(); // Added getCustomerById
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -87,18 +87,18 @@ export default function DashboardPage() {
       .map(inv => ({
         name: inv.id,
         value: inv.remainingBalance,
-        customerName: inv.customerName || customers.find(c => c.id === inv.customerId)?.name || 'N/A',
+        customerName: inv.customerName || getCustomerById(inv.customerId)?.name || 'N/A',
         dueDate: inv.dueDate,
         status: inv.status,
       }));
-  }, [invoices, customers]);
+  }, [invoices, getCustomerById]);
 
 
   if (isLoading) {
     return (
       <>
         <PageHeader title="Dashboard" description="Overview of your invoicing activities." />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
           {[...Array(5)].map((_, i) => ( 
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -112,13 +112,13 @@ export default function DashboardPage() {
             </Card>
           ))}
         </div>
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Revenue Over Time</CardTitle>
               <CardDescription>Last 6 months received invoice amounts.</CardDescription>
             </CardHeader>
-            <CardContent className="pl-2">
+            <CardContent className="pl-0 pr-2 sm:pl-2 sm:pr-4"> {/* Adjusted padding */}
               <Skeleton className="h-[300px] sm:h-[350px] w-full" />
             </CardContent>
           </Card>
@@ -127,7 +127,7 @@ export default function DashboardPage() {
               <CardTitle>Invoice Statuses</CardTitle>
               <CardDescription>Distribution of current invoice statuses.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-2 sm:p-4"> {/* Adjusted padding */}
               <Skeleton className="h-[300px] sm:h-[350px] w-full" />
             </CardContent>
           </Card>
@@ -137,7 +137,7 @@ export default function DashboardPage() {
             <CardTitle>Top Outstanding Invoices</CardTitle>
              <CardDescription>Top 5 invoices with remaining balances.</CardDescription>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="overflow-x-auto p-2 sm:p-4"> {/* Adjusted padding */}
             <Skeleton className="h-40 w-full min-w-[600px]" /> {/* Ensure skeleton also considers min-width for table */}
           </CardContent>
         </Card>
@@ -206,20 +206,20 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3"> {/* Adjusted for mobile friendliness */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Over Time</CardTitle>
             <CardDescription>Last 6 months received invoice amounts.</CardDescription>
           </CardHeader>
-          <CardContent className="pl-0 sm:pl-2"> {/* Adjust padding for smaller screens */}
+          <CardContent className="pl-0 pr-1 sm:pl-2 sm:pr-3"> {/* Adjust padding for smaller screens */}
           <ChartContainer config={{
                 revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
               }} className="h-[300px] sm:h-[350px] w-full">
              <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={monthlyRevenueData} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}> {/* Adjust margins */}
+              <RechartsBarChart data={monthlyRevenueData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}> {/* Adjust margins */}
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize="10px" /> {/* Smaller font for XAxis */}
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize="10px" interval={0} /> {/* Smaller font for XAxis */}
                 <YAxis tickFormatter={(value) => `$${value/1000}k`} tickLine={false} axisLine={false} tickMargin={8} fontSize="10px" /> {/* Smaller font for YAxis */}
                 <RechartsTooltip
                   cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
@@ -237,16 +237,15 @@ export default function DashboardPage() {
             <CardTitle>Invoice Statuses</CardTitle>
              <CardDescription>Distribution of current invoice statuses.</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center items-center h-[300px] sm:h-[350px]">
-             <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square max-h-full w-auto"> {/* Ensure responsive container for pie chart */}
+          <CardContent className="flex justify-center items-center h-[300px] sm:h-[350px] p-2 sm:p-4">
+             <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square max-h-full w-auto">
               <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <RechartsTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
-                <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false}  /* Adjusted outerRadius */
+                <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false} 
                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                         const RADIAN = Math.PI / 180;
-                        // Adjusted radius for label positioning to be more dynamic
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5; 
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.4; // Adjust label position
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
                         if (percent * 100 < 5) return null; 
@@ -261,7 +260,7 @@ export default function DashboardPage() {
                     <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--card))" style={{filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))'}}/>
                   ))}
                 </Pie>
-                 <ChartLegend content={<ChartLegendContent nameKey="name" className="text-[10px] sm:text-xs"/>} /> {/* Smaller font for legend */}
+                 <ChartLegend content={<ChartLegendContent nameKey="name" className="text-[10px] sm:text-xs"/>} />
               </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -274,30 +273,30 @@ export default function DashboardPage() {
           <CardTitle>Top Outstanding Invoices</CardTitle>
           <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto"> {/* Make table scrollable */}
+        <CardContent className="overflow-x-auto p-0 sm:p-2"> {/* Make table scrollable and adjust padding */}
           {outstandingInvoicesData.length > 0 ? (
             <Table className="min-w-[600px]"> {/* Ensure table has a min-width */}
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4">Due Date</TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4">Status</TableHead>
+                  <TableHead className="text-right py-2 px-2 sm:px-4">Balance</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outstandingInvoicesData.map((invoice) => (
                   <TableRow key={invoice.name}>
-                    <TableCell className="font-medium">{invoice.name}</TableCell>
-                    <TableCell>{invoice.customerName}</TableCell>
-                    <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium py-2 px-2 sm:px-4">{invoice.name}</TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4">{invoice.customerName}</TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4">{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4">
                       <Badge variant={getStatusBadgeVariant(invoice.status as InvoiceStatus)}>
                         {invoice.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold">${invoice.value.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold py-2 px-2 sm:px-4">${invoice.value.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
