@@ -82,6 +82,7 @@ interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
   companyProfile: CompanyProfile;
+  invoices: Invoice[]; // Added to determine if editing an existing invoice
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -123,7 +124,7 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
 };
 
 
-export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
+export function InvoiceForm({ initialData, customers, companyProfile, invoices, onSubmit, onCancel, isSubmitting }: InvoiceFormProps) {
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: getDefaultFormValues(initialData),
@@ -227,6 +228,8 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
     displayAmountPaid = (initialData?.amountPaid || 0) + watchedPartialAmountPaid;
   }
 
+  const isEditingExistingInvoice = initialData?.id && invoices.some(i => i.id === initialData.id);
+
 
   return (
     <Form {...form}>
@@ -267,7 +270,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                              setCustomerSuggestions(filteredSuggestions);
                              setIsCustomerPopoverOpen(true);
                            }
-                        } else if (customers.length > 0) { // If empty and focused, show all if not too many or based on some logic
+                        } else if (customers.length > 0) { 
                            // setCustomerSuggestions(customers.slice(0,5)); // Example: show first 5
                            // setIsCustomerPopoverOpen(true);
                         }
@@ -278,7 +281,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
                   </PopoverTrigger>
                   <PopoverContent
                     className="w-[--radix-popover-trigger-width] p-0"
-                    align="start" // Ensures popover aligns with the start of the trigger
+                    align="start" 
                   >
                     {isCustomerPopoverOpen && (
                       <ul className="max-h-60 overflow-y-auto">
@@ -687,18 +690,10 @@ export function InvoiceForm({ initialData, customers, companyProfile, onSubmit, 
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : (initialData?.id && customers.length > 0 && invoices.some(i => i.id === initialData.id) ? 'Save Changes' : 'Create Invoice')}
+            {isSubmitting ? 'Saving...' : (isEditingExistingInvoice ? 'Save Invoice' : 'Create Invoice')}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
-
-// Helper to check if the initialData invoice is actually present in the main invoices list (from context)
-// This helps determine if it's a true edit of an existing persisted invoice vs. a new invoice pre-filled from params.
-// This is not used in the current code but can be useful for more complex logic.
-// NOTE: `invoices` here is a local const, not from context. This would need to be passed or accessed if logic changes.
-const invoices: Invoice[] = []; 
-
-    

@@ -388,6 +388,7 @@ export default function InvoicesPage() {
             initialData={editingInvoice}
             customers={customers}
             companyProfile={companyProfile}
+            invoices={invoices}
             onSubmit={handleSubmit}
             onCancel={() => handleModalOpenChange(false)}
           />
