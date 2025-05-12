@@ -1,6 +1,7 @@
 
 'use client';
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,12 +53,46 @@ export default function InvoicesPage() {
     isLoading 
   } = useData();
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    const customerIdParam = searchParams.get('customerId');
+    const customerNameParam = searchParams.get('customerName');
+
+    if (action === 'new' && customerIdParam && !isLoading && customers.length > 0) {
+      const customer = customers.find(c => c.id === customerIdParam);
+      const newInvoiceTemplate: Invoice = {
+        id: `INV-${String(Date.now()).slice(-6)}-${Math.random().toString(36).substring(2, 7)}`, // Ensure unique ID
+        customerId: customerIdParam,
+        customerName: customer ? customer.name : (customerNameParam ? decodeURIComponent(customerNameParam) : 'Unknown Customer'),
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
+        dueDate: format(new Date(new Date().setDate(new Date().getDate() + 30)), 'yyyy-MM-dd'),
+        items: [{ id: `item-${Date.now()}`, description: '', quantity: 1, unitPrice: 0, total: 0, unitType: 'PCS' }],
+        subtotal: 0,
+        taxAmount: 0,
+        vatAmount: 0,
+        totalAmount: 0,
+        status: 'Draft',
+        paymentProcessingStatus: 'Unpaid',
+        amountPaid: 0,
+        remainingBalance: 0,
+        paymentHistory: [],
+      };
+      setEditingInvoice(newInvoiceTemplate);
+      setIsModalOpen(true);
+      // Query params will be cleared when modal closes (see handleModalOpenChange)
+    }
+  }, [searchParams, isLoading, customers, router]);
+
 
   const filteredInvoices = useMemo(() => {
     if (!searchTerm) return invoices;
@@ -109,25 +144,21 @@ export default function InvoicesPage() {
     const totalAmount = subtotal + taxAmount + vatAmount;
     const customerName = customers.find(c => c.id === data.customerId)?.name;
 
-    const previousTotalAmountPaid = editingInvoice?.amountPaid || 0;
+    const previousTotalAmountPaid = (editingInvoice && invoices.some(i => i.id === editingInvoice.id)) ? editingInvoice.amountPaid : 0;
+
     let newPaymentAmount = 0;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       newPaymentAmount = totalAmount - previousTotalAmountPaid;
-       if (newPaymentAmount < 0) newPaymentAmount = 0; // ensure not negative if already overpaid somehow
+       if (newPaymentAmount < 0) newPaymentAmount = 0; 
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       newPaymentAmount = data.partialAmountPaid;
-       if (previousTotalAmountPaid + newPaymentAmount > totalAmount) {
-         // Cap partial payment if it would exceed total. Or let it overpay? For now, cap.
-         // Or, better, this validation should be in the form if strict.
-         // For now, we assume data.partialAmountPaid is the intended payment.
-       }
     }
     
-    const calculatedAmountPaid = previousTotalAmountPaid + newPaymentAmount; // New total amount paid
+    const calculatedAmountPaid = previousTotalAmountPaid + newPaymentAmount; 
     
     if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid) {
-        if (data.partialAmountPaid <= 0 || (editingInvoice && (previousTotalAmountPaid + data.partialAmountPaid) >= totalAmount && (previousTotalAmountPaid + data.partialAmountPaid) !== totalAmount) ) {
+        if (data.partialAmountPaid <= 0 || ((previousTotalAmountPaid + data.partialAmountPaid) > totalAmount && (previousTotalAmountPaid + data.partialAmountPaid) !== totalAmount) ) {
              if(data.partialAmountPaid > 0 && (previousTotalAmountPaid + data.partialAmountPaid) === totalAmount && data.paymentProcessingStatus !== 'Fully Paid') {
                 // This case is fine, it makes it fully paid
              } else {
@@ -141,20 +172,18 @@ export default function InvoicesPage() {
         }
     }
 
-
     const calculatedRemainingBalance = totalAmount - calculatedAmountPaid;
     
     let finalStatus = data.status;
     if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
       finalStatus = 'Received';
     } else if (data.status === 'Received' && calculatedRemainingBalance > 0) {
-      finalStatus = editingInvoice?.status === 'Draft' ? 'Draft' : 'Due'; 
+      finalStatus = (editingInvoice && invoices.some(i => i.id === editingInvoice.id) && editingInvoice.status === 'Draft') ? 'Draft' : 'Due'; 
     }
 
+    let updatedPaymentHistory: PaymentRecord[] = (editingInvoice && invoices.some(i => i.id === editingInvoice.id) && editingInvoice.paymentHistory) ? [...editingInvoice.paymentHistory] : [];
 
-    let updatedPaymentHistory: PaymentRecord[] = editingInvoice?.paymentHistory ? [...editingInvoice.paymentHistory] : [];
-
-    if (newPaymentAmount > 0 && data.paymentMethod) { // A payment was actually made
+    if (newPaymentAmount > 0 && data.paymentMethod) { 
         const paymentRecordStatus: PaymentRecord['status'] = 
             (calculatedRemainingBalance <= 0 && totalAmount > 0)
             ? 'Full Payment' 
@@ -174,7 +203,6 @@ export default function InvoicesPage() {
         updatedPaymentHistory.push(newPaymentRecord);
     }
 
-
     const invoiceData: Invoice = {
       id: data.id, 
       customerId: data.customerId,
@@ -191,23 +219,35 @@ export default function InvoicesPage() {
       amountPaid: calculatedAmountPaid,
       remainingBalance: calculatedRemainingBalance,
       paymentHistory: updatedPaymentHistory,
-      paymentMethod: data.paymentMethod, // Store last used method on invoice
+      paymentMethod: data.paymentMethod, 
       cashVoucherNumber: data.cashVoucherNumber,
       bankName: data.bankName,
       bankAccountNumber: data.bankAccountNumber,
       onlineTransactionNumber: data.onlineTransactionNumber,
     };
 
-    if (editingInvoice) {
+    const isActuallyEditing = editingInvoice && invoices.some(i => i.id === editingInvoice.id);
+
+    if (isActuallyEditing) {
       updateInvoice(invoiceData);
       toast({ title: "Invoice Updated", description: `Invoice ${invoiceData.id} details have been updated.` });
-      setEditingInvoice(invoiceData); // Keep modal open and pass updated data to form for reset of payment fields
+      setEditingInvoice(invoiceData); 
     } else {
       addInvoice(invoiceData);
       toast({ title: "Invoice Created", description: `Invoice ${invoiceData.id} has been successfully created.` });
-      setIsModalOpen(false); // Close modal for new invoice
-      setEditingInvoice(null); // Reset editing state
+      setIsModalOpen(false); 
+      setEditingInvoice(null); 
     }
+  };
+
+  const handleModalOpenChange = (isOpen: boolean) => {
+      setIsModalOpen(isOpen);
+      if (!isOpen) {
+        setEditingInvoice(null);
+        if (searchParams.get('action') === 'new' && searchParams.get('customerId')) {
+            router.replace('/invoices', { scroll: false });
+        }
+      }
   };
   
   if (isLoading) {
@@ -335,24 +375,21 @@ export default function InvoicesPage() {
         />
       )}
 
-      <Dialog open={isModalOpen} onOpenChange={(isOpen) => {
-          setIsModalOpen(isOpen);
-          if (!isOpen) setEditingInvoice(null);
-      }}>
+      <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent className="w-[90vw] max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
+            <DialogTitle>{editingInvoice && invoices.some(i => i.id === editingInvoice.id) ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
-              {editingInvoice ? `Update details for invoice ${editingInvoice.id}.` : 'Fill in the details to create a new invoice.'}
+              {editingInvoice && invoices.some(i => i.id === editingInvoice.id) ? `Update details for invoice ${editingInvoice.id}.` : 'Fill in the details to create a new invoice.'}
             </DialogDescription>
           </DialogHeader>
           <InvoiceForm
-            key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) : 'new-invoice'} // Force re-render with reset fields when editingInvoice changes meaningfully
+            key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) + editingInvoice.customerId : 'new-invoice'}
             initialData={editingInvoice}
             customers={customers}
             companyProfile={companyProfile}
             onSubmit={handleSubmit}
-            onCancel={() => { setIsModalOpen(false); setEditingInvoice(null); }}
+            onCancel={() => handleModalOpenChange(false)}
           />
         </DialogContent>
       </Dialog>

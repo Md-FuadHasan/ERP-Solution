@@ -1,6 +1,7 @@
 
 'use client';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale } from 'lucide-react';
@@ -18,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { CustomerForm, type CustomerFormValues } from '@/components/forms/customer-form';
 import { SearchInput } from '@/components/common/search-input';
@@ -51,6 +53,7 @@ export default function CustomersPage() {
     isLoading, 
     getInvoicesByCustomerId 
   } = useData(); 
+  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -126,7 +129,15 @@ export default function CustomersPage() {
 
   const closeCustomerDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    setTimeout(() => setSelectedCustomerForDetails(null), 300);
+    setTimeout(() => setSelectedCustomerForDetails(null), 300); // Delay to allow animation
+  };
+
+  const handleAddNewInvoiceForCustomer = (customer: Customer | null) => {
+    if (customer) {
+      const customerName = customer.name ? encodeURIComponent(customer.name) : '';
+      closeCustomerDetailsModal();
+      router.push(`/invoices?action=new&customerId=${customer.id}&customerName=${customerName}`);
+    }
   };
 
 
@@ -238,12 +249,12 @@ export default function CustomersPage() {
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="mr-2 hover:text-primary" title="Edit Customer">
                       <Edit className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={(e) => {
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
                             e.stopPropagation(); 
                             handleDeleteCustomer(customer);
                           }}>
@@ -393,9 +404,17 @@ export default function CustomersPage() {
               </div>
             </div>
           )}
-           <div className="mt-auto pt-4 flex justify-end">
-                <Button variant="outline" onClick={closeCustomerDetailsModal}>Close</Button>
-            </div>
+           <DialogFooter className="mt-auto pt-4 flex flex-col sm:flex-row justify-end gap-2">
+                <Button 
+                  onClick={() => handleAddNewInvoiceForCustomer(selectedCustomerForDetails)} 
+                  variant="default" 
+                  disabled={!selectedCustomerForDetails}
+                  className="w-full sm:w-auto"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice for Customer
+                </Button>
+                <Button variant="outline" onClick={closeCustomerDetailsModal} className="w-full sm:w-auto">Close</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -419,3 +438,4 @@ export default function CustomersPage() {
     </>
   );
 }
+
