@@ -114,7 +114,7 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
     issueDate: new Date(),
     dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
     items: [{ id: `item-${Date.now()}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
-    status: 'Draft',
+    status: 'Pending', // Updated default status
     paymentProcessingStatus: 'Unpaid',
     partialAmountPaid: undefined,
     paymentMethod: undefined,
@@ -388,7 +388,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>Set to 'Received' automatically if fully paid.</FormDescription>
+                <FormDescription>This status will automatically update to 'Paid' when the invoice is fully paid.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

@@ -24,9 +24,9 @@ import {
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Invoice, Customer, PaymentRecord } from '@/types';
+import type { Invoice, Customer, PaymentRecord, InvoiceStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isBefore, startOfDay } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +81,7 @@ export default function InvoicesPage() {
         taxAmount: 0,
         vatAmount: 0,
         totalAmount: 0,
-        status: 'Draft',
+        status: 'Pending', // Updated default status
         paymentProcessingStatus: 'Unpaid',
         amountPaid: 0,
         remainingBalance: 0,
@@ -174,12 +174,31 @@ export default function InvoicesPage() {
 
     const calculatedRemainingBalance = totalAmount - calculatedAmountPaid;
     
-    let finalStatus = data.status;
-    if (calculatedRemainingBalance <= 0 && totalAmount > 0) {
-      finalStatus = 'Received';
-    } else if (data.status === 'Received' && calculatedRemainingBalance > 0) {
-      finalStatus = (editingInvoice && invoices.some(i => i.id === editingInvoice.id) && editingInvoice.status === 'Draft') ? 'Draft' : 'Due'; 
+    let finalStatus: InvoiceStatus = data.status;
+
+    if (data.status === 'Cancelled') {
+        finalStatus = 'Cancelled';
+    } else {
+        if (totalAmount > 0) {
+            if (calculatedRemainingBalance <= 0) {
+                finalStatus = 'Paid';
+            } else if (calculatedAmountPaid > 0) {
+                finalStatus = 'Partially Paid';
+            } else { // No payment made
+                // If user chose 'Paid' or 'Partially Paid' but conditions not met, revert to 'Pending'
+                if (finalStatus === 'Paid' || finalStatus === 'Partially Paid') {
+                    finalStatus = 'Pending';
+                }
+                // If status is 'Pending' and due date has passed, set to 'Overdue'
+                if (finalStatus === 'Pending' && isBefore(startOfDay(data.dueDate), startOfDay(new Date()))) {
+                    finalStatus = 'Overdue';
+                }
+            }
+        } else { // totalAmount is 0 or less
+            finalStatus = 'Pending'; // Or potentially 'Cancelled' or another status if 0 amount invoices are handled differently
+        }
     }
+
 
     let updatedPaymentHistory: PaymentRecord[] = (editingInvoice && invoices.some(i => i.id === editingInvoice.id) && editingInvoice.paymentHistory) ? [...editingInvoice.paymentHistory] : [];
 
