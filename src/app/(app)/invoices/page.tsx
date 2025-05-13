@@ -71,7 +71,7 @@ export default function InvoicesPage() {
     if (action === 'new' && customerIdParam && !isLoading && customers.length > 0) {
       const customer = customers.find(c => c.id === customerIdParam);
       const newInvoiceTemplate: Invoice = {
-        id: `INV-${String(Date.now()).slice(-6)}-${Math.random().toString(36).substring(2, 7)}`, // Ensure unique ID
+        id: `INV-${String(Date.now()).slice(-6)}`, // Updated invoice ID generation
         customerId: customerIdParam,
         customerName: customer ? customer.name : (customerNameParam ? decodeURIComponent(customerNameParam) : 'Unknown Customer'),
         issueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -81,7 +81,7 @@ export default function InvoicesPage() {
         taxAmount: 0,
         vatAmount: 0,
         totalAmount: 0,
-        status: 'Pending', // Updated default status
+        status: 'Pending', 
         paymentProcessingStatus: 'Unpaid',
         amountPaid: 0,
         remainingBalance: 0,
@@ -184,18 +184,16 @@ export default function InvoicesPage() {
                 finalStatus = 'Paid';
             } else if (calculatedAmountPaid > 0) {
                 finalStatus = 'Partially Paid';
-            } else { // No payment made
-                // If user chose 'Paid' or 'Partially Paid' but conditions not met, revert to 'Pending'
+            } else { 
                 if (finalStatus === 'Paid' || finalStatus === 'Partially Paid') {
                     finalStatus = 'Pending';
                 }
-                // If status is 'Pending' and due date has passed, set to 'Overdue'
-                if (finalStatus === 'Pending' && isBefore(startOfDay(data.dueDate), startOfDay(new Date()))) {
+                if (finalStatus === 'Pending' && isBefore(startOfDay(new Date(data.dueDate)), startOfDay(new Date())) && calculatedRemainingBalance > 0) {
                     finalStatus = 'Overdue';
                 }
             }
-        } else { // totalAmount is 0 or less
-            finalStatus = 'Pending'; // Or potentially 'Cancelled' or another status if 0 amount invoices are handled differently
+        } else { 
+            finalStatus = 'Pending'; 
         }
     }
 
@@ -288,10 +286,14 @@ export default function InvoicesPage() {
           <Skeleton className="h-8 w-1/4 mb-4" />
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+              <Skeleton className="h-6 flex-1 min-w-[120px]" />
+              <Skeleton className="h-6 flex-1 min-w-[200px]" />
+              <Skeleton className="h-6 flex-1 min-w-[120px]" />
               <Skeleton className="h-6 flex-1 min-w-[100px]" />
-              <Skeleton className="h-6 flex-1 min-w-[150px]" />
               <Skeleton className="h-6 flex-1 min-w-[100px]" />
-              <Skeleton className="h-6 w-24 min-w-[96px]" />
+              <Skeleton className="h-6 flex-1 min-w-[100px]" />
+              <Skeleton className="h-6 flex-1 min-w-[120px]" />
+              <Skeleton className="h-6 w-24 min-w-[100px]" />
             </div>
           ))}
         </div>
@@ -324,15 +326,14 @@ export default function InvoicesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[150px]">Invoice ID</TableHead>
-                <TableHead className="min-w-[180px]">Customer</TableHead>
-                <TableHead className="min-w-[120px]">Issue Date</TableHead>
-                <TableHead className="min-w-[120px]">Due Date</TableHead>
-                <TableHead className="min-w-[100px]">Total</TableHead>
-                <TableHead className="min-w-[100px]">Paid</TableHead>
-                <TableHead className="min-w-[100px]">Balance</TableHead>
-                <TableHead className="min-w-[100px]">Status</TableHead>
-                <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                <TableHead className="min-w-[160px]">Invoice ID</TableHead>
+                <TableHead className="min-w-[220px]">Customer</TableHead>
+                <TableHead className="min-w-[130px]">Due Date</TableHead>
+                <TableHead className="min-w-[110px]">Total</TableHead>
+                <TableHead className="min-w-[110px]">Paid</TableHead>
+                <TableHead className="min-w-[110px]">Balance</TableHead>
+                <TableHead className="min-w-[120px]">Status</TableHead>
+                <TableHead className="text-right min-w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -340,7 +341,6 @@ export default function InvoicesPage() {
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.id}</TableCell>
                   <TableCell>{invoice.customerName || customers.find(c=>c.id === invoice.customerId)?.name || invoice.customerId}</TableCell>
-                  <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>${invoice.amountPaid.toFixed(2)}</TableCell>
@@ -407,7 +407,7 @@ export default function InvoicesPage() {
           </DialogHeader>
           <div className="overflow-y-auto flex-grow p-6">
             <InvoiceForm
-              key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) + editingInvoice.customerId : 'new-invoice'}
+              key={editingInvoice ? editingInvoice.id + (editingInvoice.paymentHistory?.length || 0) + editingInvoice.customerId + editingInvoice.status : 'new-invoice'}
               initialData={editingInvoice}
               customers={customers}
               companyProfile={companyProfile}

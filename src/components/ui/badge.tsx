@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -15,6 +16,17 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // New specific variants for invoice statuses
+        statusPaid: 
+          "border-transparent bg-status-paid text-status-paid-foreground hover:bg-status-paid/80",
+        statusPartiallyPaid: 
+          "border-transparent bg-status-partially-paid text-status-partially-paid-foreground hover:bg-status-partially-paid/80",
+        statusPending: 
+          "border-transparent bg-status-pending text-status-pending-foreground hover:bg-status-pending/80",
+        statusOverdue: 
+          "border-transparent bg-status-overdue text-status-overdue-foreground hover:bg-status-overdue/80",
+        statusCancelled: 
+          "border-transparent bg-status-cancelled text-status-cancelled-foreground hover:bg-status-cancelled/80",
       },
     },
     defaultVariants: {
@@ -34,3 +46,4 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export { Badge, badgeVariants }
+

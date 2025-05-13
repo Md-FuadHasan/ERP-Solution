@@ -109,12 +109,12 @@ const getDefaultFormValues = (invoice?: Invoice | null): InvoiceFormValues => {
     };
   }
   return {
-    id: `INV-${String(Date.now()).slice(-6)}-${Math.random().toString(36).substring(2,5)}`,
+    id: `INV-${String(Date.now()).slice(-6)}`, // Updated invoice ID generation
     customerId: '',
     issueDate: new Date(),
     dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
     items: [{ id: `item-${Date.now()}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
-    status: 'Pending', // Updated default status
+    status: 'Pending', 
     paymentProcessingStatus: 'Unpaid',
     partialAmountPaid: undefined,
     paymentMethod: undefined,
@@ -141,6 +141,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const watchedPaymentProcessingStatus = form.watch("paymentProcessingStatus");
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
   const watchedPaymentMethod = form.watch("paymentMethod");
+  const watchedStatus = form.watch("status");
 
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [currentCustomerSearchInput, setCurrentCustomerSearchInput] = useState('');
@@ -248,6 +249,15 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                       const selectedCustomerId = form.getValues("customerId");
                       const customer = customers.find(c => c.id === selectedCustomerId);
                       setCurrentCustomerSearchInput(customer ? customer.name : "");
+                    } else {
+                       // Reset search when closing if no customer is selected or to reflect current selection
+                      const selectedCustomerId = form.getValues("customerId");
+                      const customer = customers.find(c => c.id === selectedCustomerId);
+                       if (customer) {
+                         setCurrentCustomerSearchInput(customer.name);
+                       } else {
+                         setCurrentCustomerSearchInput(""); // Clear if no valid customer is selected
+                       }
                     }
                   }}
                 >

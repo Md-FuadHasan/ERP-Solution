@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -43,6 +44,18 @@ body {
     --sidebar-accent-foreground: 0 0% 100%; /* White */
     --sidebar-border: 180 60% 15%;
     --sidebar-ring: 45 100% 52.2%; /* Yellow */
+
+    /* Invoice Status Colors */
+    --status-paid: 150 89% 34%; /* #09a45d */
+    --status-paid-foreground: 0 0% 98%;
+    --status-partially-paid: 39 100% 60%; /* #ffa533 */
+    --status-partially-paid-foreground: 0 0% 10%; 
+    --status-pending: 13 100% 60%; /* #ff5733 */
+    --status-pending-foreground: 0 0% 98%;
+    --status-overdue: 0 68% 51%; /* #dc2c2c */
+    --status-overdue-foreground: 0 0% 98%;
+    --status-cancelled: 282 92% 68%; /* #c865f7 */
+    --status-cancelled-foreground: 0 0% 98%;
   }
   .dark {
     --background: 0 0% 10%; /* Dark Gray for dark mode background */
@@ -80,6 +93,18 @@ body {
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 0 0% 10%;
     --sidebar-ring: 45 100% 62.2%;
+
+    /* Dark Invoice Status Colors */
+    --status-paid: 150 70% 40%;
+    --status-paid-foreground: 0 0% 98%;
+    --status-partially-paid: 39 90% 65%;
+    --status-partially-paid-foreground: 0 0% 10%;
+    --status-pending: 13 90% 65%;
+    --status-pending-foreground: 0 0% 98%;
+    --status-overdue: 0 75% 55%;
+    --status-overdue-foreground: 0 0% 98%;
+    --status-cancelled: 282 80% 70%;
+    --status-cancelled-foreground: 0 0% 98%;
   }
 }
 
@@ -91,3 +116,4 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
