@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, TrendingDown, Zap, UserPlus } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, TrendingDown, Zap, UserPlus, PieChart as PieChartIcon } from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
@@ -60,6 +60,11 @@ export default function DashboardPage() {
     }, {} as Record<InvoiceStatus, number>);
     return Object.entries(statusCounts).map(([name, value], index) => ({ name, value, fill: COLORS[index % COLORS.length] }));
   }, [invoices]);
+
+  const hasValidPieData = useMemo(() => {
+    if (!invoiceStatusData || invoiceStatusData.length === 0) return false;
+    return invoiceStatusData.some(d => d.value > 0);
+  }, [invoiceStatusData]);
 
   const monthlyRevenueData: ChartDataPoint[] = useMemo(() => {
     const revenueByMonth: Record<string, number> = {};
@@ -237,33 +242,51 @@ export default function DashboardPage() {
             <CardTitle>Invoice Statuses</CardTitle>
              <CardDescription>Distribution of current invoice statuses.</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center items-center h-[300px] sm:h-[350px] p-2 sm:p-4">
-             <ChartContainer config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} className="mx-auto aspect-square max-h-full w-auto">
-              <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <RechartsTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
-                <Pie data={invoiceStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" labelLine={false} 
-                     label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
-                        const RADIAN = Math.PI / 180;
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.4; // Adjust label position
-                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        if (percent * 100 < 5) return null; 
-                        return (
-                          <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] sm:text-xs font-medium">
-                            {`${(percent * 100).toFixed(0)}%`}
-                          </text>
-                        );
-                      }}
-                >
-                  {invoiceStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--card))" style={{filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))'}}/>
-                  ))}
-                </Pie>
-                 <ChartLegend content={<ChartLegendContent nameKey="name" className="text-[10px] sm:text-xs"/>} />
-              </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+          <CardContent className="p-2 sm:p-4">
+            {hasValidPieData ? (
+              <ChartContainer 
+                config={invoiceStatusData.reduce((acc, cur) => ({...acc, [cur.name]: {label: cur.name, color: cur.fill}}), {})} 
+                className="h-[300px] sm:h-[350px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <RechartsTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
+                  <Pie 
+                    data={invoiceStatusData} 
+                    dataKey="value" 
+                    nameKey="name" 
+                    cx="50%" 
+                    cy="50%" 
+                    outerRadius="80%" 
+                    labelLine={false} 
+                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+                      const RADIAN = Math.PI / 180;
+                      const radius = innerRadius + (outerRadius - innerRadius) * 0.4; 
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                      if (percent * 100 < 5) return null; 
+                      return (
+                        <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] sm:text-xs font-medium">
+                          {`${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      );
+                    }}
+                  >
+                    {invoiceStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--card))" style={{filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))'}}/>
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="name" className="text-[10px] sm:text-xs"/>} />
+                </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[300px] sm:h-[350px] text-center text-muted-foreground">
+                <PieChartIcon className="mx-auto h-12 w-12 mb-2" />
+                <p className="font-semibold">No Invoice Status Data</p>
+                <p>There is no data to display for invoice statuses.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
