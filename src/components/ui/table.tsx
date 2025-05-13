@@ -1,37 +1,45 @@
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+// Assuming this is a utility function like clsx or similar for merging class names
+import { cn } from "@/lib/utils";
 
+// The main Table component, wrapped in a div for responsive overflow
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, children, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
+    {/* The <table> element should contain all table content (caption, thead, tbody, tfoot) */}
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
       {...props}
     >
+      {/* Render children (TableHeader, TableBody, TableFooter, TableCaption) inside the table */}
       {children}
     </table>
   </div>
-))
-Table.displayName = "Table"
+));
+Table.displayName = "Table";
 
+// Table Header component
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, children, ...props }, ref) => (
+  // Thead element for table header group
   <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props}>
     {children}
   </thead>
-))
-TableHeader.displayName = "TableHeader"
+));
+TableHeader.displayName = "TableHeader";
 
+// Table Body component
 const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, children, ...props }, ref) => (
+  // Tbody element for table body group
   <tbody
     ref={ref}
     className={cn("[&_tr:last-child]:border-0", className)}
@@ -39,13 +47,15 @@ const TableBody = React.forwardRef<
   >
     {children}
   </tbody>
-))
-TableBody.displayName = "TableBody"
+));
+TableBody.displayName = "TableBody";
 
+// Table Footer component
 const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, children, ...props }, ref) => (
+  // Tfoot element for table footer group
   <tfoot
     ref={ref}
     className={cn(
@@ -56,13 +66,15 @@ const TableFooter = React.forwardRef<
   >
     {children}
   </tfoot>
-))
-TableFooter.displayName = "TableFooter"
+));
+TableFooter.displayName = "TableFooter";
 
+// Table Row component
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, children, ...props }, ref) => (
+  // Tr element for table rows
   <tr
     ref={ref}
     className={cn(
@@ -73,13 +85,15 @@ const TableRow = React.forwardRef<
   >
     {children}
   </tr>
-))
-TableRow.displayName = "TableRow"
+));
+TableRow.displayName = "TableRow";
 
+// Table Head Cell component
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => (
+  // Th element for table header cells
   <th
     ref={ref}
     className={cn(
@@ -90,13 +104,15 @@ const TableHead = React.forwardRef<
   >
     {children}
   </th>
-))
-TableHead.displayName = "TableHead"
+));
+TableHead.displayName = "TableHead";
 
+// Table Cell component
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => (
+  // Td element for table data cells
   <td
     ref={ref}
     className={cn("p-2 align-middle sm:p-4 [&:has([role=checkbox])]:pr-0", className)}
@@ -104,13 +120,15 @@ const TableCell = React.forwardRef<
   >
     {children}
   </td>
-))
-TableCell.displayName = "TableCell"
+));
+TableCell.displayName = "TableCell";
 
+// Table Caption component
 const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
   React.HTMLAttributes<HTMLTableCaptionElement>
 >(({ className, children, ...props }, ref) => (
+  // Caption element for table caption
   <caption
     ref={ref}
     className={cn("mt-4 text-sm text-muted-foreground", className)}
@@ -118,9 +136,10 @@ const TableCaption = React.forwardRef<
   >
     {children}
   </caption>
-))
-TableCaption.displayName = "TableCaption"
+));
+TableCaption.displayName = "TableCaption";
 
+// Export the components for use
 export {
   Table,
   TableHeader,
@@ -130,4 +149,4 @@ export {
   TableRow,
   TableCell,
   TableCaption,
-}
+};

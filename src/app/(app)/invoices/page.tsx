@@ -346,7 +346,9 @@ export default function InvoicesPage() {
                   <TableCell>${invoice.amountPaid.toFixed(2)}</TableCell>
                   <TableCell>${invoice.remainingBalance.toFixed(2)}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
+                    <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                      {invoice.status === 'Partially Paid' ? 'Partially' : invoice.status} {/* Modified line */}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                      <div className="flex justify-end items-center gap-1">

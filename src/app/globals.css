@@ -49,7 +49,7 @@ body {
     --status-paid: 150 89% 34%; /* #09a45d */
     --status-paid-foreground: 0 0% 98%;
     --status-partially-paid: 39 100% 60%; /* #ffa533 */
-    --status-partially-paid-foreground: 0 0% 10%; 
+    --status-partially-paid-foreground: 0 0% 10%;
     --status-pending: 13 100% 60%; /* #ff5733 */
     --status-pending-foreground: 0 0% 98%;
     --status-overdue: 0 68% 51%; /* #dc2c2c */
@@ -85,7 +85,7 @@ body {
     --chart-5: 0 0% 70%;
 
     /* Dark Sidebar specific theme */
-    --sidebar-background: 0 0% 8%; 
+    --sidebar-background: 0 0% 8%;
     --sidebar-foreground: 0 0% 85%;
     --sidebar-primary: 45 100% 62.2%; /* Yellow accent for active items */
     --sidebar-primary-foreground: 0 0% 10%;

@@ -1,4 +1,3 @@
-
 'use client';
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -37,35 +36,45 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load data from localStorage on initial mount
   useEffect(() => {
-    setIsLoading(true); // Explicitly set loading to true at the start of the effect
+    setIsLoading(true);
+    console.log("DataContext: Loading data from localStorage...");
+    console.log("DataContext: isLoading set to true.");
     try {
       const storedCustomers = localStorage.getItem(LOCAL_STORAGE_KEYS.CUSTOMERS);
       if (storedCustomers) {
+        console.log("DataContext: Found customers in localStorage");
         setCustomers(JSON.parse(storedCustomers));
       } else {
+        console.log("DataContext: No customers in localStorage, using mocks");
         setCustomers(MOCK_CUSTOMERS); 
       }
 
       const storedInvoices = localStorage.getItem(LOCAL_STORAGE_KEYS.INVOICES);
       if (storedInvoices) {
+        console.log("DataContext: Found invoices in localStorage");
         setInvoices(JSON.parse(storedInvoices));
       } else {
+        console.log("DataContext: No invoices in localStorage, using mocks");
         setInvoices(MOCK_INVOICES); 
       }
 
       const storedProfile = localStorage.getItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE);
       if (storedProfile) {
+        console.log("DataContext: Found company profile in localStorage");
         setCompanyProfile(JSON.parse(storedProfile));
       } else {
+        console.log("DataContext: No company profile in localStorage, using mocks");
         setCompanyProfile(MOCK_COMPANY_PROFILE); 
       }
     } catch (error) {
-      console.error("Failed to load data from localStorage, using mocks:", error);
+      console.error("DataContext: Failed to load data from localStorage, using mocks:", error);
       setCustomers(MOCK_CUSTOMERS);
       setInvoices(MOCK_INVOICES);
       setCompanyProfile(MOCK_COMPANY_PROFILE);
     } finally {
+      console.log("DataContext: Data loading complete.");
       setIsLoading(false);
+      console.log("DataContext: isLoading set to false.");
     }
   }, []);
 
@@ -175,5 +184,3 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
-
-    
