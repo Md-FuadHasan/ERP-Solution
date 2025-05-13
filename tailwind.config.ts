@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -59,7 +60,18 @@ export default {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+        // Invoice Status Colors
+        'status-paid': 'hsl(var(--status-paid))',
+        'status-paid-foreground': 'hsl(var(--status-paid-foreground))',
+        'status-partially-paid': 'hsl(var(--status-partially-paid))',
+        'status-partially-paid-foreground': 'hsl(var(--status-partially-paid-foreground))',
+        'status-pending': 'hsl(var(--status-pending))',
+        'status-pending-foreground': 'hsl(var(--status-pending-foreground))',
+        'status-overdue': 'hsl(var(--status-overdue))',
+        'status-overdue-foreground': 'hsl(var(--status-overdue-foreground))',
+        'status-cancelled': 'hsl(var(--status-cancelled))',
+        'status-cancelled-foreground': 'hsl(var(--status-cancelled-foreground))',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
