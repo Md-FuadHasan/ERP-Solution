@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,15 +8,37 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Customer } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Customer, CustomerType, InvoiceAgingDays } from '@/types';
+import { CUSTOMER_TYPES, INVOICE_AGING_OPTIONS } from '@/types';
 
 const customerFormSchema = z.object({
-  id: z.string().max(50).optional(), // Customer ID is optional for auto-generation
+  id: z.string().max(50).optional(),
   name: z.string().min(2, { message: "Name must be at least 2 characters." }).max(100),
   email: z.string().email({ message: "Invalid email address." }).max(100),
   phone: z.string().min(7, { message: "Phone number seems too short." }).max(20),
   billingAddress: z.string().min(5, { message: "Billing address is required." }).max(255),
   shippingAddress: z.string().max(255).optional(),
+  customerType: z.enum(CUSTOMER_TYPES, { required_error: "Customer type is required." }),
+  creditLimit: z.coerce.number().positive("Credit limit must be a positive number.").optional(),
+  invoiceAgingDays: z.coerce.number().optional().transform(val => val ? Number(val) as InvoiceAgingDays : undefined),
+}).superRefine((data, ctx) => {
+  if (data.customerType === 'Credit') {
+    if (data.creditLimit === undefined || data.creditLimit === null || data.creditLimit <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Credit limit is required for Credit customers and must be positive.",
+        path: ["creditLimit"],
+      });
+    }
+    if (!data.invoiceAgingDays) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invoice aging period is required for Credit customers.",
+        path: ["invoiceAgingDays"],
+      });
+    }
+  }
 });
 
 export type CustomerFormValues = z.infer<typeof customerFormSchema>;
@@ -37,15 +60,31 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
       phone: initialData.phone,
       billingAddress: initialData.billingAddress,
       shippingAddress: initialData.shippingAddress || '',
+      customerType: initialData.customerType || 'Cash',
+      creditLimit: initialData.creditLimit || undefined,
+      invoiceAgingDays: initialData.invoiceAgingDays || undefined,
     } : {
-      id: '', // Default to empty for new customers
+      id: '',
       name: '',
       email: '',
       phone: '',
       billingAddress: '',
       shippingAddress: '',
+      customerType: 'Cash',
+      creditLimit: undefined,
+      invoiceAgingDays: undefined,
     },
   });
+
+  const watchedCustomerType = form.watch("customerType");
+
+  // Reset credit fields if customer type changes to Cash
+  React.useEffect(() => {
+    if (watchedCustomerType === 'Cash') {
+      form.setValue('creditLimit', undefined);
+      form.setValue('invoiceAgingDays', undefined);
+    }
+  }, [watchedCustomerType, form]);
 
   return (
     <Form {...form}>
@@ -60,8 +99,8 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
                 <Input 
                   placeholder="Leave blank for auto-generation" 
                   {...field} 
-                  readOnly={!!initialData} // ID is read-only when editing
-                  disabled={!!initialData} // Also disable to prevent focus
+                  readOnly={!!initialData} 
+                  disabled={!!initialData} 
                 />
               </FormControl>
               {!initialData && <FormDescription>Optional. If left blank, a unique ID will be generated.</FormDescription>}
@@ -136,6 +175,79 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="customerType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Customer Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {CUSTOMER_TYPES.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {watchedCustomerType === 'Credit' && (
+          <>
+            <FormField
+              control={form.control}
+              name="invoiceAgingDays"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Invoice Aging Period</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) as InvoiceAgingDays : undefined)} 
+                    value={field.value?.toString()}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select aging period" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {INVOICE_AGING_OPTIONS.map(days => (
+                        <SelectItem key={days} value={days.toString()}>{days} days</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="creditLimit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credit Limit Amount</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter credit limit" 
+                      {...field} 
+                      value={field.value === undefined ? '' : String(field.value)} 
+                      onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel

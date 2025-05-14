@@ -1,10 +1,10 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, X } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
 import { CustomerForm, type CustomerFormValues } from '@/components/forms/customer-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Customer } from '@/types';
+import type { Customer, CustomerType, InvoiceAgingDays } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -143,7 +143,13 @@ export default function CustomersPage() {
 
   const handleSubmit = (data: CustomerFormValues) => {
     if (editingCustomer) {
-      updateCustomer({ ...editingCustomer, ...data }); 
+      const updatedCustomerData: Customer = {
+        ...editingCustomer,
+        ...data,
+        creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
+        invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
+      };
+      updateCustomer(updatedCustomerData); 
       toast({ title: "Customer Updated", description: `${data.name} details have been updated.` });
     } else {
       let customerId = data.id;
@@ -167,6 +173,8 @@ export default function CustomersPage() {
         ...data,
         id: customerId,
         createdAt: new Date().toISOString(),
+        creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
+        invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
       };
       addCustomer(newCustomer); 
       toast({ title: "Customer Added", description: `${data.name} has been successfully added.` });
@@ -234,6 +242,7 @@ export default function CustomersPage() {
                 <TableHead className="min-w-[180px]">Name</TableHead>
                 <TableHead className="min-w-[200px]">Email</TableHead>
                 <TableHead className="min-w-[140px]">Phone</TableHead>
+                <TableHead className="min-w-[120px]">Type</TableHead>
                 <TableHead className="text-right min-w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -249,6 +258,11 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
+                  <TableCell>
+                    <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'}>
+                      {customer.customerType}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
@@ -302,18 +316,20 @@ export default function CustomersPage() {
           setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingCustomer(null);
       }}>
-        <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl">
-          <DialogHeader>
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
             <DialogDescription>
               {editingCustomer ? 'Update the details for this customer.' : 'Enter the details for the new customer.'}
             </DialogDescription>
           </DialogHeader>
-          <CustomerForm
-            initialData={editingCustomer}
-            onSubmit={handleSubmit}
-            onCancel={() => { setIsFormModalOpen(false); setEditingCustomer(null); }}
-          />
+          <div className="flex-grow overflow-y-auto p-6">
+            <CustomerForm
+              initialData={editingCustomer}
+              onSubmit={handleSubmit}
+              onCancel={() => { setIsFormModalOpen(false); setEditingCustomer(null); }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -327,6 +343,30 @@ export default function CustomersPage() {
           </DialogHeader>
           {selectedCustomerForDetails && (
             <div className="space-y-6 flex-grow overflow-y-auto p-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Customer Information</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="flex items-center">
+                    <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <strong>Type:</strong>&nbsp;{selectedCustomerForDetails.customerType} Customer
+                  </div>
+                  {selectedCustomerForDetails.customerType === 'Credit' && (
+                    <>
+                      <div className="flex items-center">
+                        <CircleDollarSign className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <strong>Credit Limit:</strong>&nbsp;${selectedCustomerForDetails.creditLimit?.toFixed(2) || 'N/A'}
+                      </div>
+                      <div className="flex items-center col-span-1 sm:col-span-2"> {/* Span full width on small screens if needed */}
+                        <Clock3 className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <strong>Invoice Aging:</strong>&nbsp;{selectedCustomerForDetails.invoiceAgingDays || 'N/A'} days
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -441,4 +481,3 @@ export default function CustomersPage() {
     </>
   );
 }
-
