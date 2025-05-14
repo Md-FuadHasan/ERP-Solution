@@ -175,13 +175,10 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       form.reset(defaultVals);
 
       let customerForSearchInput: Customer | undefined;
-      // let currentCustomerId = ''; // This variable was declared but not used. Removed.
       if (!initialData && prefillData?.customerId) { 
-          // currentCustomerId = prefillData.customerId; // This variable was declared but not used. Removed.
           customerForSearchInput = customers.find(c => c.id === prefillData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : (prefillData.customerName || ""));
       } else if (initialData) { 
-          // currentCustomerId = initialData.customerId; // This variable was declared but not used. Removed.
           customerForSearchInput = customers.find(c => c.id === initialData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
       } else { 
@@ -285,7 +282,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
             control={form.control}
             name="id"
             render={({ field }) => (
-              <FormItem className="md:col-span-3">
+              <FormItem className="flex flex-col md:col-span-3">
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. INV-2024001" {...field} readOnly={!!initialData?.id && isEditingExistingInvoice} />
@@ -434,7 +431,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
             control={form.control}
             name="status" 
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="flex flex-col">
                 <FormLabel>Invoice Status</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                   <FormControl>
@@ -544,7 +541,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
             control={form.control}
             name="paymentProcessingStatus"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="flex flex-col">
                 <FormLabel>Payment Collection Status (for this save)</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                   <FormControl>
@@ -570,7 +567,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
               control={form.control}
               name="partialAmountPaid"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Partial Amount Being Paid Now</FormLabel>
                   <FormControl>
                     <div className="relative">
@@ -595,7 +592,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                     control={form.control}
                     name="paymentMethod"
                     render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                         <FormLabel>Payment Method (for this payment)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
                         <FormControl>
@@ -620,7 +617,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         control={form.control}
                         name="cashVoucherNumber"
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Cash Voucher Number</FormLabel>
                             <FormControl>
                             <Input placeholder="Enter voucher number" {...field} value={field.value || ''} />
@@ -638,7 +635,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         control={form.control}
                         name="bankName"
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Bank Name</FormLabel>
                             <FormControl>
                             <Input placeholder="Enter bank name" {...field} value={field.value || ''} />
@@ -651,7 +648,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         control={form.control}
                         name="bankAccountNumber"
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Bank Account Number</FormLabel>
                             <FormControl>
                             <Input placeholder="Enter account number" {...field} value={field.value || ''}/>
@@ -664,7 +661,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         control={form.control}
                         name="onlineTransactionNumber"
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Online Transaction Number</FormLabel>
                             <FormControl>
                             <Input placeholder="Enter transaction number" {...field} value={field.value || ''}/>
@@ -750,7 +747,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           <Button type="button" variant="outline" onClick={onCancel} disabled={actualIsSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={actualIsSubmitting}>
+          <Button type="submit" disabled={actualIsSubmitting || !form.formState.isValid}>
             {actualIsSubmitting ? 'Saving...' : (isEditingExistingInvoice ? 'Save Invoice' : 'Create Invoice')}
           </Button>
         </div>
