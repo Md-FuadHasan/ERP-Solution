@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, FileText, Search, Filter, Printer, Download } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, FileText, Search } from 'lucide-react'; // Removed Filter from here
 import {
   Table,
   TableBody,
@@ -22,8 +22,9 @@ import {
 } from '@/components/ui/dialog';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
+import { StatusFilterDropdown, type InvoiceFilterStatus } from '@/components/common/status-filter-dropdown';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Invoice, Customer, PaymentRecord, InvoiceStatus, PaymentProcessingStatus, PaymentMethod } from '@/types'; // Make sure all types are exported
+import type { Invoice, Customer, PaymentRecord, InvoiceStatus, PaymentProcessingStatus, PaymentMethod } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +62,7 @@ export default function InvoicesPage() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InvoiceFilterStatus>('all');
   const [currentPrefillValues, setCurrentPrefillValues] = useState<{ customerId?: string | null; customerName?: string | null } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -89,11 +91,23 @@ export default function InvoicesPage() {
         invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
         invoice.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase()) // Added customerId search
+        invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
         : true;
-      return matchesSearchTerm;
+
+      let matchesStatusFilter = true;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'paid') {
+          matchesStatusFilter = invoice.status === 'Paid';
+        } else if (statusFilter === 'unpaid') {
+          matchesStatusFilter = invoice.status === 'Pending' || invoice.status === 'Overdue';
+        } else if (statusFilter === 'partially-paid') {
+          matchesStatusFilter = invoice.status === 'Partially Paid';
+        }
+      }
+      
+      return matchesSearchTerm && matchesStatusFilter;
     });
-  }, [invoices, searchTerm, getCustomerById]);
+  }, [invoices, searchTerm, statusFilter, getCustomerById]);
 
   const handleEditInvoice = (invoice: Invoice) => {
     setEditingInvoice(invoice);
@@ -175,24 +189,24 @@ export default function InvoicesPage() {
     
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (finalStatus !== 'Cancelled') { 
+    // Determine final status based on payment, unless explicitly set to 'Cancelled'
+    if (data.status === 'Cancelled' && finalStatus !== 'Paid') { // If user explicitly chose Cancelled and it's not Paid
+        finalStatus = 'Cancelled';
+    } else if (finalStatus !== 'Cancelled') { // If not Cancelled, then determine by payment
         if (newRemainingBalance <= 0) {
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else { 
+        } else { // No payment or full amount remains
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
             if (isBefore(dueDate, today)) {
                 finalStatus = 'Overdue';
             } else {
-                finalStatus = 'Pending';
+                 // Keep the user's chosen status if it's Pending, or default to Pending
+                finalStatus = data.status === 'Pending' || data.status === 'Overdue' ? data.status : 'Pending';
             }
         }
-    }
-    
-    if (data.status === 'Cancelled' && finalStatus !== 'Paid') {
-        finalStatus = 'Cancelled';
     }
 
 
@@ -244,8 +258,9 @@ export default function InvoicesPage() {
             </Button>
           }
         />
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <Skeleton className="h-10 w-full md:w-80" />
+            <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
         <div className="rounded-lg border shadow-sm bg-card p-4 overflow-x-auto">
           <Skeleton className="h-8 w-1/4 mb-4" />
@@ -277,12 +292,17 @@ export default function InvoicesPage() {
           </div>
         }
       />
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
-            placeholder="Search by Invoice ID, Customer Name, or Customer ID..."
+            placeholder="Search by ID or Customer..."
             className="w-full md:w-80" 
+        />
+        <StatusFilterDropdown
+            selectedStatus={statusFilter}
+            onStatusChange={setStatusFilter}
+            className="w-full md:w-auto"
         />
       </div>
 
@@ -352,9 +372,9 @@ export default function InvoicesPage() {
       ) : (
          <DataPlaceholder
           title="No Invoices Found"
-          message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first invoice."}
+          message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
           icon={FileText}
-          action={!searchTerm ? (
+          action={!searchTerm && statusFilter === 'all' ? (
             <Button onClick={() => handleAddNewInvoice()} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
             </Button>
