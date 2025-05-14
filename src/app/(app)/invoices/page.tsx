@@ -412,7 +412,7 @@ export default function InvoicesPage() {
           setCurrentPrefillValues(null); 
         }
       }}>
-        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
@@ -471,4 +471,3 @@ export default function InvoicesPage() {
     </>
   );
 }
-
