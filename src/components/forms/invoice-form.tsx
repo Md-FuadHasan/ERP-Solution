@@ -13,16 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 
 const invoiceItemSchema = z.object({
-  id: z.string().optional(), // id is managed internally
+  id: z.string().optional(), 
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
   unitPrice: z.coerce.number().min(0.01, "Unit price must be positive."),
@@ -84,23 +84,34 @@ interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
   companyProfile: CompanyProfile;
-  invoices: Invoice[]; // For checking existing invoice IDs if needed
-  prefillData?: { customerId?: string | null; customerName?: string | null } | null; // For prefilling new invoice
+  invoices: Invoice[]; 
+  prefillData?: { customerId?: string | null; customerName?: string | null } | null; 
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: string | null): InvoiceFormValues => {
+const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: string | null, customersArray?: Customer[]): InvoiceFormValues => {
+  let defaultDueDate = new Date(new Date().setDate(new Date().getDate() + 30));
+  if (!invoice && prefillCustomerId && customersArray) { // For new invoice with prefill
+    const customer = customersArray.find(c => c.id === prefillCustomerId);
+    if (customer && customer.customerType === 'Credit' && customer.invoiceAgingDays) {
+      defaultDueDate = addDays(new Date(), customer.invoiceAgingDays);
+    }
+  } else if (invoice) { // For existing invoice
+     defaultDueDate = new Date(invoice.dueDate);
+  }
+
+
   if (invoice) {
     return {
       id: invoice.id,
       customerId: invoice.customerId,
       issueDate: new Date(invoice.issueDate),
-      dueDate: new Date(invoice.dueDate),
+      dueDate: defaultDueDate,
       items: invoice.items.map(item => ({...item, id: item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, unitType: item.unitType || 'PCS'})),
       status: invoice.status, 
-      paymentProcessingStatus: 'Unpaid', // Always reset payment action fields
+      paymentProcessingStatus: 'Unpaid', 
       partialAmountPaid: undefined, 
       paymentMethod: undefined,
       cashVoucherNumber: '', 
@@ -109,12 +120,12 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
       onlineTransactionNumber: '', 
     };
   }
-  // Default values for a brand new invoice
+  
   return {
     id: `INV-${String(Date.now()).slice(-6)}`,
-    customerId: prefillCustomerId || '', // Use prefill if available
+    customerId: prefillCustomerId || '', 
     issueDate: new Date(),
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+    dueDate: defaultDueDate,
     items: [{ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
     status: 'Pending',
     paymentProcessingStatus: 'Unpaid',
@@ -131,7 +142,7 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
 export function InvoiceForm({ initialData, customers, companyProfile, invoices, prefillData, onSubmit, onCancel, isSubmitting: parentIsSubmitting }: InvoiceFormProps) {
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: getDefaultFormValues(initialData, prefillData?.customerId),
+    defaultValues: getDefaultFormValues(initialData, prefillData?.customerId, customers),
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -146,30 +157,34 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const watchedPaymentProcessingStatus = form.watch("paymentProcessingStatus");
   const watchedPartialAmountPaid = form.watch("partialAmountPaid");
   const watchedPaymentMethod = form.watch("paymentMethod");
-  const watchedStatus = form.watch("status"); // Correctly watch 'status' from the form
+  const watchedCustomerId = form.watch("customerId");
+
 
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [currentCustomerSearchInput, setCurrentCustomerSearchInput] = useState('');
 
   const prevInitialDataRef = useRef(initialData);
-  const prevPrefillDataRef = useRef(prefillData); // Ref for prefillData
+  const prevPrefillDataRef = useRef(prefillData); 
 
   useEffect(() => {
     if (prevInitialDataRef.current !== initialData || prevPrefillDataRef.current !== prefillData ||
         (initialData && prevInitialDataRef.current && initialData.id !== prevInitialDataRef.current.id) ||
         (prefillData && prevPrefillDataRef.current && prefillData.customerId !== prevPrefillDataRef.current.customerId)
        ) {
-      const defaultVals = getDefaultFormValues(initialData, !initialData && prefillData ? prefillData.customerId : null);
+      const defaultVals = getDefaultFormValues(initialData, !initialData && prefillData ? prefillData.customerId : null, customers);
       form.reset(defaultVals);
 
       let customerForSearchInput: Customer | undefined;
-      if (!initialData && prefillData?.customerId) { // New invoice with prefill
+      let currentCustomerId = '';
+      if (!initialData && prefillData?.customerId) { 
+          currentCustomerId = prefillData.customerId;
           customerForSearchInput = customers.find(c => c.id === prefillData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : (prefillData.customerName || ""));
-      } else if (initialData) { // Editing existing
+      } else if (initialData) { 
+          currentCustomerId = initialData.customerId;
           customerForSearchInput = customers.find(c => c.id === initialData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
-      } else { // New invoice, no prefill
+      } else { 
           setCurrentCustomerSearchInput("");
       }
       
@@ -177,6 +192,20 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       prevPrefillDataRef.current = prefillData;
     }
   }, [initialData, prefillData, customers, form]);
+
+  // Effect to update due date when customerId changes for a NEW invoice
+  useEffect(() => {
+    if (!initialData && watchedCustomerId) { // Only for new invoices and when customerId is set
+      const selectedCustomer = customers.find(c => c.id === watchedCustomerId);
+      if (selectedCustomer && selectedCustomer.customerType === 'Credit' && selectedCustomer.invoiceAgingDays) {
+        const issueDate = form.getValues('issueDate') || new Date();
+        const newDueDate = addDays(new Date(issueDate), selectedCustomer.invoiceAgingDays);
+        form.setValue('dueDate', newDueDate, { shouldValidate: true });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedCustomerId, initialData, customers, form.setValue, form.getValues]);
+
 
 
   useEffect(() => {
@@ -198,7 +227,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
     } else if (currentMethod === 'Bank Transfer') {
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
-    } else if (currentMethod === undefined || currentMethod === null || currentMethod === '') { // Also reset if payment method is cleared
+    } else if (currentMethod === undefined || currentMethod === null || currentMethod === '') { 
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
       form.setValue('bankName', '', { shouldValidate: false });
       form.setValue('bankAccountNumber', '', { shouldValidate: false });
@@ -217,19 +246,17 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const vatAmountDisplay = subtotalDisplay * vatRate;
   const totalAmountDisplay = subtotalDisplay + taxAmountDisplay + vatAmountDisplay;
 
-  // Display amount paid reflects the existing record for the invoice being edited.
-  // New payments (full/partial) are processed in handleSubmit in page.tsx
+  
   let displayAmountPaid = initialData?.amountPaid || 0;
   
-  // Note: The actual calculation of newAmountPaid and remainingBalance upon form submission
-  // happens in the InvoicesPage's handleSubmit function. This form part is for display.
+  
   let displayRemainingBalance = initialData?.remainingBalance !== undefined ? initialData.remainingBalance : totalAmountDisplay;
 
   if (watchedPaymentProcessingStatus === 'Fully Paid') {
-    // For display *during form interaction*, show what would happen if this action is saved.
+    
     displayRemainingBalance = 0; 
   } else if (watchedPaymentProcessingStatus === 'Partially Paid' && watchedPartialAmountPaid && watchedPartialAmountPaid > 0) {
-    // Display remaining if this partial payment is applied
+    
     const currentPaid = initialData?.amountPaid || 0;
     const potentialNewPaid = currentPaid + watchedPartialAmountPaid;
     displayRemainingBalance = Math.max(0, totalAmountDisplay - potentialNewPaid);
@@ -277,13 +304,11 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                   open={isCustomerPopoverOpen}
                   onOpenChange={(open) => {
                     setIsCustomerPopoverOpen(open);
-                    if (!open) { // When popover closes
+                    if (!open) { 
                       const selectedCustomerId = form.getValues("customerId");
                       const customer = customers.find(c => c.id === selectedCustomerId);
-                       if (customer) { // If a customer is selected, set search input to their name
+                       if (customer) { 
                          setCurrentCustomerSearchInput(customer.name);
-                       } else { // If no customer is selected (or field cleared), clear search input
-                         // setCurrentCustomerSearchInput(""); // Optional: clear if desired on close without selection
                        }
                     }
                   }}
@@ -407,7 +432,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           />
            <FormField
             control={form.control}
-            name="status" // Form field for desired status
+            name="status" 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Invoice Status</FormLabel>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, FileText, Search } from 'lucide-react'; // Removed Filter from here
+import { PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -65,6 +65,8 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<InvoiceFilterStatus>('all');
   const [currentPrefillValues, setCurrentPrefillValues] = useState<{ customerId?: string | null; customerName?: string | null } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
+  const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
 
   const handleAddNewInvoice = useCallback((prefillCustomerId?: string | null, prefillCustomerName?: string | null) => {
@@ -138,6 +140,28 @@ export default function InvoicesPage() {
     const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + calculatedVatAmount;
 
+    // Credit Limit Check
+    if (customer && customer.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
+      let totalOutstandingBalance = 0;
+      invoices.forEach(inv => {
+        if (
+          inv.customerId === customer.id &&
+          inv.id !== (editingInvoice?.id || '') && 
+          (inv.status === 'Pending' || inv.status === 'Overdue' || inv.status === 'Partially Paid')
+        ) {
+          totalOutstandingBalance += inv.remainingBalance;
+        }
+      });
+
+      if ((totalOutstandingBalance + calculatedTotalAmount) > customer.creditLimit) {
+        setCreditLimitAlertMessage(`This invoice of $${calculatedTotalAmount.toFixed(2)} plus existing balance of $${totalOutstandingBalance.toFixed(2)} ($${(totalOutstandingBalance + calculatedTotalAmount).toFixed(2)}) exceeds ${customer.name}'s credit limit of $${customer.creditLimit.toFixed(2)}. Please contact management to increase the limit or reduce the invoice amount.`);
+        setIsCreditLimitAlertOpen(true);
+        setIsSaving(false);
+        return;
+      }
+    }
+
+
     const existingInvoice = editingInvoice ? invoices.find(inv => inv.id === editingInvoice.id) : null;
     let newAmountPaid = existingInvoice?.amountPaid || 0;
     const newPaymentHistory: PaymentRecord[] = existingInvoice?.paymentHistory ? [...existingInvoice.paymentHistory] : [];
@@ -190,20 +214,19 @@ export default function InvoicesPage() {
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
     // Determine final status based on payment, unless explicitly set to 'Cancelled'
-    if (data.status === 'Cancelled' && finalStatus !== 'Paid') { // If user explicitly chose Cancelled and it's not Paid
+    if (data.status === 'Cancelled' && finalStatus !== 'Paid') { 
         finalStatus = 'Cancelled';
-    } else if (finalStatus !== 'Cancelled') { // If not Cancelled, then determine by payment
-        if (newRemainingBalance <= 0) {
+    } else if (finalStatus !== 'Cancelled') { 
+        if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) { // Ensure paid amount covers total
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else { // No payment or full amount remains
+        } else { 
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
-            if (isBefore(dueDate, today)) {
+            if (isBefore(dueDate, today) && newRemainingBalance > 0) { // Check remaining balance for overdue
                 finalStatus = 'Overdue';
             } else {
-                 // Keep the user's chosen status if it's Pending, or default to Pending
                 finalStatus = data.status === 'Pending' || data.status === 'Overdue' ? data.status : 'Pending';
             }
         }
@@ -428,6 +451,20 @@ export default function InvoicesPage() {
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Credit Limit Exceeded</AlertDialogTitle>
+            <AlertDialogDescription>
+              {creditLimitAlertMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsCreditLimitAlertOpen(false)}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
