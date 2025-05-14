@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
@@ -56,6 +56,7 @@ export default function InvoicesPage() {
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname(); // Added pathname
   const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -68,6 +69,17 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
+  const closeFormModal = useCallback(() => {
+    setIsFormModalOpen(false);
+    setEditingInvoice(null);
+    setCurrentPrefillValues(null);
+    // Clear relevant query params to prevent re-opening
+    const newSearchParams = new URLSearchParams(searchParams.toString());
+    newSearchParams.delete('action');
+    newSearchParams.delete('customerId');
+    newSearchParams.delete('customerName');
+    router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+  }, [searchParams, router, pathname]);
 
   const handleAddNewInvoice = useCallback((prefillCustomerId?: string | null, prefillCustomerName?: string | null) => {
     setEditingInvoice(null);
@@ -263,9 +275,7 @@ export default function InvoicesPage() {
       addInvoice(invoiceToSave);
       toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
     }
-    setIsFormModalOpen(false);
-    setEditingInvoice(null);
-    setCurrentPrefillValues(null); 
+    closeFormModal(); // Use the new close function
     setIsSaving(false);
   };
 
@@ -406,10 +416,13 @@ export default function InvoicesPage() {
       )}
 
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
-        setIsFormModalOpen(isOpen);
         if (!isOpen) {
-          setEditingInvoice(null);
-          setCurrentPrefillValues(null); 
+          closeFormModal();
+        } else {
+          // If opening via a direct action (not URL), ensure isFormModalOpen is set.
+          // This scenario is typically handled by handleAddNewInvoice or handleEditInvoice.
+          // setIsFormModalOpen(true) might be redundant if already handled by those.
+           if (!isFormModalOpen) setIsFormModalOpen(true);
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0">
@@ -427,11 +440,7 @@ export default function InvoicesPage() {
               invoices={invoices}
               onSubmit={handleSubmit}
               prefillData={currentPrefillValues}
-              onCancel={() => {
-                setIsFormModalOpen(false);
-                setEditingInvoice(null);
-                setCurrentPrefillValues(null);
-              }}
+              onCancel={closeFormModal} // Use the new close function
               isSubmitting={isSaving}
             />
           </div>
@@ -471,3 +480,4 @@ export default function InvoicesPage() {
     </>
   );
 }
+
