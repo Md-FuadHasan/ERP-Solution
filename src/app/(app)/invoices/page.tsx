@@ -418,11 +418,6 @@ export default function InvoicesPage() {
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) {
           closeFormModal();
-        } else {
-          // If opening via a direct action (not URL), ensure isFormModalOpen is set.
-          // This scenario is typically handled by handleAddNewInvoice or handleEditInvoice.
-          // setIsFormModalOpen(true) might be redundant if already handled by those.
-           if (!isFormModalOpen) setIsFormModalOpen(true);
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0">

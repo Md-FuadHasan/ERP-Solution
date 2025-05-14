@@ -253,7 +253,7 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
             {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Customer')}
           </Button>
         </div>

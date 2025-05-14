@@ -175,13 +175,13 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       form.reset(defaultVals);
 
       let customerForSearchInput: Customer | undefined;
-      let currentCustomerId = '';
+      // let currentCustomerId = ''; // This variable was declared but not used. Removed.
       if (!initialData && prefillData?.customerId) { 
-          currentCustomerId = prefillData.customerId;
+          // currentCustomerId = prefillData.customerId; // This variable was declared but not used. Removed.
           customerForSearchInput = customers.find(c => c.id === prefillData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : (prefillData.customerName || ""));
       } else if (initialData) { 
-          currentCustomerId = initialData.customerId;
+          // currentCustomerId = initialData.customerId; // This variable was declared but not used. Removed.
           customerForSearchInput = customers.find(c => c.id === initialData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
       } else { 
@@ -280,12 +280,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-10">
           <FormField
             control={form.control}
             name="id"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-3">
                 <FormLabel>Invoice Number</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. INV-2024001" {...field} readOnly={!!initialData?.id && isEditingExistingInvoice} />
@@ -298,7 +298,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
             control={form.control}
             name="customerId"
             render={({ field }) => (
-              <FormItem className="flex flex-col">
+              <FormItem className="flex flex-col md:col-span-7">
                 <FormLabel>Customer</FormLabel>
                 <Popover
                   open={isCustomerPopoverOpen}
@@ -699,7 +699,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           <hr className="my-2 border-border" />
            <div className="flex justify-between text-md">
             <span>Total Amount Paid (All Time):</span>
-            <span className={(initialData?.amountPaid || 0) > 0 ? "text-green-600 dark:text-green-400" : ""}>${(displayAmountPaid).toFixed(2)}</span>
+            <span className={(displayAmountPaid) > 0 ? "text-green-600 dark:text-green-400" : ""}>${(displayAmountPaid).toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-md font-semibold text-primary">
             <span>Overall Remaining Balance:</span>
