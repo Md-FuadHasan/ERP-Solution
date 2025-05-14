@@ -61,7 +61,6 @@ export default function InvoicesPage() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [customerSearchTerm, setCustomerSearchTerm] = useState(''); 
   const [currentPrefillValues, setCurrentPrefillValues] = useState<{ customerId?: string | null; customerName?: string | null } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -70,14 +69,13 @@ export default function InvoicesPage() {
     setEditingInvoice(null);
     setCurrentPrefillValues({ customerId: prefillCustomerId, customerName: prefillCustomerName });
     setIsFormModalOpen(true);
-  }, []); // Removed dependencies that might cause stale closures if not needed for THIS specific action of opening modal with prefill context
+  }, []); 
 
   useEffect(() => {
     const action = searchParams.get('action');
     const customerId = searchParams.get('customerId');
     const customerName = searchParams.get('customerName');
 
-    // More robust check to prevent re-triggering if modal is already handling a 'new' action
     if (action === 'new' && !isFormModalOpen && !editingInvoice && (!currentPrefillValues || currentPrefillValues.customerId !== customerId)) {
       handleAddNewInvoice(customerId, customerName);
     }
@@ -90,19 +88,16 @@ export default function InvoicesPage() {
       const matchesSearchTerm = searchTerm ? 
         invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
         invoice.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer?.name.toLowerCase().includes(searchTerm.toLowerCase())
+        customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase()) // Added customerId search
         : true;
-      const matchesCustomerSearchTerm = customerSearchTerm ? 
-        invoice.customerId.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-        customer?.id.toLowerCase().includes(customerSearchTerm.toLowerCase())
-        : true;
-      return matchesSearchTerm && matchesCustomerSearchTerm;
+      return matchesSearchTerm;
     });
-  }, [invoices, searchTerm, customerSearchTerm, getCustomerById]);
+  }, [invoices, searchTerm, getCustomerById]);
 
   const handleEditInvoice = (invoice: Invoice) => {
     setEditingInvoice(invoice);
-    setCurrentPrefillValues(null); // Clear prefill when editing
+    setCurrentPrefillValues(null); 
     setIsFormModalOpen(true);
   };
 
@@ -122,7 +117,6 @@ export default function InvoicesPage() {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
 
-    // Calculate subtotal, tax, VAT, and total amount from items
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
     const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0.10;
     const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.05;
@@ -138,8 +132,8 @@ export default function InvoicesPage() {
 
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      const paymentAmount = calculatedTotalAmount - newAmountPaid; // Amount needed to be fully paid
-      if (paymentAmount > 0) { // Only add payment record if there's an amount to pay
+      const paymentAmount = calculatedTotalAmount - newAmountPaid; 
+      if (paymentAmount > 0) { 
         newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -155,8 +149,8 @@ export default function InvoicesPage() {
       newAmountPaid = calculatedTotalAmount;
       finalStatus = 'Paid';
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
-      const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid); // Cap payment at remaining balance
-      if (actualPartialPayment > 0) { // Only add record if a positive amount is being paid
+      const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid); 
+      if (actualPartialPayment > 0) { 
          newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -173,7 +167,7 @@ export default function InvoicesPage() {
 
       if (newAmountPaid >= calculatedTotalAmount) {
         finalStatus = 'Paid';
-        newAmountPaid = calculatedTotalAmount; // Ensure it doesn't exceed total
+        newAmountPaid = calculatedTotalAmount; 
       } else {
         finalStatus = 'Partially Paid';
       }
@@ -181,13 +175,12 @@ export default function InvoicesPage() {
     
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    // Auto-update status based on balance and due date, respecting 'Cancelled'
-    if (finalStatus !== 'Cancelled') { // Don't override 'Cancelled' unless it becomes 'Paid'
+    if (finalStatus !== 'Cancelled') { 
         if (newRemainingBalance <= 0) {
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else { // newAmountPaid is 0 or invalid
+        } else { 
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
             if (isBefore(dueDate, today)) {
@@ -197,7 +190,7 @@ export default function InvoicesPage() {
             }
         }
     }
-    // If form status was set to Cancelled, ensure it remains Cancelled unless it's fully paid.
+    
     if (data.status === 'Cancelled' && finalStatus !== 'Paid') {
         finalStatus = 'Cancelled';
     }
@@ -215,7 +208,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, // Store the action status for record if needed
+      paymentProcessingStatus: data.paymentProcessingStatus, 
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -235,7 +228,7 @@ export default function InvoicesPage() {
     }
     setIsFormModalOpen(false);
     setEditingInvoice(null);
-    setCurrentPrefillValues(null); // Clear prefill after submit
+    setCurrentPrefillValues(null); 
     setIsSaving(false);
   };
 
@@ -251,11 +244,10 @@ export default function InvoicesPage() {
             </Button>
           }
         />
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+        <div className="mb-6">
+            <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="rounded-lg border shadow-sm bg-card p-4">
+        <div className="rounded-lg border shadow-sm bg-card p-4 overflow-x-auto">
           <Skeleton className="h-8 w-1/4 mb-4" />
           {[...Array(3)].map((_, i) => (
             <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
@@ -282,22 +274,15 @@ export default function InvoicesPage() {
             <Button onClick={() => handleAddNewInvoice()} className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
             </Button>
-            {/* Add filter, print, download buttons here if needed */}
           </div>
         }
       />
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mb-6">
         <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
-            placeholder="Search by Invoice ID or Customer Name..."
-            className="w-full"
-        />
-        <SearchInput
-            value={customerSearchTerm}
-            onChange={setCustomerSearchTerm}
-            placeholder="Filter by Customer ID..."
-            className="w-full"
+            placeholder="Search by Invoice ID, Customer Name, or Customer ID..."
+            className="w-full md:w-80" 
         />
       </div>
 
@@ -367,9 +352,9 @@ export default function InvoicesPage() {
       ) : (
          <DataPlaceholder
           title="No Invoices Found"
-          message={searchTerm || customerSearchTerm ? "Try adjusting your search terms." : "Get started by adding your first invoice."}
+          message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first invoice."}
           icon={FileText}
-          action={!searchTerm && !customerSearchTerm ? (
+          action={!searchTerm ? (
             <Button onClick={() => handleAddNewInvoice()} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
             </Button>
@@ -381,7 +366,7 @@ export default function InvoicesPage() {
         setIsFormModalOpen(isOpen);
         if (!isOpen) {
           setEditingInvoice(null);
-          setCurrentPrefillValues(null); // Clear prefill on close
+          setCurrentPrefillValues(null); 
         }
       }}>
         <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col p-0">
@@ -429,3 +414,4 @@ export default function InvoicesPage() {
     </>
   );
 }
+
