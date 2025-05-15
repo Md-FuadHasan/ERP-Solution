@@ -38,6 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -103,8 +104,6 @@ export default function InvoicesPage() {
 
 
   const handleAddNewInvoice = useCallback(() => {
-    // Clear any existing URL params first by calling closeFormModal
-    // then reset states before opening the modal
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
     newSearchParams.delete('customerId');
@@ -113,7 +112,7 @@ export default function InvoicesPage() {
     
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null; // Ensure ref is cleared
+    openedBySearchParamsRef.current = null; 
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
@@ -275,9 +274,20 @@ export default function InvoicesPage() {
 
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
+    
+    // For new invoices, or if payment processing status was not 'Unpaid' (meaning a payment was made)
+    if (!editingInvoice || data.paymentProcessingStatus !== 'Unpaid') {
+        // Reset payment fields by closing and reopening the form, 
+        // which will re-initialize it to default or existing invoice state without recent payment inputs
+        closeFormModal(); 
+        if (editingInvoice) { // If was editing, reopen to continue editing if needed
+            handleEditInvoice(invoiceToSave); // Pass the saved invoice data to repopulate correctly
+        }
+    } else {
+        setIsFormModalOpen(false); // Just close if it was an edit without a new payment
+    }
     setIsSaving(false);
-    setIsFormModalOpen(false);
-  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, setIsFormModalOpen]);
+  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, closeFormModal, handleEditInvoice]);
 
   if (isLoading) {
     return (
@@ -291,26 +301,24 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0">
-          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
             <div className="overflow-y-auto max-h-96 h-full">
               <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
               <div className="p-4 space-y-2">
                 {[...Array(7)].map((_, i) => (
                   <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[180px]" />
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[150px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
-                    <Skeleton className="h-6 w-24 min-w-[100px]" />
+                    <Skeleton className="h-6 w-20 min-w-[80px]" />
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        </div>
       </div>
     );
   }
@@ -331,84 +339,82 @@ export default function InvoicesPage() {
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
       
-      <div className="flex-grow min-h-0">
-        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-          <div className="overflow-y-auto max-h-96 h-full">
-            {filteredInvoices.length > 0 ? (
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
-                  <TableRow>
-                    <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                    <TableHead className="min-w-[180px]">Customer</TableHead>
-                    <TableHead className="min-w-[100px]">Due Date</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Amount</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Paid</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Balance</TableHead>
-                    <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Actions</TableHead>
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+        <div className="overflow-y-auto max-h-96 h-full">
+          {filteredInvoices.length > 0 ? (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
+                  <TableHead className="min-w-[180px]">Customer</TableHead>
+                  <TableHead className="min-w-[100px]">Due Date</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
+                  <TableHead className="min-w-[120px]">Status</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInvoices.map((invoice) => (
+                  <TableRow key={invoice.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">{invoice.id}</TableCell>
+                    <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                    <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                        {invoice.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete invoice "{invoiceToDelete?.id}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">{invoice.id}</TableCell>
-                      <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                      <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete invoice "{invoiceToDelete?.id}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="h-full flex items-center justify-center p-8">
-                <DataPlaceholder
-                  title="No Invoices Found"
-                  message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
-                  icon={PlusCircle}
-                  action={!searchTerm && statusFilter === 'all' ? (
-                    <Button onClick={handleAddNewInvoice} className="w-full max-w-xs sm:w-auto">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
-                    </Button>
-                  ) : undefined}
-                />
-              </div>
-            )}
-          </div>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="h-full flex items-center justify-center p-8">
+              <DataPlaceholder
+                title="No Invoices Found"
+                message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
+                icon={PlusCircle}
+                action={!searchTerm && statusFilter === 'all' ? (
+                  <Button onClick={handleAddNewInvoice} className="w-full max-w-xs sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
         </div>
       </div>
 
