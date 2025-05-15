@@ -1,7 +1,7 @@
 
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'; // Added useRef
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
@@ -56,7 +56,7 @@ export default function InvoicesPage() {
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = usePathname(); // Added pathname
+  const pathname = usePathname();
   const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -69,10 +69,14 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
+  const openedBySearchParamsRef = useRef<string | null>(null);
+
   const closeFormModal = useCallback(() => {
     setIsFormModalOpen(false);
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
+    openedBySearchParamsRef.current = null; // Reset the ref
+
     // Clear relevant query params to prevent re-opening
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
@@ -91,11 +95,21 @@ export default function InvoicesPage() {
     const action = searchParams.get('action');
     const customerId = searchParams.get('customerId');
     const customerName = searchParams.get('customerName');
+    
+    // Generate a unique key for the current intent to open, if any
+    // Ensure consistent order for comparison if params could vary in order (though unlikely for searchParams.toString())
+    const openIntentKey = action === 'new' ? `action=new&customerId=${customerId || ''}&customerName=${customerName || ''}` : null;
 
-    if (action === 'new' && !isFormModalOpen && !editingInvoice && (!currentPrefillValues || currentPrefillValues.customerId !== customerId)) {
-      handleAddNewInvoice(customerId, customerName);
+    if (openIntentKey) { // If there's an intent to open from URL
+      if (!isFormModalOpen && !editingInvoice) { // And modal is not already open or in edit mode
+        if (openedBySearchParamsRef.current !== openIntentKey) { // And this specific intent hasn't been processed
+          handleAddNewInvoice(customerId, customerName);
+          openedBySearchParamsRef.current = openIntentKey; // Mark this intent as processed
+        }
+      }
     }
-  }, [searchParams, isFormModalOpen, editingInvoice, currentPrefillValues, handleAddNewInvoice]);
+    // No explicit 'else' to close the modal here; closing is handled by user interaction via closeFormModal
+  }, [searchParams, isFormModalOpen, editingInvoice, handleAddNewInvoice]);
 
 
   const filteredInvoices = useMemo(() => {
@@ -127,6 +141,7 @@ export default function InvoicesPage() {
     setEditingInvoice(invoice);
     setCurrentPrefillValues(null); 
     setIsFormModalOpen(true);
+     openedBySearchParamsRef.current = null; // Clear if opening for edit, not URL based
   };
 
   const handleDeleteInvoice = (invoice: Invoice) => {
@@ -197,7 +212,7 @@ export default function InvoicesPage() {
         });
       }
       newAmountPaid = calculatedTotalAmount;
-      finalStatus = 'Paid';
+      // finalStatus = 'Paid'; // Status will be re-evaluated below
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid); 
       if (actualPartialPayment > 0) { 
@@ -215,31 +230,33 @@ export default function InvoicesPage() {
         newAmountPaid += actualPartialPayment;
       }
 
-      if (newAmountPaid >= calculatedTotalAmount) {
-        finalStatus = 'Paid';
-        newAmountPaid = calculatedTotalAmount; 
-      } else {
-        finalStatus = 'Partially Paid';
-      }
+      // if (newAmountPaid >= calculatedTotalAmount) {
+      //   finalStatus = 'Paid'; // Status will be re-evaluated below
+      //   newAmountPaid = calculatedTotalAmount; 
+      // } else {
+      //   finalStatus = 'Partially Paid'; // Status will be re-evaluated below
+      // }
     }
     
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    // Determine final status based on payment, unless explicitly set to 'Cancelled'
-    if (data.status === 'Cancelled' && finalStatus !== 'Paid') { 
+    // Determine final status based on payment AND original status, unless explicitly set to 'Cancelled'
+    if (data.status === 'Cancelled') { 
         finalStatus = 'Cancelled';
-    } else if (finalStatus !== 'Cancelled') { 
-        if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) { // Ensure paid amount covers total
+    } else { 
+        if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else { 
+        } else { // No new payment or payment didn't cover total, rely on due date or existing status
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
-            if (isBefore(dueDate, today) && newRemainingBalance > 0) { // Check remaining balance for overdue
+            if (isBefore(dueDate, today) && newRemainingBalance > 0) {
                 finalStatus = 'Overdue';
-            } else {
-                finalStatus = data.status === 'Pending' || data.status === 'Overdue' ? data.status : 'Pending';
+            } else if (newRemainingBalance > 0) { // If balance remains and not overdue, it's Pending
+                finalStatus = 'Pending';
+            } else { // Default to Pending if no other condition met (e.g. $0 invoice fully "paid")
+                 finalStatus = 'Pending';
             }
         }
     }
@@ -249,8 +266,8 @@ export default function InvoicesPage() {
       id: data.id,
       customerId: data.customerId,
       customerName: customer?.name || 'N/A',
-      issueDate: format(data.issueDate, 'yyyy-MM-dd'),
-      dueDate: format(data.dueDate, 'yyyy-MM-dd'),
+      issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
+      dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })),
       subtotal: calculatedSubtotal,
       taxAmount: calculatedTaxAmount,
@@ -275,8 +292,8 @@ export default function InvoicesPage() {
       addInvoice(invoiceToSave);
       toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
     }
-    closeFormModal(); // Use the new close function
     setIsSaving(false);
+    closeFormModal();
   };
 
   if (isLoading) {
@@ -418,6 +435,12 @@ export default function InvoicesPage() {
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) {
           closeFormModal();
+        } else {
+            // If opening, ensure openedBySearchParamsRef is managed if it was due to URL
+            const action = searchParams.get('action');
+             if (action !== 'new') { // if opened by edit button or direct "add new" button
+                openedBySearchParamsRef.current = null;
+             }
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0">
@@ -435,7 +458,7 @@ export default function InvoicesPage() {
               invoices={invoices}
               onSubmit={handleSubmit}
               prefillData={currentPrefillValues}
-              onCancel={closeFormModal} // Use the new close function
+              onCancel={closeFormModal} 
               isSubmitting={isSaving}
             />
           </div>
