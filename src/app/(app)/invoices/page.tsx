@@ -44,15 +44,15 @@ import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InvoicesPage() {
-  const { 
-    invoices, 
-    customers, 
-    addInvoice, 
-    updateInvoice, 
-    deleteInvoice, 
-    isLoading, 
+  const {
+    invoices,
+    customers,
+    addInvoice,
+    updateInvoice,
+    deleteInvoice,
+    isLoading,
     getCustomerById,
-    companyProfile 
+    companyProfile
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,40 +69,46 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
-  const openedBySearchParamsRef = useRef<string | null>(null);
+  const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
+
 
   // Effect to open modal based on URL parameters
   useEffect(() => {
     const action = searchParams.get('action');
     const customerId = searchParams.get('customerId');
     const customerName = searchParams.get('customerName');
-    const openIntentKey = action === 'new' ? `action=new&customerId=${customerId || ''}&customerName=${customerName || ''}` : null;
+    const currentUrlIntentKey = action === 'new' ? `action=new&customerId=${customerId || ''}&customerName=${customerName || ''}` : null;
 
-    if (openIntentKey) {
-      if (!isFormModalOpen && !editingInvoice) { // Only if not already open or editing
-        if (openedBySearchParamsRef.current !== openIntentKey) {
-          setCurrentPrefillValues({ customerId, customerName });
-          setEditingInvoice(null);
-          setIsFormModalOpen(true);
-          openedBySearchParamsRef.current = openIntentKey;
-        }
+    if (currentUrlIntentKey) {
+      // If action=new is in URL, and this specific intent hasn't been processed, and modal is not already open for editing
+      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+        setCurrentPrefillValues({ customerId, customerName });
+        setEditingInvoice(null); // Ensure "new" mode
+        setIsFormModalOpen(true);
+        setUrlParamsProcessedIntentKey(currentUrlIntentKey); // Mark this intent as processed
+      }
+    } else {
+      // If URL no longer has action=new, reset the processed key.
+      // This allows the modal to be re-opened if the user navigates back to the URL with action=new.
+      if (urlParamsProcessedIntentKey) {
+        setUrlParamsProcessedIntentKey(null);
       }
     }
-  }, [searchParams, isFormModalOpen, editingInvoice]);
+  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey]);
 
 
   const handleAddNewInvoice = useCallback(() => {
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null; // Not opened by search params
+    setUrlParamsProcessedIntentKey(null); // Not opened by search params that need tracking
     setIsFormModalOpen(true);
-  }, []); 
+  }, []);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(invoice => {
       const customer = getCustomerById(invoice.customerId);
-      const matchesSearchTerm = searchTerm ? 
-        invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchesSearchTerm = searchTerm ?
+        invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         invoice.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -118,15 +124,15 @@ export default function InvoicesPage() {
           matchesStatusFilter = invoice.status === 'Partially Paid';
         }
       }
-      
+
       return matchesSearchTerm && matchesStatusFilter;
     });
   }, [invoices, searchTerm, statusFilter, getCustomerById]);
 
   const handleEditInvoice = (invoice: Invoice) => {
     setEditingInvoice(invoice);
-    setCurrentPrefillValues(null); 
-    openedBySearchParamsRef.current = null; // Not opened by search params
+    setCurrentPrefillValues(null);
+    setUrlParamsProcessedIntentKey(null); // Not opened by search params that need tracking
     setIsFormModalOpen(true);
   };
 
@@ -158,7 +164,7 @@ export default function InvoicesPage() {
       invoices.forEach(inv => {
         if (
           inv.customerId === customer.id &&
-          inv.id !== (editingInvoice?.id || '') && 
+          inv.id !== (editingInvoice?.id || '') &&
           (inv.status === 'Pending' || inv.status === 'Overdue' || inv.status === 'Partially Paid')
         ) {
           totalOutstandingBalance += inv.remainingBalance;
@@ -179,8 +185,8 @@ export default function InvoicesPage() {
     let finalStatus: InvoiceStatus = existingInvoice?.status || data.status;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      const paymentAmount = calculatedTotalAmount - newAmountPaid; 
-      if (paymentAmount > 0) { 
+      const paymentAmount = calculatedTotalAmount - newAmountPaid;
+      if (paymentAmount > 0) {
         newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -195,8 +201,8 @@ export default function InvoicesPage() {
       }
       newAmountPaid = calculatedTotalAmount;
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
-      const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid); 
-      if (actualPartialPayment > 0) { 
+      const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
+      if (actualPartialPayment > 0) {
          newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -211,24 +217,24 @@ export default function InvoicesPage() {
         newAmountPaid += actualPartialPayment;
       }
     }
-    
+
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { 
+    if (data.status === 'Cancelled') {
         finalStatus = 'Cancelled';
-    } else { 
+    } else {
         if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else { 
+        } else {
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
             if (isBefore(dueDate, today) && newRemainingBalance > 0) {
                 finalStatus = 'Overdue';
-            } else if (newRemainingBalance > 0) { 
+            } else if (newRemainingBalance > 0) {
                 finalStatus = 'Pending';
-            } else { 
+            } else {
                  finalStatus = 'Pending';
             }
         }
@@ -246,7 +252,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, 
+      paymentProcessingStatus: data.paymentProcessingStatus,
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -319,7 +325,7 @@ export default function InvoicesPage() {
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Search by ID or Customer..."
-            className="w-full md:w-80" 
+            className="w-full md:w-80"
         />
         <StatusFilterDropdown
             selectedStatus={statusFilter}
@@ -363,7 +369,7 @@ export default function InvoicesPage() {
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
-                              e.stopPropagation(); 
+                              e.stopPropagation();
                               handleDeleteInvoice(invoice);
                             }}>
                              <Trash2 className="h-4 w-4" />
@@ -404,16 +410,15 @@ export default function InvoicesPage() {
         />
       )}
 
-      <Dialog 
-        open={isFormModalOpen} 
+      <Dialog
+        open={isFormModalOpen}
         onOpenChange={(isOpen) => {
-          setIsFormModalOpen(isOpen); // Update main state control for dialog visibility
-          if (!isOpen) { // If dialog is being closed (by X, Esc, or clicking outside)
+          setIsFormModalOpen(isOpen);
+          if (!isOpen) {
             setEditingInvoice(null);
             setCurrentPrefillValues(null);
-            openedBySearchParamsRef.current = null; // Clear ref
+            // urlParamsProcessedIntentKey is reset by useEffect when searchParams no longer show 'action=new'
 
-            // Clear URL parameters if they were used to open it
             const currentAction = searchParams.get('action');
             const currentCustomerId = searchParams.get('customerId');
             if (currentAction === 'new' && currentCustomerId) {
@@ -434,7 +439,6 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {/* Conditionally render InvoiceForm to ensure it unmounts and remounts with fresh state */}
             {isFormModalOpen && (
               <InvoiceForm
                 initialData={editingInvoice}
@@ -443,14 +447,14 @@ export default function InvoicesPage() {
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
-                onCancel={() => setIsFormModalOpen(false)} // Simplified: just close the dialog
+                onCancel={() => setIsFormModalOpen(false)}
                 isSubmitting={isSaving}
               />
             )}
           </div>
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -484,3 +488,4 @@ export default function InvoicesPage() {
     </>
   );
 }
+
