@@ -1,3 +1,4 @@
+
 import * as React from "react";
 
 // Assuming this is a utility function like clsx or similar for merging class names
@@ -97,7 +98,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-2 text-left align-middle font-medium text-muted-foreground sm:px-4 [&:has([role=checkbox])]:pr-0",
+      "h-12 px-2 text-left align-middle font-bold text-foreground sm:px-4 [&:has([role=checkbox])]:pr-0", // Changed font-medium text-muted-foreground to font-bold text-foreground
       className
     )}
     {...props}
@@ -115,7 +116,7 @@ const TableCell = React.forwardRef<
   // Td element for table data cells
   <td
     ref={ref}
-    className={cn("p-2 align-middle sm:p-4 [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("p-2 align-middle text-xs sm:p-4 [&:has([role=checkbox])]:pr-0", className)} // Added text-xs for smaller font
     {...props}
   >
     {children}

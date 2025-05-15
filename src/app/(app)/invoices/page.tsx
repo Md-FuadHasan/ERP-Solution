@@ -187,7 +187,7 @@ export default function InvoicesPage() {
     const existingInvoice = editingInvoice ? invoices.find(inv => inv.id === editingInvoice.id) : null;
     let newAmountPaid = existingInvoice?.amountPaid || 0;
     const newPaymentHistory: PaymentRecord[] = existingInvoice?.paymentHistory ? [...existingInvoice.paymentHistory] : [];
-    let finalStatus: InvoiceStatus = data.status; // Start with form status
+    let finalStatus: InvoiceStatus = data.status; 
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
@@ -239,8 +239,7 @@ export default function InvoicesPage() {
                 finalStatus = 'Overdue';
             } else if (newRemainingBalance > 0) { 
                 finalStatus = 'Pending';
-            } // If it's 0 remaining but not Paid (e.g. from cancel), it might still be Pending if set so. Or default to Paid.
-              // The logic here defaults to the form's status unless overridden by payment.
+            }
         }
     }
 
@@ -297,14 +296,13 @@ export default function InvoicesPage() {
         </div>
         <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
           <div className="h-full overflow-auto">
-            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" />
-            <div className="p-4 space-y-2">
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> {/* Header Skeleton */}
+            <div className="p-4 space-y-2"> {/* Rows Skeleton Area */}
                 {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
                     <Skeleton className="h-6 flex-1 min-w-[120px]" />
                     <Skeleton className="h-6 flex-1 min-w-[180px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> {/* Removed Issue Date, adjusted others */}
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
                     <Skeleton className="h-6 flex-1 min-w-[120px]" />
@@ -368,7 +366,7 @@ export default function InvoicesPage() {
                     <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
                     <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right text-green-600 dark:text-green-400">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
                     <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
