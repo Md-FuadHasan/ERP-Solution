@@ -77,20 +77,17 @@ useEffect(() => {
     const action = searchParams.get('action');
     const customerId = searchParams.get('customerId');
     const customerName = searchParams.get('customerName');
-    // Construct a unique key for the current URL intent to open the modal
+    
     const currentUrlIntentKey = action === 'new' ? `action=new&customerId=${customerId || ''}&customerName=${customerName || ''}` : null;
 
     if (currentUrlIntentKey) {
-      // If action=new is in URL, and this specific intent hasn't been processed, and modal is not already open for editing
       if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
         setCurrentPrefillValues({ customerId, customerName });
-        setEditingInvoice(null); // Ensure "new" mode
+        setEditingInvoice(null); 
         setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(currentUrlIntentKey); // Mark this intent as processed
+        setUrlParamsProcessedIntentKey(currentUrlIntentKey); 
       }
     } else {
-      // If URL no longer has action=new, reset the processed key.
-      // This allows the modal to be re-opened if the user navigates back to the URL with action=new.
       if (urlParamsProcessedIntentKey) {
         setUrlParamsProcessedIntentKey(null);
       }
@@ -221,25 +218,26 @@ useEffect(() => {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') {
+    if (data.status === 'Cancelled') { // Respect manually set 'Cancelled' status
         finalStatus = 'Cancelled';
     } else {
         if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
             finalStatus = 'Paid';
         } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
             finalStatus = 'Partially Paid';
-        } else {
+        } else { // If not paid or partially paid, determine if Pending or Overdue
             const today = startOfDay(new Date());
             const dueDate = startOfDay(new Date(data.dueDate));
             if (isBefore(dueDate, today) && newRemainingBalance > 0) {
                 finalStatus = 'Overdue';
-            } else if (newRemainingBalance > 0) {
+            } else if (newRemainingBalance > 0) { // Not overdue, but still has balance
                 finalStatus = 'Pending';
-            } else { // Should default to pending if no other conditions met.
-                 finalStatus = 'Pending';
+            } else { // Should default to pending if no other specific conditions met.
+                 finalStatus = 'Pending'; // This case might be rare if logic above is complete
             }
         }
     }
+
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -291,19 +289,22 @@ useEffect(() => {
             <Skeleton className="h-10 w-full md:w-80" />
             <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow overflow-hidden rounded-lg border shadow-sm bg-card">
-          <div className="h-full overflow-auto p-4">
-            <Skeleton className="h-8 w-1/4 mb-4" />
-            {[...Array(7)].map((_, i) => (
-              <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                <Skeleton className="h-6 w-24 min-w-[96px]" />
-              </div>
-            ))}
+        {/* Adjusted skeleton for scrolling area */}
+        <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
+          <div className="h-full overflow-auto">
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> {/* Skeleton for TableHeader */}
+            <div className="p-4 space-y-2">
+                {[...Array(7)].map((_, i) => (
+                <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[150px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                    <Skeleton className="h-6 w-24 min-w-[96px]" />
+                </div>
+                ))}
+            </div>
           </div>
         </div>
       </div>
@@ -337,9 +338,11 @@ useEffect(() => {
         />
       </div>
 
-      <div className="flex-grow overflow-hidden rounded-lg border shadow-sm bg-card">
+      {/* This div should grow and contain the scrollable table area */}
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
         {filteredInvoices.length > 0 ? (
-          <div className="h-full overflow-auto"> {/* This div handles both vertical and horizontal scroll for the table */}
+          // This div is the actual scrollable viewport for the table
+          <div className="h-full overflow-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -424,13 +427,13 @@ useEffect(() => {
           if (!isOpen) {
             setEditingInvoice(null);
             setCurrentPrefillValues(null);
-            if (urlParamsProcessedIntentKey) { // Only clear URL if it was opened by URL
+            if (urlParamsProcessedIntentKey) { 
                 const newSearchParams = new URLSearchParams(searchParams.toString());
                 newSearchParams.delete('action');
                 newSearchParams.delete('customerId');
                 newSearchParams.delete('customerName');
                 router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-                setUrlParamsProcessedIntentKey(null); // Reset after clearing
+                setUrlParamsProcessedIntentKey(null); 
             }
           }
         }}
@@ -451,7 +454,10 @@ useEffect(() => {
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
-                onCancel={() => setIsFormModalOpen(false)}
+                onCancel={() => {
+                  setIsFormModalOpen(false);
+                  // No need to clear URL params here, onOpenChange will handle it
+                }}
                 isSubmitting={isSaving}
               />
             )}
@@ -492,6 +498,4 @@ useEffect(() => {
     </div>
   );
 }
-
-
     
