@@ -35,6 +35,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -197,22 +198,20 @@ export default function CustomersPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="flex-grow min-h-0">
-          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-            <div className="overflow-y-auto max-h-96 h-full">
-              <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
-              <div className="p-4 space-y-2">
-                {[...Array(7)].map((_, i) => (
-                  <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                    <Skeleton className="h-6 w-24 min-w-[96px]" />
-                    <Skeleton className="h-6 w-20 min-w-[80px]" />
-                    <Skeleton className="h-6 w-24 min-w-[96px]" />
-                  </div>
-                ))}
-              </div>
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+          <div className="overflow-y-auto max-h-96 h-full">
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
+            <div className="p-4 space-y-2">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
+                  <Skeleton className="h-6 w-24 min-w-[96px]" />
+                  <Skeleton className="h-6 w-20 min-w-[80px]" />
+                  <Skeleton className="h-6 w-24 min-w-[96px]" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -240,88 +239,86 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0">
-        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-          <div className="overflow-y-auto max-h-96 h-full">
-            {filteredCustomers.length > 0 ? (
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
-                  <TableRow>
-                    <TableHead className="min-w-[120px]">Customer ID</TableHead>
-                    <TableHead className="min-w-[180px]">Name</TableHead>
-                    <TableHead className="min-w-[200px]">Email</TableHead>
-                    <TableHead className="min-w-[140px]">Phone</TableHead>
-                    <TableHead className="min-w-[120px]">Type</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+        <div className="overflow-y-auto max-h-96 h-full">
+          {filteredCustomers.length > 0 ? (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  <TableHead className="min-w-[120px]">Customer ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[200px]">Email</TableHead>
+                  <TableHead className="min-w-[140px]">Phone</TableHead>
+                  <TableHead className="min-w-[120px]">Type</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.id}</TableCell>
+                    <TableCell 
+                      className="cursor-pointer hover:text-primary hover:underline"
+                      onClick={() => handleViewCustomerDetails(customer)}
+                    >
+                      {customer.name}
+                    </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.phone}</TableCell>
+                    <TableCell>
+                      <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'}>
+                        {customer.customerType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                                e.stopPropagation(); 
+                                handleDeleteCustomerConfirm(customer);
+                              }}>
+                               <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                           <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the customer
+                                "{customerToDelete?.name}" and all associated data (including invoices).
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCustomers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.id}</TableCell>
-                      <TableCell 
-                        className="cursor-pointer hover:text-primary hover:underline"
-                        onClick={() => handleViewCustomerDetails(customer)}
-                      >
-                        {customer.name}
-                      </TableCell>
-                      <TableCell>{customer.email}</TableCell>
-                      <TableCell>{customer.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'}>
-                          {customer.customerType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                                  e.stopPropagation(); 
-                                  handleDeleteCustomerConfirm(customer);
-                                }}>
-                                 <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                             <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the customer
-                                  "{customerToDelete?.name}" and all associated data (including invoices).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="h-full flex items-center justify-center p-8">
-                <DataPlaceholder
-                  title="No Customers Found"
-                  message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
-                  action={!searchTerm ? (
-                    <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-                    </Button>
-                  ) : undefined}
-                />
-              </div>
-            )}
-          </div>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="h-full flex items-center justify-center p-8">
+              <DataPlaceholder
+                title="No Customers Found"
+                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
+                action={!searchTerm ? (
+                  <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -424,7 +421,7 @@ export default function CustomersPage() {
               <div>
                 <h4 className="text-lg font-semibold mb-2 text-foreground">Invoice History</h4>
                 {customerInvoices.length > 0 ? (
-                  <div className="rounded-md border bg-card overflow-hidden max-h-60"> 
+                  <div className="rounded-md border bg-muted overflow-hidden max-h-60"> 
                     <div className="overflow-y-auto h-full">
                       <Table>
                         <TableHeader className="sticky top-0 bg-muted z-10">
@@ -496,3 +493,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+
