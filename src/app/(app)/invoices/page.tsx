@@ -69,7 +69,7 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
-  const openedBySearchParamsRef = useRef<string | null>(null);
+  const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -77,33 +77,36 @@ export default function InvoicesPage() {
     const customerIdParam = searchParams.get('customerId');
     const customerNameParam = searchParams.get('customerName');
     
-    const currentUrlIntentKey = action === 'new' ? `action=new&customerId=${customerIdParam || ''}&customerName=${customerNameParam || ''}` : null;
+    const currentIntentKey = action === 'new' && customerIdParam 
+      ? `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}` 
+      : null;
 
-    if (action === 'new' && customerIdParam) {
-      if (!isFormModalOpen && openedBySearchParamsRef.current !== currentUrlIntentKey) {
+    if (currentIntentKey) {
+      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentIntentKey) {
         setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
         setEditingInvoice(null); 
         setIsFormModalOpen(true);
-        openedBySearchParamsRef.current = currentUrlIntentKey;
+        setUrlParamsProcessedIntentKey(currentIntentKey);
       }
     } else {
-      if (openedBySearchParamsRef.current) {
-        openedBySearchParamsRef.current = null; 
+      if (urlParamsProcessedIntentKey !== null) {
+         setUrlParamsProcessedIntentKey(null); // Reset if URL no longer has the action
       }
     }
-  }, [searchParams, isFormModalOpen, editingInvoice]);
+  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey]);
 
 
   const handleAddNewInvoice = useCallback(() => {
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null;
-    // Clear URL params if any related to opening modal
+    setUrlParamsProcessedIntentKey(null); 
+    
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
@@ -127,7 +130,6 @@ export default function InvoicesPage() {
           matchesStatusFilter = invoice.status === 'Partially Paid';
         }
       }
-
       return matchesSearchTerm && matchesStatusFilter;
     });
   }, [invoices, searchTerm, statusFilter, getCustomerById]);
@@ -135,7 +137,7 @@ export default function InvoicesPage() {
   const handleEditInvoice = (invoice: Invoice) => {
     setEditingInvoice(invoice);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null; 
+    setUrlParamsProcessedIntentKey(null);
     setIsFormModalOpen(true);
   };
 
@@ -185,7 +187,7 @@ export default function InvoicesPage() {
     const existingInvoice = editingInvoice ? invoices.find(inv => inv.id === editingInvoice.id) : null;
     let newAmountPaid = existingInvoice?.amountPaid || 0;
     const newPaymentHistory: PaymentRecord[] = existingInvoice?.paymentHistory ? [...existingInvoice.paymentHistory] : [];
-    let finalStatus: InvoiceStatus = existingInvoice?.status || data.status;
+    let finalStatus: InvoiceStatus = data.status; // Start with form status
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
@@ -237,9 +239,8 @@ export default function InvoicesPage() {
                 finalStatus = 'Overdue';
             } else if (newRemainingBalance > 0) { 
                 finalStatus = 'Pending';
-            } else { 
-                 finalStatus = 'Pending'; 
-            }
+            } // If it's 0 remaining but not Paid (e.g. from cancel), it might still be Pending if set so. Or default to Paid.
+              // The logic here defaults to the form's status unless overridden by payment.
         }
     }
 
@@ -280,7 +281,7 @@ export default function InvoicesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full"> {/* Root container for full height */}
+      <div className="flex flex-col h-full">
         <PageHeader
           title="Invoices"
           description="Manage and track all your invoices."
@@ -294,22 +295,20 @@ export default function InvoicesPage() {
             <Skeleton className="h-10 w-full md:w-80" />
             <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        {/* This container takes remaining space and its direct child will scroll */}
         <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
-          {/* This div is the scrollable viewport */}
           <div className="h-full overflow-auto">
-            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> {/* Skeleton for TableHeader */}
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" />
             <div className="p-4 space-y-2">
                 {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" /> {/* ID */}
-                    <Skeleton className="h-6 flex-1 min-w-[180px]" /> {/* Customer */}
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" /> {/* Due Date */}
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> {/* Amount */}
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> {/* Paid */}
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> {/* Balance */}
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" /> {/* Status */}
-                    <Skeleton className="h-6 w-24 min-w-[100px]" /> {/* Actions */}
+                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[180px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
+                    <Skeleton className="h-6 w-24 min-w-[100px]" />
                 </div>
                 ))}
             </div>
@@ -320,7 +319,7 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="flex flex-col h-full"> {/* Root container for full height */}
+    <div className="flex flex-col h-full"> 
       <PageHeader
         title="Invoices"
         description="Manage and track all your invoices."
@@ -346,10 +345,8 @@ export default function InvoicesPage() {
         />
       </div>
 
-      {/* This container takes remaining space and its direct child will scroll */}
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+      <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
         {filteredInvoices.length > 0 ? (
-          // This div is the scrollable viewport for the table
           <div className="h-full overflow-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
@@ -413,7 +410,7 @@ export default function InvoicesPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center"> {/* Ensures placeholder is centered */}
+          <div className="h-full flex items-center justify-center">
             <DataPlaceholder
               title="No Invoices Found"
               message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
@@ -435,13 +432,13 @@ export default function InvoicesPage() {
           if (!isOpen) {
             setEditingInvoice(null);
             setCurrentPrefillValues(null);
-            if (openedBySearchParamsRef.current) { 
+            if (urlParamsProcessedIntentKey) { 
                 const newSearchParams = new URLSearchParams(searchParams.toString());
                 newSearchParams.delete('action');
                 newSearchParams.delete('customerId');
                 newSearchParams.delete('customerName');
                 router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-                openedBySearchParamsRef.current = null; 
+                setUrlParamsProcessedIntentKey(null);
             }
           }
         }}
@@ -464,7 +461,6 @@ export default function InvoicesPage() {
                 prefillData={currentPrefillValues}
                 onCancel={() => {
                   setIsFormModalOpen(false);
-                  // onOpenChange will handle clearing URL params
                 }}
                 isSubmitting={isSaving}
               />
@@ -506,4 +502,6 @@ export default function InvoicesPage() {
     </div>
   );
 }
+    
+
     
