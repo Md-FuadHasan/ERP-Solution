@@ -85,10 +85,6 @@ export default function InvoicesPage() {
       setEditingInvoice(null);
       setIsFormModalOpen(true);
       openedBySearchParamsRef.current = currentIntentKey;
-    } else if (!currentIntentKey && openedBySearchParamsRef.current) {
-      // This handles case where modal is closed, and we want to allow reopening if URL params are set again (e.g. browser back)
-      // or if a new distinct set of params is passed.
-      // No specific action needed here if params are just cleared, as closeFormModal will reset the ref.
     }
   }, [searchParams, isFormModalOpen, editingInvoice]);
 
@@ -97,9 +93,8 @@ export default function InvoicesPage() {
     setIsFormModalOpen(false);
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null; // Allow next URL-triggered open
+    openedBySearchParamsRef.current = null; 
     
-    // Create new search params, keeping existing ones not related to modal open
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
     newSearchParams.delete('customerId');
@@ -149,7 +144,7 @@ export default function InvoicesPage() {
   const handleEditInvoice = useCallback((invoice: Invoice) => {
     setEditingInvoice(invoice);
     setCurrentPrefillValues(null);
-    openedBySearchParamsRef.current = null; // Clear any URL-based trigger
+    openedBySearchParamsRef.current = null; 
     setIsFormModalOpen(true);
   }, []);
 
@@ -237,7 +232,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { // explicit cancel from dropdown
+    if (data.status === 'Cancelled') { 
       finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
@@ -247,7 +242,7 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { // Fallback, should mostly be 'Paid' if none of above
+    } else { 
       finalStatus = 'Paid';
     }
     
@@ -264,7 +259,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, // Keep the selection for form state
+      paymentProcessingStatus: data.paymentProcessingStatus, 
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -280,11 +275,10 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
     
-    // Close modal and reset specific states, URL also cleaned by closeFormModal via onOpenChange
     setIsFormModalOpen(false); 
 
     setIsSaving(false);
-  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, closeFormModal]);
+  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast]);
 
   if (isLoading) {
     return (
@@ -301,7 +295,7 @@ export default function InvoicesPage() {
         <div className="flex-grow min-h-0">
           <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
             <div className="overflow-y-auto max-h-96">
-              <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
+              <Skeleton className="h-10 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
               <div className="p-4 space-y-2">
                 {[...Array(7)].map((_, i) => (
                   <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
@@ -370,7 +364,7 @@ export default function InvoicesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -403,7 +397,7 @@ export default function InvoicesPage() {
               </Table>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center p-8">
+             <div className="overflow-y-auto max-h-96 h-full flex items-center justify-center">
               <DataPlaceholder
                 title="No Invoices Found"
                 message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
@@ -442,7 +436,7 @@ export default function InvoicesPage() {
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
-                onCancel={() => setIsFormModalOpen(false)} // Simplified cancel
+                onCancel={() => setIsFormModalOpen(false)} 
                 isSubmitting={isSaving}
               />
             )}
