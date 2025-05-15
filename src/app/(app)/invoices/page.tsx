@@ -239,6 +239,8 @@ export default function InvoicesPage() {
                 finalStatus = 'Overdue';
             } else if (newRemainingBalance > 0) { 
                 finalStatus = 'Pending';
+            } else { // If newRemainingBalance is 0 or less, and not explicitly Cancelled, it should be Paid
+                 finalStatus = 'Paid';
             }
         }
     }
@@ -294,15 +296,15 @@ export default function InvoicesPage() {
             <Skeleton className="h-10 w-full md:w-80" />
             <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
-          <div className="h-full overflow-auto">
-            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> {/* Header Skeleton */}
-            <div className="p-4 space-y-2"> {/* Rows Skeleton Area */}
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+          <div className="overflow-y-auto max-h-96"> {/* Adjusted for sticky skeleton */}
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> 
+            <div className="p-4 space-y-2">
                 {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
                     <Skeleton className="h-6 flex-1 min-w-[120px]" />
                     <Skeleton className="h-6 flex-1 min-w-[180px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> {/* Removed Issue Date, adjusted others */}
+                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> 
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
                     <Skeleton className="h-6 flex-1 min-w-[100px]" />
                     <Skeleton className="h-6 flex-1 min-w-[120px]" />
@@ -345,7 +347,7 @@ export default function InvoicesPage() {
 
       <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
         {filteredInvoices.length > 0 ? (
-          <div className="h-full overflow-auto"> 
+          <div className="overflow-y-auto max-h-96"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -408,7 +410,7 @@ export default function InvoicesPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex items-center justify-center p-8"> {/* Added p-8 for better spacing of placeholder */}
             <DataPlaceholder
               title="No Invoices Found"
               message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
