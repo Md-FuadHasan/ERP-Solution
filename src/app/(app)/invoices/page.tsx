@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -52,7 +52,7 @@ export default function InvoicesPage() {
     deleteInvoice,
     isLoading,
     getCustomerById,
-    companyProfile
+    companyProfile,
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,91 +69,93 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
-  const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
-
+  const openedBySearchParamsRef = useRef<string | null>(null);
 
   useEffect(() => {
     const action = searchParams.get('action');
     const customerIdParam = searchParams.get('customerId');
     const customerNameParam = searchParams.get('customerName');
-    
-    const currentIntentKey = action === 'new' && customerIdParam 
-      ? `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}` 
+    const currentIntentKey = action === 'new' && customerIdParam
+      ? `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`
       : null;
 
-    if (currentIntentKey) {
-      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentIntentKey) {
-        setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
-        setEditingInvoice(null); 
-        setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(currentIntentKey);
-      }
-    } else {
-      if (urlParamsProcessedIntentKey !== null) {
-         setUrlParamsProcessedIntentKey(null); // Reset if URL no longer has the action
-      }
+    if (currentIntentKey && !isFormModalOpen && !editingInvoice && openedBySearchParamsRef.current !== currentIntentKey) {
+      setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
+      setEditingInvoice(null);
+      setIsFormModalOpen(true);
+      openedBySearchParamsRef.current = currentIntentKey;
+    } else if (!currentIntentKey && openedBySearchParamsRef.current) {
+      // Reset if URL params are cleared and we had an intent
+      openedBySearchParamsRef.current = null;
     }
-  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey]);
+  }, [searchParams, isFormModalOpen, editingInvoice]);
 
 
-  const handleAddNewInvoice = useCallback(() => {
+  const closeFormModal = useCallback(() => {
+    setIsFormModalOpen(false);
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null); 
-    
+    openedBySearchParamsRef.current = null; // Reset the ref
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    
-    setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
+
+
+  const handleAddNewInvoice = useCallback(() => {
+    closeFormModal(); // Clear any existing URL params first
+    setEditingInvoice(null);
+    setCurrentPrefillValues(null);
+    setIsFormModalOpen(true);
+  }, [closeFormModal]);
+
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(invoice => {
       const customer = getCustomerById(invoice.customerId);
-      const matchesSearchTerm = searchTerm ?
-        invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (invoice.customerName && invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (customer && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = searchTerm
+        ? invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (invoice.customerName && invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (customer && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
         : true;
 
-      let matchesStatusFilter = true;
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'paid') {
-          matchesStatusFilter = invoice.status === 'Paid';
-        } else if (statusFilter === 'unpaid') {
-          matchesStatusFilter = invoice.status === 'Pending' || invoice.status === 'Overdue';
-        } else if (statusFilter === 'partially-paid') {
-          matchesStatusFilter = invoice.status === 'Partially Paid';
-        }
-      }
-      return matchesSearchTerm && matchesStatusFilter;
+      const matchesStatus = statusFilter === 'all'
+        ? true
+        : statusFilter === 'paid'
+          ? invoice.status === 'Paid'
+          : statusFilter === 'unpaid'
+            ? invoice.status === 'Pending' || invoice.status === 'Overdue'
+            : statusFilter === 'partially-paid'
+              ? invoice.status === 'Partially Paid'
+              : false; // Should not happen with current filter options
+
+      return matchesSearch && matchesStatus;
     });
   }, [invoices, searchTerm, statusFilter, getCustomerById]);
 
-  const handleEditInvoice = (invoice: Invoice) => {
+  const handleEditInvoice = useCallback((invoice: Invoice) => {
     setEditingInvoice(invoice);
     setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null);
+    openedBySearchParamsRef.current = null;
     setIsFormModalOpen(true);
-  };
+  }, []);
 
-  const handleDeleteInvoice = (invoice: Invoice) => {
+  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
-  };
+  }, []);
 
-  const confirmDelete = () => {
+  const confirmDelete = useCallback(() => {
     if (invoiceToDelete) {
       deleteInvoice(invoiceToDelete.id);
       toast({ title: "Invoice Deleted", description: `Invoice ${invoiceToDelete.id} has been removed.` });
       setInvoiceToDelete(null);
     }
-  };
+  }, [invoiceToDelete, deleteInvoice, toast]);
 
-  const handleSubmit = async (data: InvoiceFormValues) => {
+  const handleSubmit = useCallback(async (data: InvoiceFormValues) => {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
 
@@ -164,20 +166,16 @@ export default function InvoicesPage() {
     const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + calculatedVatAmount;
 
-    if (customer && customer.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
-      let totalOutstandingBalance = 0;
-      invoices.forEach(inv => {
-        if (
-          inv.customerId === customer.id &&
-          inv.id !== (editingInvoice?.id || '') &&
-          (inv.status === 'Pending' || inv.status === 'Overdue' || inv.status === 'Partially Paid')
-        ) {
-          totalOutstandingBalance += inv.remainingBalance;
-        }
-      });
+    if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
+      const totalOutstandingBalance = invoices
+        .filter(inv => inv.customerId === customer.id && inv.id !== (editingInvoice?.id || '') && 
+          ['Pending', 'Overdue', 'Partially Paid'].includes(inv.status))
+        .reduce((sum, inv) => sum + inv.remainingBalance, 0);
 
-      if ((totalOutstandingBalance + calculatedTotalAmount) > customer.creditLimit) {
-        setCreditLimitAlertMessage(`This invoice of $${calculatedTotalAmount.toFixed(2)} plus existing balance of $${totalOutstandingBalance.toFixed(2)} ($${(totalOutstandingBalance + calculatedTotalAmount).toFixed(2)}) exceeds ${customer.name}'s credit limit of $${customer.creditLimit.toFixed(2)}. Please contact management to increase the limit or reduce the invoice amount.`);
+      if (totalOutstandingBalance + calculatedTotalAmount > customer.creditLimit) {
+        setCreditLimitAlertMessage(
+          `This invoice of $${calculatedTotalAmount.toFixed(2)} plus existing balance of $${totalOutstandingBalance.toFixed(2)} ($${(totalOutstandingBalance + calculatedTotalAmount).toFixed(2)}) exceeds ${customer.name}'s credit limit of $${customer.creditLimit.toFixed(2)}. Please contact management to increase the limit or reduce the invoice amount.`
+        );
         setIsCreditLimitAlertOpen(true);
         setIsSaving(false);
         return;
@@ -187,7 +185,7 @@ export default function InvoicesPage() {
     const existingInvoice = editingInvoice ? invoices.find(inv => inv.id === editingInvoice.id) : null;
     let newAmountPaid = existingInvoice?.amountPaid || 0;
     const newPaymentHistory: PaymentRecord[] = existingInvoice?.paymentHistory ? [...existingInvoice.paymentHistory] : [];
-    let finalStatus: InvoiceStatus = data.status; 
+    let finalStatus: InvoiceStatus = data.status;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
@@ -198,26 +196,30 @@ export default function InvoicesPage() {
           amount: paymentAmount,
           status: 'Full Payment',
           paymentMethod: data.paymentMethod,
-          cashVoucherNumber: data.paymentMethod === 'Cash' ? data.cashVoucherNumber : undefined,
-          bankName: data.paymentMethod === 'Bank Transfer' ? data.bankName : undefined,
-          bankAccountNumber: data.paymentMethod === 'Bank Transfer' ? data.bankAccountNumber : undefined,
-          onlineTransactionNumber: data.paymentMethod === 'Bank Transfer' ? data.onlineTransactionNumber : undefined,
+          ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
+          ...(data.paymentMethod === 'Bank Transfer' && {
+            bankName: data.bankName,
+            bankAccountNumber: data.bankAccountNumber,
+            onlineTransactionNumber: data.onlineTransactionNumber,
+          }),
         });
       }
       newAmountPaid = calculatedTotalAmount;
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
-         newPaymentHistory.push({
+        newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
           amount: actualPartialPayment,
           status: 'Partial Payment',
           paymentMethod: data.paymentMethod,
-          cashVoucherNumber: data.paymentMethod === 'Cash' ? data.cashVoucherNumber : undefined,
-          bankName: data.paymentMethod === 'Bank Transfer' ? data.bankName : undefined,
-          bankAccountNumber: data.paymentMethod === 'Bank Transfer' ? data.bankAccountNumber : undefined,
-          onlineTransactionNumber: data.paymentMethod === 'Bank Transfer' ? data.onlineTransactionNumber : undefined,
+          ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
+          ...(data.paymentMethod === 'Bank Transfer' && {
+            bankName: data.bankName,
+            bankAccountNumber: data.bankAccountNumber,
+            onlineTransactionNumber: data.onlineTransactionNumber,
+          }),
         });
         newAmountPaid += actualPartialPayment;
       }
@@ -225,26 +227,20 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { 
-        finalStatus = 'Cancelled';
+    if (data.status === 'Cancelled') {
+      finalStatus = 'Cancelled';
     } else {
-        if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
-            finalStatus = 'Paid';
-        } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
-            finalStatus = 'Partially Paid';
-        } else { 
-            const today = startOfDay(new Date());
-            const dueDate = startOfDay(new Date(data.dueDate));
-            if (isBefore(dueDate, today) && newRemainingBalance > 0) {
-                finalStatus = 'Overdue';
-            } else if (newRemainingBalance > 0) { 
-                finalStatus = 'Pending';
-            } else { // If newRemainingBalance is 0 or less, and not explicitly Cancelled, it should be Paid
-                 finalStatus = 'Paid';
-            }
-        }
+      finalStatus = newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount
+        ? 'Paid'
+        : newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount
+          ? 'Partially Paid'
+          : isBefore(startOfDay(new Date(data.dueDate)), startOfDay(new Date())) && newRemainingBalance > 0
+            ? 'Overdue'
+            : newRemainingBalance > 0
+              ? 'Pending'
+              : 'Paid'; // Default to Paid if no other conditions met, this might need review
     }
-
+    
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -263,22 +259,19 @@ export default function InvoicesPage() {
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
       paymentMethod: data.paymentMethod,
-      cashVoucherNumber: data.cashVoucherNumber,
-      bankName: data.bankName,
-      bankAccountNumber: data.bankAccountNumber,
-      onlineTransactionNumber: data.onlineTransactionNumber,
+      ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
+      ...(data.paymentMethod === 'Bank Transfer' && {
+        bankName: data.bankName,
+        bankAccountNumber: data.bankAccountNumber,
+        onlineTransactionNumber: data.onlineTransactionNumber,
+      }),
     };
 
-    if (editingInvoice) {
-      updateInvoice(invoiceToSave);
-      toast({ title: "Invoice Updated", description: `Invoice ${data.id} has been updated.` });
-    } else {
-      addInvoice(invoiceToSave);
-      toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
-    }
+    editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
+    toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
     setIsSaving(false);
-    setIsFormModalOpen(false); 
-  };
+    setIsFormModalOpen(false); // This will trigger onOpenChange which calls closeFormModal
+  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, setIsFormModalOpen]);
 
   if (isLoading) {
     return (
@@ -286,31 +279,27 @@ export default function InvoicesPage() {
         <PageHeader
           title="Invoices"
           description="Manage and track all your invoices."
-          actions={
-            <Button onClick={() => handleAddNewInvoice()} className="w-full sm:w-auto" disabled>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
-            </Button>
-          }
+          actions={<Button onClick={handleAddNewInvoice} className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice</Button>}
         />
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
-            <Skeleton className="h-10 w-full md:w-80" />
-            <Skeleton className="h-10 w-full md:w-[200px]" />
+          <Skeleton className="h-10 w-full md:w-80" />
+          <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96"> {/* Adjusted for sticky skeleton */}
-            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" /> 
+          <div className="h-full overflow-y-auto"> {/* Adjusted for skeleton scroll */}
+            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-card p-4 border-b" />
             <div className="p-4 space-y-2">
-                {[...Array(7)].map((_, i) => (
+              {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[180px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" /> 
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[120px]" />
-                    <Skeleton className="h-6 w-24 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[120px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[180px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[120px]" />
+                  <Skeleton className="h-6 w-24 min-w-[100px]" />
                 </div>
-                ))}
+              ))}
             </div>
           </div>
         </div>
@@ -319,51 +308,39 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="flex flex-col h-full"> 
+    <div className="flex flex-col h-full">
       <PageHeader
         title="Invoices"
         description="Manage and track all your invoices."
         actions={
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={() => handleAddNewInvoice()} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
-            </Button>
-          </div>
+          <Button onClick={handleAddNewInvoice} className="w-full sm:w-auto">
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
+          </Button>
         }
       />
-      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <SearchInput
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Search by ID or Customer..."
-            className="w-full md:w-80"
-        />
-        <StatusFilterDropdown
-            selectedStatus={statusFilter}
-            onStatusChange={setStatusFilter}
-            className="w-full md:w-auto"
-        />
+      <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
+        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
+        <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
-
-      <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
         {filteredInvoices.length > 0 ? (
-          <div className="overflow-y-auto max-h-96"> 
+          <div className="h-full overflow-y-auto"> {/* This div handles vertical scroll for the table */}
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead className="min-w-[120px]">Invoice ID</TableHead>
                   <TableHead className="min-w-[180px]">Customer</TableHead>
-                  <TableHead className="min-w-[120px]">Due Date</TableHead>
+                  <TableHead className="min-w-[100px]">Due Date</TableHead>
                   <TableHead className="min-w-[100px] text-right">Amount</TableHead>
                   <TableHead className="min-w-[100px] text-right">Paid</TableHead>
                   <TableHead className="min-w-[100px] text-right">Balance</TableHead>
                   <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
+                  <TableRow key={invoice.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{invoice.id}</TableCell>
                     <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
                     <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
@@ -371,27 +348,26 @@ export default function InvoicesPage() {
                     <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
                     <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
+                      <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                        {invoice.status}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-1">
+                      <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                             <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteInvoice(invoice);
-                              }}>
-                               <Trash2 className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete invoice "{invoiceToDelete?.id}".
+                                This will permanently delete invoice "{invoiceToDelete?.id}".
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -410,13 +386,13 @@ export default function InvoicesPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> {/* Added p-8 for better spacing of placeholder */}
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Invoices Found"
               message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
-              icon={FileText}
+              icon={PlusCircle}
               action={!searchTerm && statusFilter === 'all' ? (
-                <Button onClick={() => handleAddNewInvoice()} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                <Button onClick={handleAddNewInvoice} className="w-full max-w-xs sm:w-auto">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
                 </Button>
               ) : undefined}
@@ -425,25 +401,14 @@ export default function InvoicesPage() {
         )}
       </div>
 
-      <Dialog
-        open={isFormModalOpen}
-        onOpenChange={(isOpen) => {
-          setIsFormModalOpen(isOpen);
-          if (!isOpen) {
-            setEditingInvoice(null);
-            setCurrentPrefillValues(null);
-            if (urlParamsProcessedIntentKey) { 
-                const newSearchParams = new URLSearchParams(searchParams.toString());
-                newSearchParams.delete('action');
-                newSearchParams.delete('customerId');
-                newSearchParams.delete('customerName');
-                router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-                setUrlParamsProcessedIntentKey(null);
-            }
-          }
-        }}
-      >
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0">
+      <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          closeFormModal();
+        } else {
+          setIsFormModalOpen(true);
+        }
+      }}>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
@@ -451,7 +416,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && (
+            {isFormModalOpen && ( // Conditionally render form
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -459,9 +424,7 @@ export default function InvoicesPage() {
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
-                onCancel={() => {
-                  setIsFormModalOpen(false);
-                }}
+                onCancel={closeFormModal} // Use closeFormModal for cancel
                 isSubmitting={isSaving}
               />
             )}
@@ -474,7 +437,7 @@ export default function InvoicesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete invoice "{invoiceToDelete?.id}".
+              This will permanently delete invoice "{invoiceToDelete?.id}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -490,9 +453,7 @@ export default function InvoicesPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Credit Limit Exceeded</AlertDialogTitle>
-            <AlertDialogDescription>
-              {creditLimitAlertMessage}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{creditLimitAlertMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setIsCreditLimitAlertOpen(false)}>OK</AlertDialogAction>
@@ -502,6 +463,5 @@ export default function InvoicesPage() {
     </div>
   );
 }
-    
 
     
