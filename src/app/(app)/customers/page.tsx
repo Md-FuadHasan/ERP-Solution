@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign, Eye } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -199,7 +199,7 @@ export default function CustomersPage() {
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96 h-full">
+          <div className="overflow-y-auto max-h-96">
             <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
             <div className="p-4 space-y-2">
               {[...Array(7)].map((_, i) => (
@@ -209,7 +209,7 @@ export default function CustomersPage() {
                   <Skeleton className="h-6 flex-1 min-w-[150px]" />
                   <Skeleton className="h-6 w-24 min-w-[96px]" />
                   <Skeleton className="h-6 w-20 min-w-[80px]" />
-                  <Skeleton className="h-6 w-24 min-w-[96px]" />
+                  <Skeleton className="h-6 w-32 min-w-[128px]" /> {/* Adjusted for 3 action buttons */}
                 </div>
               ))}
             </div>
@@ -240,7 +240,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96 h-full">
+        <div className="overflow-y-auto max-h-96">
           {filteredCustomers.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-muted">
@@ -250,7 +250,7 @@ export default function CustomersPage() {
                   <TableHead className="min-w-[200px]">Email</TableHead>
                   <TableHead className="min-w-[140px]">Phone</TableHead>
                   <TableHead className="min-w-[120px]">Type</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                  <TableHead className="text-right min-w-[120px]">Actions</TableHead> {/* Increased min-width for 3 icons */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -272,6 +272,9 @@ export default function CustomersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary" title="View Customer">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                           <Edit className="h-4 w-4" />
                         </Button>
