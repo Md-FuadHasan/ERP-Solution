@@ -238,7 +238,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-4 w-4 text-[hsl(var(--primary))]" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <TrendingUp className="h-4 w-4 text-[hsl(var(--status-paid))]" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">${stats.totalPaid.toFixed(2)}</div>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <AlertTriangle className="h-4 w-4 text-orange-500 dark:text-orange-400" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${stats.totalOutstanding > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Overdue Invoices</CardTitle>
-              <FileWarning className="h-4 w-4 text-muted-foreground" />
+              <FileWarning className="h-4 w-4 text-[hsl(var(--status-overdue))]" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${stats.overdueInvoicesCount > 0 ? 'text-red-500 dark:text-red-400' : ''}`}>
@@ -282,7 +282,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-4 w-4 text-[hsl(var(--primary))]" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalCustomerCount}</div>
@@ -367,7 +367,7 @@ export default function DashboardPage() {
                 </ChartContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-[300px] sm:h-[350px] text-center text-muted-foreground">
-                  <PieChartIcon className="mx-auto h-12 w-12 mb-2" />
+                  <PieChartIcon className="mx-auto h-12 w-12 mb-2 text-primary" />
                   <p className="font-semibold">No Invoice Status Data</p>
                   <p>There is no data to display for invoice statuses.</p>
                 </div>
@@ -471,17 +471,17 @@ export default function DashboardPage() {
               <CardContent className="flex flex-col gap-3">
                 <Button asChild variant="outline" className="w-full justify-start">
                   <Link href="/invoices?action=new">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
+                    <PlusCircle className="mr-2 h-4 w-4 text-primary" /> Create New Invoice
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full justify-start">
                   <Link href="/customers"> {/* This will navigate to customers page, user can click Add Customer there */}
-                    <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
+                    <UserPlus className="mr-2 h-4 w-4 text-primary" /> Add New Customer
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full justify-start">
                   <Link href="/reports">
-                    <BarChartHorizontalBig className="mr-2 h-4 w-4" /> Generate Report
+                    <BarChartHorizontalBig className="mr-2 h-4 w-4 text-primary" /> Generate Report
                   </Link>
                 </Button>
               </CardContent>
