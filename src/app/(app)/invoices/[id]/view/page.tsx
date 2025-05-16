@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { Printer, Download, Edit, ArrowLeft, Loader2 } from 'lucide-react';
+import { Printer, Download, Edit, ArrowLeft, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QRCodeCanvas } from 'qrcode.react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function InvoiceViewPage() {
   const params = useParams();
@@ -66,90 +67,90 @@ export default function InvoiceViewPage() {
   };
   
   const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
+  const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
+
 
   if (pageLoading || isDataContextLoading) {
     return (
       <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg animate-pulse">
-        <div className="flex justify-between items-center mb-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-6 w-20" />
-        </div>
-        <Skeleton className="h-4 w-24 mb-4" /> {/* Back button placeholder */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <div>
-            <Skeleton className="h-5 w-20 mb-1" />
-            <Skeleton className="h-4 w-40 mb-0.5" />
-            <Skeleton className="h-4 w-32 mb-0.5" />
-            <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-6 w-24 mb-8" /> {/* Back button placeholder */}
+        
+        <header className="mb-8">
+          <div className="flex justify-between items-center mb-2">
+            <Skeleton className="h-10 w-40" /> {/* INVOICE title skeleton */}
+            <Skeleton className="h-8 w-24" /> {/* Badge skeleton */}
           </div>
+          <Skeleton className="h-4 w-32" /> {/* Invoice # skeleton */}
+        </header>
+        
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
           <div>
-            <Skeleton className="h-5 w-20 mb-1" />
-            <Skeleton className="h-4 w-36 mb-0.5" />
-            <Skeleton className="h-4 w-44 mb-0.5" />
-            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-16 mb-2" /> {/* From label skeleton */}
+            <Skeleton className="h-6 w-48 mb-1" /> {/* Company name skeleton */}
+            <Skeleton className="h-4 w-full mb-0.5" /> {/* Address line 1 skeleton */}
+            <Skeleton className="h-4 w-3/4 mb-0.5" /> {/* Address line 2 skeleton */}
+            <Skeleton className="h-4 w-5/6" /> {/* Contact skeleton */}
           </div>
-        </div>
-        <Separator className="my-8" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 mb-6 text-sm">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="space-y-1">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-          ))}
-        </div>
+          <div className="md:text-left">
+            <Skeleton className="h-4 w-16 mb-2" /> {/* Bill To label skeleton */}
+            <Skeleton className="h-6 w-40 mb-1" /> {/* Customer name skeleton */}
+            <Skeleton className="h-4 w-full mb-0.5" /> {/* Address line 1 skeleton */}
+            <Skeleton className="h-4 w-3/4 mb-0.5" /> {/* Address line 2 skeleton */}
+            <Skeleton className="h-4 w-5/6" /> {/* Contact skeleton */}
+          </div>
+        </section>
         
         <Separator className="my-8" />
-        <h2 className="text-xl font-semibold mb-4"><Skeleton className="h-6 w-32" /></h2>
-        <div className="overflow-x-auto mb-8">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead><Skeleton className="h-5 w-24" /></TableHead>
-                <TableHead className="text-center"><Skeleton className="h-5 w-12" /></TableHead>
-                <TableHead className="text-right"><Skeleton className="h-5 w-16" /></TableHead>
-                <TableHead className="text-right"><Skeleton className="h-5 w-20" /></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...Array(2)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                  <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex justify-between items-start mb-8">
-            <Skeleton className="h-32 w-32" /> {/* QR Code Skeleton */}
-            <div className="w-full max-w-xs space-y-2">
-                <Skeleton className="h-5 w-32 ml-auto" />
-                <Skeleton className="h-5 w-28 ml-auto" />
-                <Skeleton className="h-6 w-36 ml-auto" />
-                <Skeleton className="h-5 w-24 ml-auto mt-2" />
-                <Skeleton className="h-6 w-28 ml-auto" />
+
+        <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
+           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="space-y-1">
+                <Skeleton className="h-3 w-20" /> {/* Label skeleton */}
+                <Skeleton className="h-5 w-28" /> {/* Value skeleton */}
+              </div>
+            ))}
+          </div>
+        </section>
+        
+        <section className="mb-8">
+          <Skeleton className="h-6 w-36 mb-4" /> {/* Order Summary title skeleton */}
+          <div className="overflow-x-auto rounded-lg border">
+            <Skeleton className="h-48 w-full" /> {/* Table Skeleton */}
+          </div>
+        </section>
+
+        <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
+            <div className="w-full md:w-auto flex flex-col items-center md:items-start">
+                <Skeleton className="h-5 w-32 mb-2" /> {/* QR Code title skeleton */}
+                <Skeleton className="h-32 w-32" /> {/* QR Code Skeleton */}
             </div>
-        </div>
+            <div className="w-full md:max-w-sm space-y-2.5 border p-4 sm:p-6 rounded-lg bg-muted/40">
+                <Skeleton className="h-5 w-24 ml-auto" />
+                <Skeleton className="h-5 w-20 ml-auto" />
+                <Skeleton className="h-1 w-full my-3 !bg-border" />
+                <Skeleton className="h-6 w-28 ml-auto" />
+                <Skeleton className="h-5 w-24 ml-auto mt-2" />
+                <Skeleton className="h-6 w-32 ml-auto" />
+            </div>
+        </section>
         <Separator className="my-8" />
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-10 w-36" />
+        <footer className="flex flex-col sm:flex-row justify-end items-center gap-3 sm:gap-4">
           <Skeleton className="h-10 w-32" />
-        </div>
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+        </footer>
       </div>
     );
   }
 
   if (!invoice) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4">
         <h2 className="text-2xl font-semibold mb-2 text-destructive">Invoice Not Found</h2>
         <p className="text-muted-foreground mb-4">The invoice with ID "{invoiceId}" could not be found.</p>
-        <Button onClick={() => router.push('/invoices')} variant="outline">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
+        <Button onClick={() => router.back()} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
       </div>
     );
@@ -157,141 +158,191 @@ export default function InvoiceViewPage() {
   
   if (!customer) {
      return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4">
         <h2 className="text-2xl font-semibold mb-2 text-destructive">Customer Not Found</h2>
         <p className="text-muted-foreground mb-4">The customer for invoice "{invoiceId}" could not be found.</p>
-         <Button onClick={() => router.push('/invoices')} variant="outline">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
+         <Button onClick={() => router.back()} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
       </div>
     );
   }
 
-
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg">
-      <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-6 group">
+      <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-8 group print:hidden">
         <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
         Back
       </Button>
 
-      <div className="flex justify-between items-start mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Invoice {invoice.id}</h1>
-        <Badge variant={getStatusBadgeVariant(invoice.status)} className="text-sm px-3 py-1">
-          {invoice.status}
-        </Badge>
-      </div>
+      <header className="mb-8">
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">INVOICE</h1>
+          <Badge variant={getStatusBadgeVariant(invoice.status)} className="text-base px-4 py-1.5">
+            {invoice.status}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">Invoice # {invoice.id}</p>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
         <div>
-          <p className="text-muted-foreground mb-1">From</p>
-          <p className="font-semibold text-foreground">{companyProfile.name}</p>
-          <p className="text-muted-foreground whitespace-pre-line">{companyProfile.address}</p>
+          <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">From</h3>
+          <p className="font-semibold text-lg text-foreground">{companyProfile.name}</p>
+          <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{companyProfile.address}</p>
+          <p className="text-muted-foreground">{companyProfile.email} | {companyProfile.phone}</p>
         </div>
         <div className="md:text-left"> 
-          <p className="text-muted-foreground mb-1">Bill To</p>
-          <p className="font-semibold text-foreground">{customer.name}</p>
-          <p className="text-muted-foreground whitespace-pre-line">{customer.billingAddress}</p>
+          <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">Bill To</h3>
+          <p className="font-semibold text-lg text-foreground">{customer.name}</p>
+          <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{customer.billingAddress}</p>
+          <p className="text-muted-foreground">{customer.email} | {customer.phone}</p>
         </div>
-      </div>
+      </section>
       
-      <Separator className="my-6 md:my-8" />
+      <Separator className="my-8" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 mb-6 text-sm">
-        <div>
-          <p className="text-muted-foreground">Invoice Number:</p>
-          <p className="font-medium text-foreground">{invoice.id}</p>
+      <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
+            <p className="font-medium text-base text-foreground">{format(new Date(invoice.issueDate), 'MMMM d, yyyy')}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Due Date</p>
+            <p className="font-medium text-base text-foreground">{format(new Date(invoice.dueDate), 'MMMM d, yyyy')}</p>
+          </div>
+           <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Invoice Total</p>
+            <p className="font-bold text-base text-primary">${invoice.totalAmount.toFixed(2)}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-muted-foreground">Issue Date:</p>
-          <p className="font-medium text-foreground">{format(new Date(invoice.issueDate), 'MMM d, yyyy')}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Due Date:</p>
-          <p className="font-medium text-foreground">{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</p>
-        </div>
-      </div>
+      </section>
 
-      <Separator className="my-6 md:my-8" />
-
-      <h2 className="text-xl font-semibold mb-4 text-foreground">Invoice Items</h2>
-      <div className="overflow-x-auto mb-8">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-[200px]">Item</TableHead>
-              <TableHead className="text-center w-24">Qty</TableHead>
-              <TableHead className="text-right w-32">Price</TableHead>
-              <TableHead className="text-right w-32">Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {invoice.items.map((item: InvoiceItem, index: number) => (
-              <TableRow key={item.id || index}>
-                <TableCell className="font-medium text-foreground">{item.description}</TableCell>
-                <TableCell className="text-center text-muted-foreground">{item.quantity} ({item.unitType})</TableCell>
-                <TableCell className="text-right text-muted-foreground">${item.unitPrice.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-medium text-foreground">${item.total.toFixed(2)}</TableCell>
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Order Summary</h2>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
+                <TableHead className="text-center w-24">Qty</TableHead>
+                <TableHead className="text-right w-32">Unit Price</TableHead>
+                <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {invoice.items.map((item: InvoiceItem, index: number) => (
+                <TableRow key={item.id || index} className="even:bg-muted/20">
+                  <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
+                  <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
+                  <TableCell className="text-right text-muted-foreground py-3">${item.unitPrice.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${item.total.toFixed(2)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
 
-      <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-6">
-        <div className="w-full md:w-auto flex justify-center md:justify-start">
+      <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
+        <div className="w-full md:w-auto flex flex-col items-center md:items-start print:hidden">
           {qrCodeValue && (
-            <div className="p-2 border rounded-md inline-block bg-white">
-              <QRCodeCanvas value={qrCodeValue} size={128} bgColor="#ffffff" fgColor="#000000" level="Q" />
-            </div>
+            <>
+              <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center"><QrCode className="w-4 h-4 mr-2"/>Scan for Quick Details</h3>
+              <div className="p-3 border rounded-lg inline-block bg-white shadow-sm">
+                <QRCodeCanvas value={qrCodeValue} size={128} bgColor="#ffffff" fgColor="#000000" level="Q" />
+              </div>
+            </>
           )}
         </div>
-        <div className="w-full md:max-w-xs space-y-2 text-sm">
+        <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-muted-foreground">Subtotal:</span>
             <span className="font-medium text-foreground">${invoice.subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%)</span> 
+            <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
             <span className="font-medium text-foreground">${invoice.taxAmount.toFixed(2)}</span>
           </div>
           {invoice.vatAmount > 0 && (
              <div className="flex justify-between">
-                <span className="text-muted-foreground">VAT ({companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)).toFixed(0) : '0'}%)</span>
+                <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
                 <span className="font-medium text-foreground">${invoice.vatAmount.toFixed(2)}</span>
             </div>
           )}
-          <Separator />
+          <Separator className="my-3 !bg-border" />
           <div className="flex justify-between text-base font-semibold">
-            <span className="text-foreground">Total</span>
+            <span className="text-foreground">Total Amount:</span>
             <span className="text-foreground">${invoice.totalAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-green-600">Amount Paid</span>
-            <span className="font-medium text-green-600">${invoice.amountPaid.toFixed(2)}</span>
+          <div className="flex justify-between mt-2 text-green-600 dark:text-green-400">
+            <span className="font-medium">Amount Paid:</span>
+            <span className="font-semibold">${invoice.amountPaid.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between font-semibold">
-            <span className="text-foreground">Balance Due</span>
-            <span className="text-destructive">${invoice.remainingBalance.toFixed(2)}</span>
+          <div className="flex justify-between text-lg font-bold">
+            <span className="text-foreground">Balance Due:</span>
+            <span className={`${invoice.remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
+              ${invoice.remainingBalance.toFixed(2)}
+            </span>
           </div>
         </div>
-      </div>
+      </section>
 
-      <Separator className="my-6 md:my-8" />
+      {invoice.paymentHistory && invoice.paymentHistory.length > 0 && (
+        <section className="mb-8 print:hidden">
+          <Separator className="my-8" />
+          <h3 className="text-lg font-semibold text-foreground mb-3">Payment History</h3>
+            <div className="rounded-md border">
+            {invoice.paymentHistory.map((record, index) => (
+                <div key={record.id} className={`p-3 ${index < invoice.paymentHistory!.length -1 ? 'border-b' : ''} ${index % 2 === 0 ? 'bg-muted/20' : 'bg-card'}`}>
+                    <div className="flex justify-between items-center text-sm">
+                        <div>
+                            <p className="font-medium">{record.status} {record.paymentMethod ? `(${record.paymentMethod})` : ''}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {format(new Date(record.paymentDate), "MMM d, yyyy 'at' hh:mm a")}
+                            </p>
+                        </div>
+                        <p className="font-semibold text-primary">${record.amount.toFixed(2)}</p>
+                    </div>
+                    {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
+                        <p className="text-xs text-muted-foreground mt-1">Voucher: {record.cashVoucherNumber}</p>
+                    )}
+                    {record.paymentMethod === 'Bank Transfer' && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                        {record.bankName && <p>Bank: {record.bankName}</p>}
+                        {record.bankAccountNumber && <p>Acc: {record.bankAccountNumber}</p>}
+                        {record.onlineTransactionNumber && <p>TxN: {record.onlineTransactionNumber}</p>}
+                        </div>
+                    )}
+                </div>
+            ))}
+            </div>
+        </section>
+      )}
+      
+      <Separator className="my-8 print:hidden" />
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
-        <div className="flex gap-3 w-full sm:w-auto">
-            <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-4 w-4" /> Print
-            </Button>
-            <Button variant="outline" onClick={handleDownloadPDF} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> Download PDF
-            </Button>
-        </div>
+      <footer className="flex flex-col sm:flex-row justify-end items-center gap-3 sm:gap-4 print:hidden">
+        <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto">
+          <Printer className="mr-2 h-4 w-4" /> Print Invoice
+        </Button>
+        <Button variant="outline" onClick={handleDownloadPDF} className="w-full sm:w-auto">
+          <Download className="mr-2 h-4 w-4" /> Download PDF
+        </Button>
         <Button onClick={handleEditInvoice} className="w-full sm:w-auto">
           <Edit className="mr-2 h-4 w-4" /> Edit Invoice
         </Button>
+      </footer>
+      
+      <div className="mt-12 text-center text-xs text-muted-foreground print:block hidden">
+        <p>Thank you for your business!</p>
+        <p>{companyProfile.name} | {companyProfile.email} | {companyProfile.phone}</p>
       </div>
+
     </div>
   );
 }
+
+
+    
