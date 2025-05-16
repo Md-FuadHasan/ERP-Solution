@@ -129,6 +129,7 @@ export default function CustomersPage() {
 
   const closeCustomerDetailsModal = () => {
     setIsDetailsModalOpen(false);
+    // Delay clearing selected customer to allow modal fade-out animation
     setTimeout(() => setSelectedCustomerForDetails(null), 300); 
   };
 
@@ -154,18 +155,20 @@ export default function CustomersPage() {
     } else {
       let customerId = data.id;
       if (!customerId) {
+        // Generate a more robust unique ID
         customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
-        while (customers.find(c => c.id === customerId)) {
+        while (customers.find(c => c.id === customerId)) { // Ensure uniqueness
             customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
         }
       } else {
+        // Check if manually entered ID already exists for a *different* customer
         if (customers.find(c => c.id === customerId && (!editingCustomer || editingCustomer.id !== customerId))) {
           toast({
             title: "Error: Customer ID exists",
             description: `Customer ID ${customerId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
             variant: "destructive",
           });
-          return;
+          return; // Prevent form submission
         }
       }
 
@@ -200,19 +203,23 @@ export default function CustomersPage() {
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
           <div className="overflow-y-auto max-h-96">
-            <Skeleton className="h-12 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
-            <div className="p-4 space-y-2">
+            <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableRow>
+                {[...Array(6)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {[...Array(7)].map((_, i) => (
-                <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                  <Skeleton className="h-6 w-24 min-w-[96px]" />
-                  <Skeleton className="h-6 w-20 min-w-[80px]" />
-                  <Skeleton className="h-6 w-32 min-w-[128px]" /> {/* Adjusted for 3 action buttons */}
-                </div>
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-2/4" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                </TableRow>
               ))}
-            </div>
+            </TableBody>
           </div>
         </div>
       </div>
@@ -278,31 +285,14 @@ export default function CustomersPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                                e.stopPropagation(); 
-                                handleDeleteCustomerConfirm(customer);
-                              }}>
-                               <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                           <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the customer
-                                "{customerToDelete?.name}" and all associated data (including invoices).
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                              e.stopPropagation(); 
+                              handleDeleteCustomerConfirm(customer);
+                            }}>
+                              <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -346,6 +336,7 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Customer Details Modal */}
       <Dialog open={isDetailsModalOpen} onOpenChange={closeCustomerDetailsModal}>
         <DialogContent className="w-[90vw] max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -476,6 +467,7 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -497,3 +489,5 @@ export default function CustomersPage() {
   );
 }
 
+
+    
