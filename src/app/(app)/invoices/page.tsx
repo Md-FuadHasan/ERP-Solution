@@ -64,7 +64,7 @@ export default function InvoicesPage() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceFilterStatus>('all');
-  
+
   const [currentPrefillValues, setCurrentPrefillValues] = useState<{ customerId?: string | null; customerName?: string | null } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
@@ -78,7 +78,7 @@ export default function InvoicesPage() {
     const invoiceIdParam = searchParams.get('id'); // For editing
     const customerIdParam = searchParams.get('customerId'); // For new from customer
     const customerNameParam = searchParams.get('customerName');
-    
+
     let currentIntentKey: string | null = null;
 
     if (action === 'new' && customerIdParam) {
@@ -113,11 +113,11 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      
+
       const currentAction = searchParams.get('action');
       const currentCustomerId = searchParams.get('customerId');
       const currentInvoiceId = searchParams.get('id');
-      
+
       let intentKeyToClear: string | null = null;
       if (currentAction === 'new' && currentCustomerId) {
         intentKeyToClear = `action=new&customerId=${currentCustomerId}&customerName=${searchParams.get('customerName') || ''}`;
@@ -146,10 +146,10 @@ export default function InvoicesPage() {
     newSearchParams.delete('customerName');
     newSearchParams.delete('id');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    
+
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null); 
+    setUrlParamsProcessedIntentKey(null);
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
@@ -172,9 +172,9 @@ export default function InvoicesPage() {
             ? invoice.status === 'Pending' || invoice.status === 'Overdue'
             : statusFilter === 'partially-paid'
               ? invoice.status === 'Partially Paid'
-              : statusFilter === 'cancelled' 
+              : statusFilter === 'cancelled'
                 ? invoice.status === 'Cancelled'
-                : false; 
+                : false;
 
       return matchesSearch && matchesStatus;
     });
@@ -220,7 +220,7 @@ export default function InvoicesPage() {
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
-        .filter(inv => inv.customerId === customer.id && inv.id !== (editingInvoice?.id || '') && 
+        .filter(inv => inv.customerId === customer.id && inv.id !== (editingInvoice?.id || '') &&
           ['Pending', 'Overdue', 'Partially Paid'].includes(inv.status))
         .reduce((sum, inv) => sum + inv.remainingBalance, 0);
 
@@ -279,7 +279,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { 
+    if (data.status === 'Cancelled') {
       finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
@@ -289,10 +289,10 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { 
+    } else {
       finalStatus = 'Paid'; // Fallback if newRemainingBalance is 0 but somehow didn't hit first 'Paid'
     }
-    
+
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -306,7 +306,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, 
+      paymentProcessingStatus: data.paymentProcessingStatus,
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -321,8 +321,8 @@ export default function InvoicesPage() {
 
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
-    
-    handleFormModalOpenChange(false); 
+
+    handleFormModalOpenChange(false);
 
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
@@ -335,26 +335,40 @@ export default function InvoicesPage() {
           description="Manage and track all your invoices."
           actions={<Button onClick={handleAddNewInvoice} className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice</Button>}
         />
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
           <div className="overflow-y-auto max-h-96">
-            <Skeleton className="h-10 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
-            <div className="p-4 space-y-2">
-              {[...Array(7)].map((_, i) => (
-                <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                  <Skeleton className="h-6 w-32 min-w-[128px]" />
-                </div>
-              ))}
-            </div>
+             <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                  <TableHead className="min-w-[120px] text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -376,7 +390,7 @@ export default function InvoicesPage() {
         <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
-      
+
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
         <div className="overflow-y-auto max-h-96">
           {filteredInvoices.length > 0 ? (
@@ -468,7 +482,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && ( 
+            {isFormModalOpen && (
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -476,7 +490,7 @@ export default function InvoicesPage() {
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
-                onCancel={() => handleFormModalOpenChange(false)} 
+                onCancel={() => handleFormModalOpenChange(false)}
                 isSubmitting={isSaving}
               />
             )}

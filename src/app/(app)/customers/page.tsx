@@ -41,18 +41,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
-import { useData } from '@/context/DataContext'; 
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { useData } from '@/context/DataContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CustomersPage() {
-  const { 
-    customers, 
-    addCustomer, 
-    updateCustomer, 
-    deleteCustomer, 
-    isLoading, 
-    getInvoicesByCustomerId 
-  } = useData(); 
+  const {
+    customers,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    isLoading,
+    getInvoicesByCustomerId
+  } = useData();
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,7 +116,7 @@ export default function CustomersPage() {
 
   const confirmDelete = () => {
     if (customerToDelete) {
-      deleteCustomer(customerToDelete.id); 
+      deleteCustomer(customerToDelete.id);
       toast({ title: "Customer Deleted", description: `${customerToDelete.name} has been removed.` });
       setCustomerToDelete(null);
     }
@@ -130,7 +130,7 @@ export default function CustomersPage() {
   const closeCustomerDetailsModal = () => {
     setIsDetailsModalOpen(false);
     // Delay clearing selected customer to allow modal fade-out animation
-    setTimeout(() => setSelectedCustomerForDetails(null), 300); 
+    setTimeout(() => setSelectedCustomerForDetails(null), 300);
   };
 
   const handleAddNewInvoiceForCustomer = (customer: Customer | null) => {
@@ -150,7 +150,7 @@ export default function CustomersPage() {
         creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
         invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
       };
-      updateCustomer(updatedCustomerData); 
+      updateCustomer(updatedCustomerData);
       toast({ title: "Customer Updated", description: `${data.name} details have been updated.` });
     } else {
       let customerId = data.id;
@@ -179,7 +179,7 @@ export default function CustomersPage() {
         creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
         invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
       };
-      addCustomer(newCustomer); 
+      addCustomer(newCustomer);
       toast({ title: "Customer Added", description: `${data.name} has been successfully added.` });
     }
     setIsFormModalOpen(false);
@@ -203,23 +203,25 @@ export default function CustomersPage() {
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
           <div className="overflow-y-auto max-h-96">
-            <TableHeader className="sticky top-0 z-10 bg-muted">
-              <TableRow>
-                {[...Array(6)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...Array(7)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-2/4" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  {[...Array(6)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
                 </TableRow>
-              ))}
-            </TableBody>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-2/4" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -264,7 +266,7 @@ export default function CustomersPage() {
                 {filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.id}</TableCell>
-                    <TableCell 
+                    <TableCell
                       className="cursor-pointer hover:text-primary hover:underline"
                       onClick={() => handleViewCustomerDetails(customer)}
                     >
@@ -285,14 +287,30 @@ export default function CustomersPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                              e.stopPropagation(); 
-                              handleDeleteCustomerConfirm(customer);
-                            }}>
-                              <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCustomerConfirm(customer);
+                              }}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete customer "{customerToDelete?.name}" and all associated invoices.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -415,7 +433,7 @@ export default function CustomersPage() {
               <div>
                 <h4 className="text-lg font-semibold mb-2 text-foreground">Invoice History</h4>
                 {customerInvoices.length > 0 ? (
-                  <div className="rounded-md border bg-muted overflow-hidden max-h-60"> 
+                  <div className="rounded-md border bg-muted overflow-hidden max-h-60">
                     <div className="overflow-y-auto h-full">
                       <Table>
                         <TableHeader className="sticky top-0 bg-muted z-10">
@@ -454,9 +472,9 @@ export default function CustomersPage() {
             </div>
           )}
            <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2">
-                <Button 
-                  onClick={() => handleAddNewInvoiceForCustomer(selectedCustomerForDetails)} 
-                  variant="default" 
+                <Button
+                  onClick={() => handleAddNewInvoiceForCustomer(selectedCustomerForDetails)}
+                  variant="default"
                   disabled={!selectedCustomerForDetails}
                   className="w-full sm:w-auto"
                 >
@@ -468,7 +486,7 @@ export default function CustomersPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
+       <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -488,6 +506,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-
-    
