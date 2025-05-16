@@ -16,7 +16,6 @@ const Table = React.forwardRef<
       className={cn("w-full caption-bottom text-sm", className)}
       {...props}
     >
-      {/* Render children (TableHeader, TableBody, TableFooter, TableCaption) inside the table */}
       {children}
     </table>
   </div>
@@ -83,9 +82,7 @@ const TableRow = React.forwardRef<
       className
     )}
     {...props}
-  >
-    {children}
-  </tr>
+  >{children}</tr>
 ));
 TableRow.displayName = "TableRow";
 
