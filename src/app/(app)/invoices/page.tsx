@@ -70,53 +70,69 @@ export default function InvoicesPage() {
   const [isCreditLimitAlertOpen, setIsCreditLimitAlertOpen] = useState(false);
   const [creditLimitAlertMessage, setCreditLimitAlertMessage] = useState('');
 
-  const openedBySearchParamsRef = useRef<string | null>(null);
   const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
 
 
   useEffect(() => {
     const action = searchParams.get('action');
-    const customerIdParam = searchParams.get('customerId');
+    const invoiceIdParam = searchParams.get('id'); // For editing
+    const customerIdParam = searchParams.get('customerId'); // For new from customer
     const customerNameParam = searchParams.get('customerName');
-    const currentIntentKey = action === 'new' && customerIdParam
-      ? `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`
-      : null;
+    
+    let currentIntentKey: string | null = null;
+
+    if (action === 'new' && customerIdParam) {
+      currentIntentKey = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
+    } else if (action === 'edit' && invoiceIdParam) {
+      currentIntentKey = `action=edit&id=${invoiceIdParam}`;
+    }
 
     if (currentIntentKey) {
-      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentIntentKey) {
-        setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
-        setEditingInvoice(null);
+      if (!isFormModalOpen && urlParamsProcessedIntentKey !== currentIntentKey) {
+        if (action === 'new' && customerIdParam) {
+          setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
+          setEditingInvoice(null);
+        } else if (action === 'edit' && invoiceIdParam) {
+          const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
+          setEditingInvoice(invoiceToEdit || null);
+          setCurrentPrefillValues(null);
+        }
         setIsFormModalOpen(true);
         setUrlParamsProcessedIntentKey(currentIntentKey);
       }
     } else {
-        // If URL params are cleared and we had a processed key, reset it.
         if (urlParamsProcessedIntentKey) {
             setUrlParamsProcessedIntentKey(null);
         }
     }
-  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey]);
+  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey, invoices]);
 
 
-  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+ const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      // Only clear params if they were the ones that triggered the modal
-      const action = searchParams.get('action');
-      const customerIdParam = searchParams.get('customerId');
-      const currentIntentKey = action === 'new' && customerIdParam ? `action=new&customerId=${customerIdParam}&customerName=${searchParams.get('customerName') || ''}` : null;
       
-      if (currentIntentKey && urlParamsProcessedIntentKey === currentIntentKey) {
+      const currentAction = searchParams.get('action');
+      const currentCustomerId = searchParams.get('customerId');
+      const currentInvoiceId = searchParams.get('id');
+      
+      let intentKeyToClear: string | null = null;
+      if (currentAction === 'new' && currentCustomerId) {
+        intentKeyToClear = `action=new&customerId=${currentCustomerId}&customerName=${searchParams.get('customerName') || ''}`;
+      } else if (currentAction === 'edit' && currentInvoiceId) {
+        intentKeyToClear = `action=edit&id=${currentInvoiceId}`;
+      }
+
+      if (intentKeyToClear && urlParamsProcessedIntentKey === intentKeyToClear) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
+        newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // The useEffect listening to searchParams will then reset urlParamsProcessedIntentKey
-      } else if (!currentIntentKey && urlParamsProcessedIntentKey) {
-        // If the dialog is closed by other means and an intent key was processed, ensure it's ready for a new one.
+      } else if (!intentKeyToClear && urlParamsProcessedIntentKey) {
         setUrlParamsProcessedIntentKey(null);
       }
     }
@@ -124,16 +140,16 @@ export default function InvoicesPage() {
 
 
   const handleAddNewInvoice = useCallback(() => {
-    // Clear any existing URL params that might conflict
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete('action');
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
+    newSearchParams.delete('id');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
     
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null); // Ensure no stale intent key
+    setUrlParamsProcessedIntentKey(null); 
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
@@ -156,18 +172,28 @@ export default function InvoicesPage() {
             ? invoice.status === 'Pending' || invoice.status === 'Overdue'
             : statusFilter === 'partially-paid'
               ? invoice.status === 'Partially Paid'
-              : false; 
+              : statusFilter === 'cancelled' 
+                ? invoice.status === 'Cancelled'
+                : false; 
 
       return matchesSearch && matchesStatus;
     });
   }, [invoices, searchTerm, statusFilter, getCustomerById]);
 
   const handleEditInvoice = useCallback((invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null); 
-    setIsFormModalOpen(true);
-  }, []);
+    // Navigate to edit by setting URL params, which useEffect will pick up
+    const newSearchParams = new URLSearchParams(searchParams.toString());
+    newSearchParams.set('action', 'edit');
+    newSearchParams.set('id', invoice.id);
+    newSearchParams.delete('customerId'); // Clear any new invoice params
+    newSearchParams.delete('customerName');
+    router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    // useEffect will handle setting editingInvoice and opening the modal
+  }, [searchParams, router, pathname]);
+
+  const handleViewInvoice = useCallback((invoice: Invoice) => {
+    router.push(`/invoices/${invoice.id}/view`);
+  }, [router]);
 
   const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
@@ -264,7 +290,7 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else { 
-      finalStatus = 'Paid';
+      finalStatus = 'Paid'; // Fallback if newRemainingBalance is 0 but somehow didn't hit first 'Paid'
     }
     
 
@@ -296,7 +322,7 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
     
-    handleFormModalOpenChange(false); // Use centralized close handler
+    handleFormModalOpenChange(false); 
 
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
@@ -313,23 +339,21 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0">
-          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-            <div className="overflow-y-auto max-h-96">
-              <Skeleton className="h-10 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
-              <div className="p-4 space-y-2">
-                {[...Array(7)].map((_, i) => (
-                  <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[150px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[80px]" />
-                    <Skeleton className="h-6 flex-1 min-w-[100px]" />
-                    <Skeleton className="h-6 w-32 min-w-[128px]" /> {/* Adjusted for 3 action buttons */}
-                  </div>
-                ))}
-              </div>
+        <div className="flex-grow min-h-0 overflow-hidden rounded-lg border shadow-sm bg-card">
+          <div className="overflow-y-auto max-h-96">
+            <Skeleton className="h-10 w-full sticky top-0 z-10 bg-muted p-4 border-b" />
+            <div className="p-4 space-y-2">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className="flex space-x-4 py-2 border-b last:border-b-0">
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[150px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[80px]" />
+                  <Skeleton className="h-6 flex-1 min-w-[100px]" />
+                  <Skeleton className="h-6 w-32 min-w-[128px]" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -366,7 +390,7 @@ export default function InvoicesPage() {
                   <TableHead className="min-w-[100px] text-right">Paid</TableHead>
                   <TableHead className="min-w-[100px] text-right">Balance</TableHead>
                   <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[120px] text-right">Actions</TableHead> {/* Increased min-width for 3 icons */}
+                  <TableHead className="min-w-[120px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -385,7 +409,7 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="View/Edit Invoice">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(invoice)} className="hover:text-primary" title="View Invoice">
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
@@ -419,7 +443,7 @@ export default function InvoicesPage() {
               </TableBody>
             </Table>
           ) : (
-             <div className="h-full flex items-center justify-center">
+             <div className="h-full flex items-center justify-center p-8">
               <DataPlaceholder
                 title="No Invoices Found"
                 message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
@@ -491,4 +515,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
