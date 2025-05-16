@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function InvoiceViewPage() {
   const params = useParams();
@@ -25,6 +26,7 @@ export default function InvoiceViewPage() {
   const [invoice, setInvoice] = useState<Invoice | null | undefined>(undefined); // undefined for loading, null for not found
   const [customer, setCustomer] = useState<Customer | null | undefined>(undefined);
   const [pageLoading, setPageLoading] = useState(true);
+  const [qrCodeValue, setQrCodeValue] = useState('');
 
   const invoiceId = typeof params.id === 'string' ? params.id : undefined;
 
@@ -35,6 +37,7 @@ export default function InvoiceViewPage() {
       if (foundInvoice) {
         const foundCustomer = getCustomerById(foundInvoice.customerId);
         setCustomer(foundCustomer);
+        setQrCodeValue(`Invoice ID: ${foundInvoice.id}\nTotal Amount: $${foundInvoice.totalAmount.toFixed(2)}\nDue Date: ${format(new Date(foundInvoice.dueDate), 'MMM d, yyyy')}`);
       } else {
         setCustomer(null); // Invoice not found, so customer is also not applicable
       }
@@ -63,9 +66,6 @@ export default function InvoiceViewPage() {
   };
   
   const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
-  // VAT rate is not directly shown in the image example's tax line, assuming tax line includes VAT or is a general tax.
-  // If VAT needs to be a separate line, this needs adjustment.
-  // For simplicity, using companyProfile.taxRate as the "Tax (%)" shown.
 
   if (pageLoading || isDataContextLoading) {
     return (
@@ -90,7 +90,7 @@ export default function InvoiceViewPage() {
           </div>
         </div>
         <Separator className="my-8" />
-        <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 mb-6 text-sm">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="space-y-1">
               <Skeleton className="h-4 w-24" />
@@ -98,10 +98,7 @@ export default function InvoiceViewPage() {
             </div>
           ))}
         </div>
-        <div className="space-y-1 mb-6 text-sm text-right">
-            <Skeleton className="h-4 w-24 ml-auto" />
-            <Skeleton className="h-5 w-20 ml-auto" />
-        </div>
+        
         <Separator className="my-8" />
         <h2 className="text-xl font-semibold mb-4"><Skeleton className="h-6 w-32" /></h2>
         <div className="overflow-x-auto mb-8">
@@ -126,14 +123,15 @@ export default function InvoiceViewPage() {
             </TableBody>
           </Table>
         </div>
-        <div className="flex justify-end mb-8">
-          <div className="w-full max-w-xs space-y-2">
-            <Skeleton className="h-5 w-32 ml-auto" />
-            <Skeleton className="h-5 w-28 ml-auto" />
-            <Skeleton className="h-6 w-36 ml-auto" />
-            <Skeleton className="h-5 w-24 ml-auto mt-2" />
-            <Skeleton className="h-6 w-28 ml-auto" />
-          </div>
+        <div className="flex justify-between items-start mb-8">
+            <Skeleton className="h-32 w-32" /> {/* QR Code Skeleton */}
+            <div className="w-full max-w-xs space-y-2">
+                <Skeleton className="h-5 w-32 ml-auto" />
+                <Skeleton className="h-5 w-28 ml-auto" />
+                <Skeleton className="h-6 w-36 ml-auto" />
+                <Skeleton className="h-5 w-24 ml-auto mt-2" />
+                <Skeleton className="h-6 w-28 ml-auto" />
+            </div>
         </div>
         <Separator className="my-8" />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -190,7 +188,7 @@ export default function InvoiceViewPage() {
           <p className="font-semibold text-foreground">{companyProfile.name}</p>
           <p className="text-muted-foreground whitespace-pre-line">{companyProfile.address}</p>
         </div>
-        <div className="md:text-left"> {/* Adjusted for consistency, can be md:text-right if preferred */}
+        <div className="md:text-left"> 
           <p className="text-muted-foreground mb-1">Bill To</p>
           <p className="font-semibold text-foreground">{customer.name}</p>
           <p className="text-muted-foreground whitespace-pre-line">{customer.billingAddress}</p>
@@ -213,22 +211,6 @@ export default function InvoiceViewPage() {
           <p className="font-medium text-foreground">{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</p>
         </div>
       </div>
-
-       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 mb-6 text-sm">
-        <div>
-            <p className="text-muted-foreground">Status:</p>
-            <Badge variant={getStatusBadgeVariant(invoice.status)} className="px-2 py-0.5">{invoice.status}</Badge>
-        </div>
-        <div>
-            <p className="text-muted-foreground">Amount Paid:</p>
-            <p className="font-medium text-green-600">${invoice.amountPaid.toFixed(2)}</p>
-        </div>
-        <div>
-            <p className="text-muted-foreground">Amount Due:</p>
-            <p className="font-medium text-destructive">${invoice.remainingBalance.toFixed(2)}</p>
-        </div>
-      </div>
-
 
       <Separator className="my-6 md:my-8" />
 
@@ -256,8 +238,15 @@ export default function InvoiceViewPage() {
         </Table>
       </div>
 
-      <div className="flex justify-end mb-8">
-        <div className="w-full max-w-xs space-y-2 text-sm">
+      <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-6">
+        <div className="w-full md:w-auto flex justify-center md:justify-start">
+          {qrCodeValue && (
+            <div className="p-2 border rounded-md inline-block bg-white">
+              <QRCodeCanvas value={qrCodeValue} size={128} bgColor="#ffffff" fgColor="#000000" level="Q" />
+            </div>
+          )}
+        </div>
+        <div className="w-full md:max-w-xs space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="font-medium text-foreground">${invoice.subtotal.toFixed(2)}</span>
@@ -266,7 +255,7 @@ export default function InvoiceViewPage() {
             <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%)</span> 
             <span className="font-medium text-foreground">${invoice.taxAmount.toFixed(2)}</span>
           </div>
-          {invoice.vatAmount > 0 && ( // Only show VAT if it's greater than 0
+          {invoice.vatAmount > 0 && (
              <div className="flex justify-between">
                 <span className="text-muted-foreground">VAT ({companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)).toFixed(0) : '0'}%)</span>
                 <span className="font-medium text-foreground">${invoice.vatAmount.toFixed(2)}</span>
