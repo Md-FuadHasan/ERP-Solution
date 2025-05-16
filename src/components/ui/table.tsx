@@ -74,17 +74,7 @@ const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, children, ...props }, ref) => {
-  // Tr element for table rows
-  return (
-    <tr
-      ref={ref}
-      className={cn(
-        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-        className
-      )}
-      {...props}
-    >{children}</tr>
-  );
+  return <tr ref={ref} className={cn("border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted", className)} {...props}>{children}</tr>;
 });
 TableRow.displayName = "TableRow";
 
@@ -150,4 +140,3 @@ export {
   TableCell,
   TableCaption,
 };
-
