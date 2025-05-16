@@ -103,11 +103,11 @@ export default function InvoiceViewPage() {
         <Separator className="my-8" />
 
         <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
-           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+           <div className="grid grid-cols-3 gap-x-4 text-sm"> {/* Updated skeleton grid */}
             {[...Array(3)].map((_, i) => (
               <div key={i} className="space-y-1">
                 <Skeleton className="h-3 w-20" /> {/* Label skeleton */}
-                <Skeleton className="h-5 w-28" /> {/* Value skeleton */}
+                <Skeleton className="h-5 w-full max-w-[100px] sm:max-w-[120px]" /> {/* Value skeleton */}
               </div>
             ))}
           </div>
@@ -203,7 +203,7 @@ export default function InvoiceViewPage() {
       <Separator className="my-8" />
 
       <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+        <div className="grid grid-cols-3 gap-x-4 text-sm"> {/* Changed to grid-cols-3 and adjusted gap */}
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
             <p className="font-medium text-base text-foreground">{format(new Date(invoice.issueDate), 'MMMM d, yyyy')}</p>
@@ -343,6 +343,3 @@ export default function InvoiceViewPage() {
     </div>
   );
 }
-
-
-    
