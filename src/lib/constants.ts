@@ -1,4 +1,5 @@
-import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb } from 'lucide-react';
+
+import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -12,6 +13,7 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/invoices', label: 'Invoices', icon: FileText },
   { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/products', label: 'Products', icon: Package },
   { href: '/inventory', label: 'Inventory', icon: Archive },
   { href: '/sales', label: 'Sales', icon: ShoppingCart },
   { href: '/employee-management', label: 'Employee Management', icon: Briefcase },
