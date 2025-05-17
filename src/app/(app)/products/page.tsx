@@ -91,8 +91,8 @@ export default function ProductsPage() {
   // };
 
   const handleSubmit = (data: ProductFormValues) => {
-    const productData: Product = {
-      id: data.id || '', // Will be overridden for new products
+    // Create base product data from form, excluding the ID from the form initially
+    const productBaseData = {
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -105,42 +105,46 @@ export default function ProductsPage() {
       salePrice: data.salePrice,
     };
 
-
     if (editingProduct) {
       const updatedProductData: Product = {
-        ...editingProduct,
-        ...productData,
+        ...editingProduct, // Includes the original ID from the product being edited
+        ...productBaseData,   // Overwrites other fields with new values from the form
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
-    } else {
-      let productId = data.id;
-      if (!productId) {
-        productId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-        while (products.find(p => p.id === productId)) {
-          productId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-        }
-      } else {
-         if (products.find(p => p.id === productId && (!editingProduct || editingProduct.id !== productId))) {
+    } else { // Adding new product
+      let finalProductId = data.id; // ID from the form field (optional)
+
+      if (finalProductId && finalProductId.trim() !== '') {
+        // User provided an ID, check for uniqueness
+        if (products.find(p => p.id === finalProductId)) {
           toast({
             title: "Error: Product ID exists",
-            description: `Product ID ${productId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
+            description: `Product ID ${finalProductId} is already in use. Please choose a different ID or leave blank.`,
             variant: "destructive",
           });
-          return;
+          return; // Stop processing if ID exists
+        }
+      } else {
+        // User did not provide an ID (or it was empty/whitespace), so generate one
+        finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+        while (products.find(p => p.id === finalProductId)) { // Ensure uniqueness of generated ID
+          finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
         }
       }
 
       const newProduct: Product = {
-        ...productData,
-        id: productId,
+        ...productBaseData,
+        id: finalProductId, // Assign the validated or generated ID
       };
       addProduct(newProduct);
-      toast({ title: "Product Added", description: `${data.name} has been successfully added.` });
+      toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
     }
+    
     setIsFormModalOpen(false);
-    setEditingProduct(null);
+    setEditingProduct(null); // Reset editing product state
   };
+
 
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
@@ -151,9 +155,9 @@ export default function ProductsPage() {
       case 'Packaging':
         return 'categoryPackaging';
       case 'Beverages':
-        return 'categoryFinishedGoods';
+        return 'categoryFinishedGoods'; // Assuming beverages are finished goods
       case 'Dairy':
-        return 'categoryFinishedGoods';
+        return 'categoryFinishedGoods'; // Assuming dairy products are finished goods
       default:
         return 'secondary';
     }
@@ -173,7 +177,6 @@ export default function ProductsPage() {
     if (priceUnit.toLowerCase() === 'carton' || priceUnit.toLowerCase() === 'cartons') {
         priceUnit = 'Ctn';
     }
-
 
     return {
       priceWithVat: basePriceForCalc * vatMultiplier,
@@ -198,7 +201,7 @@ export default function ProductsPage() {
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96">
+          <div className="overflow-y-auto max-h-96"> {/* Fixed height scrollable container */}
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -247,7 +250,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96">
+        <div className="overflow-y-auto max-h-96"> {/* Fixed height scrollable container */}
           {filteredProducts.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -369,11 +372,12 @@ export default function ProductsPage() {
                       {productToView.category}
                     </Badge>
                   </div>
-                  <div><strong>Base Unit:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge></div>
+                  <div><strong>Base Unit:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge> ({productToView.unitType} are tracked in stock)</div>
                    {productToView.packagingUnit && (
                     <>
+                      <div className="col-span-2"><Separator className="my-1"/></div>
                       <div><strong>Packaging Unit:</strong></div><div><Badge variant="outline">{productToView.packagingUnit}</Badge></div>
-                      <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit}</div>
+                      <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit} {productToView.unitType}</div>
                     </>
                   )}
                 </CardContent>
@@ -431,3 +435,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
