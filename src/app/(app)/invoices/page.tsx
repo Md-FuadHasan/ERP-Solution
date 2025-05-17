@@ -122,6 +122,8 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
+      // Immediately clear the processed intent key to prevent re-opening
+      setUrlParamsProcessedIntentKey(null); 
 
       const currentAction = searchParams.get('action');
       const currentCustomerId = searchParams.get('customerId');
@@ -134,19 +136,19 @@ export default function InvoicesPage() {
         intentKeyToClear = `action=edit&id=${currentInvoiceId}`;
       }
 
-      if (intentKeyToClear && urlParamsProcessedIntentKey === intentKeyToClear) {
+      // Clear URL params if they were responsible for opening the modal
+      // This ensures that if the user closes the modal, the URL is cleaned up
+      if (intentKeyToClear) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        setUrlParamsProcessedIntentKey(null);
-      } else if (!intentKeyToClear && urlParamsProcessedIntentKey) {
-        setUrlParamsProcessedIntentKey(null);
       }
     }
-  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues, setUrlParamsProcessedIntentKey]);
+
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -195,6 +197,7 @@ export default function InvoicesPage() {
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    // The useEffect hook will pick this up and open the modal
   }, [searchParams, router, pathname]);
 
   const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
@@ -304,8 +307,8 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else {
-      finalStatus = 'Paid';
+    } else { // This else branch implies newRemainingBalance is 0 and newAmountPaid is also 0 or less than total (which shouldn't happen if logic above is correct)
+      finalStatus = 'Paid'; // Default to Paid if somehow conditions are met. Could be Pending if newRemainingBalance > 0 was missed.
     }
 
     const invoiceToSave: Invoice = {
@@ -373,7 +376,7 @@ export default function InvoicesPage() {
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
                     <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-full" /></TableCell>
@@ -408,7 +411,7 @@ export default function InvoicesPage() {
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
 
-      <div className="flex-grow min-h-0">
+       <div className="flex-grow min-h-0">
         <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
           <div className="overflow-y-auto max-h-96">
             {filteredInvoices.length > 0 ? (
@@ -426,8 +429,8 @@ export default function InvoicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="hover:bg-muted/50">
+                  {filteredInvoices.map((invoice, index) => (
+                    <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
                       <TableCell className="font-medium">{invoice.id}</TableCell>
                       <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
                       <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
@@ -502,7 +505,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && (
+            {isFormModalOpen && ( // Conditionally render form to reset state on open/close
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -522,12 +525,12 @@ export default function InvoicesPage() {
       <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => {
         setIsViewModalOpen(isOpen);
         if (!isOpen) {
-          setInvoiceToViewInModal(null);
+          setInvoiceToViewInModal(null); // Clear invoice data when modal closes
           setQrCodeValueForModal('');
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          {isDataContextLoading && isViewModalOpen && (
+          {isDataContextLoading && isViewModalOpen && ( // Show skeleton if data is loading AND modal is open
             <div className="p-6 space-y-6 animate-pulse">
               <Skeleton className="h-8 w-1/2 mb-2" /> {/* Title Skel */}
               <Skeleton className="h-4 w-3/4 mb-6" /> {/* Desc Skel */}
@@ -543,7 +546,7 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
-          {!isDataContextLoading && invoiceToViewInModal && (
+          {!isDataContextLoading && invoiceToViewInModal && ( // Only render if data is loaded AND an invoice is selected
             <>
               <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
@@ -761,3 +764,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
