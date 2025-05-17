@@ -40,6 +40,7 @@ export default function ProductsPage() {
     updateProduct,
     // deleteProduct, // We'll add delete functionality later
     isLoading,
+    companyProfile, // Get companyProfile for VAT rate
   } = useData();
   const { toast } = useToast();
 
@@ -149,10 +150,32 @@ export default function ProductsPage() {
         return 'categoryRawMaterials';
       case 'Packaging':
         return 'categoryPackaging';
+      case 'Beverages':
+        return 'categoryFinishedGoods'; // Example, adjust as needed
+      case 'Dairy':
+        return 'categoryFinishedGoods'; // Example, adjust as needed
       default:
-        return 'secondary'; 
+        return 'secondary';
     }
   };
+
+  const calculateDisplaySalePrice = (product: Product) => {
+    const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
+    const vatMultiplier = 1 + (vatRatePercent / 100);
+    let basePriceForCalc = product.salePrice;
+    let priceUnit = product.unitType;
+
+    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      basePriceForCalc = product.salePrice * product.itemsPerPackagingUnit;
+      priceUnit = product.packagingUnit;
+    }
+
+    return {
+      priceWithVat: basePriceForCalc * vatMultiplier,
+      unit: priceUnit
+    };
+  };
+
 
   if (isLoading) {
     return (
@@ -230,44 +253,49 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]">Category</TableHead>
                   <TableHead className="min-w-[100px] text-right">Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right">Cost</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Sale Price</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product, index) => (
-                  <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="font-medium text-xs">{product.id}</TableCell>
-                    <TableCell className="text-xs">{product.name}</TableCell>
-                    <TableCell className="text-xs">{product.sku}</TableCell>
-                    <TableCell>
-                      <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
-                        {product.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={cn(
-                      "text-right font-medium text-xs",
-                      product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
-                    )}>
-                      {product.stockLevel} {product.unitType}
-                    </TableCell>
-                    <TableCell className="text-right text-xs">${product.costPrice.toFixed(2)}</TableCell>
-                    <TableCell className="text-right text-xs">${product.salePrice.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-1">
-                         <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {/* <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button> */}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredProducts.map((product, index) => {
+                  const { priceWithVat, unit } = calculateDisplaySalePrice(product);
+                  return (
+                    <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                      <TableCell className="font-medium text-xs">{product.id}</TableCell>
+                      <TableCell className="text-xs">{product.name}</TableCell>
+                      <TableCell className="text-xs">{product.sku}</TableCell>
+                      <TableCell>
+                        <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
+                          {product.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={cn(
+                        "text-right font-medium text-xs",
+                        product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
+                      )}>
+                        {product.stockLevel} {product.unitType}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">${product.costPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-xs">
+                        ${priceWithVat.toFixed(2)} / {unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center gap-1">
+                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {/* <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button> */}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -357,7 +385,15 @@ export default function ProductsPage() {
               <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Cost Price:</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
-                  <div><strong>Sale Price:</strong></div><div>${productToView.salePrice.toFixed(2)} / {productToView.unitType}</div>
+                  {(() => {
+                    const { priceWithVat, unit } = calculateDisplaySalePrice(productToView);
+                    return (
+                      <>
+                        <div><strong>Sale Price (incl. VAT):</strong></div>
+                        <div>${priceWithVat.toFixed(2)} / {unit}</div>
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
@@ -390,5 +426,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    
