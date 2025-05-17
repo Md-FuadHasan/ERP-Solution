@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { SearchInput } from '@/components/common/search-input';
@@ -28,6 +29,8 @@ import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card'; // For view modal
+import { Separator } from '@/components/ui/separator'; // For view modal
 
 export default function ProductsPage() {
   const {
@@ -43,6 +46,9 @@ export default function ProductsPage() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   // const [productToDelete, setProductToDelete] = useState<Product | null>(null); // For delete later
+
+  const [productToView, setProductToView] = useState<Product | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products;
@@ -63,6 +69,11 @@ export default function ProductsPage() {
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setIsFormModalOpen(true);
+  };
+
+  const handleViewProduct = (product: Product) => {
+    setProductToView(product);
+    setIsViewModalOpen(true);
   };
 
   // const handleDeleteProductConfirm = (product: Product) => {
@@ -146,7 +157,7 @@ export default function ProductsPage() {
                     <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
                     <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
                     <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto" /></TableHead>
+                    <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto" /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -198,7 +209,7 @@ export default function ProductsPage() {
                     <TableHead className="min-w-[100px] text-right">Stock</TableHead>
                     <TableHead className="min-w-[100px] text-right">Cost</TableHead>
                     <TableHead className="min-w-[100px] text-right">Sale Price</TableHead>
-                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -218,6 +229,9 @@ export default function ProductsPage() {
                       <TableCell className="text-right">${product.salePrice.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
+                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -247,6 +261,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Add/Edit Product Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
           setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingProduct(null);
@@ -265,6 +280,55 @@ export default function ProductsPage() {
               onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Product Details Modal */}
+      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+        <DialogContent className="w-[90vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Product Details: {productToView?.name}</DialogTitle>
+            <DialogDescription>
+              Viewing details for product {productToView?.sku}.
+            </DialogDescription>
+          </DialogHeader>
+          {productToView && (
+            <div className="space-y-4 py-4 text-sm">
+              <Card>
+                <CardContent className="pt-6 space-y-2">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div><strong>Product ID:</strong></div><div>{productToView.id}</div>
+                    <div><strong>SKU:</strong></div><div>{productToView.sku}</div>
+                    <div className="col-span-2 pt-2"><strong>Name:</strong></div><div className="col-span-2 -mt-1">{productToView.name}</div>
+                  </div>
+                </CardContent>
+              </Card>
+               <Card>
+                <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div><strong>Category:</strong></div> <div><Badge variant="outline">{productToView.category}</Badge></div>
+                  <div><strong>Unit Type:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge></div>
+                </CardContent>
+              </Card>
+               <Card>
+                <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div><strong>Stock Level:</strong></div>
+                  <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
+                    {productToView.stockLevel}
+                  </div>
+                  <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div><strong>Cost Price:</strong></div><div>${productToView.costPrice.toFixed(2)}</div>
+                  <div><strong>Sale Price:</strong></div><div>${productToView.salePrice.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -290,3 +354,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
