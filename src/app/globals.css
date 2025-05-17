@@ -56,6 +56,14 @@ body {
     --status-overdue-foreground: 0 0% 98%;
     --status-cancelled: 282 92% 68%; /* #c865f7 */
     --status-cancelled-foreground: 0 0% 98%;
+
+    /* Product Category Colors */
+    --category-finished-goods-bg: 180 60% 90%; /* Light Teal */
+    --category-finished-goods-fg: 180 60% 25%; /* Darker Teal text */
+    --category-raw-materials-bg: 35 50% 90%; /* Light Beige/Tan */
+    --category-raw-materials-fg: 35 50% 25%; /* Darker Brown text */
+    --category-packaging-bg: 210 15% 92%; /* Light Bluish Gray */
+    --category-packaging-fg: 210 15% 25%; /* Darker Gray text */
   }
   .dark {
     --background: 0 0% 10%; /* Dark Gray for dark mode background */
@@ -105,6 +113,14 @@ body {
     --status-overdue-foreground: 0 0% 98%;
     --status-cancelled: 282 80% 70%;
     --status-cancelled-foreground: 0 0% 98%;
+
+    /* Dark Product Category Colors */
+    --category-finished-goods-bg: 180 40% 20%; /* Dark Teal */
+    --category-finished-goods-fg: 180 40% 85%; /* Lighter Teal text */
+    --category-raw-materials-bg: 35 30% 22%; /* Dark Brown/Tan */
+    --category-raw-materials-fg: 35 30% 80%; /* Lighter Brown text */
+    --category-packaging-bg: 210 10% 25%; /* Dark Bluish Gray */
+    --category-packaging-fg: 210 10% 75%; /* Lighter Gray text */
   }
 }
 

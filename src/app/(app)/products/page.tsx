@@ -28,7 +28,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
+import type { VariantProps } from 'class-variance-authority';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 
@@ -129,6 +130,19 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
 
+  const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
+    switch (category) {
+      case 'Finished Goods':
+        return 'categoryFinishedGoods';
+      case 'Raw Materials':
+        return 'categoryRawMaterials';
+      case 'Packaging':
+        return 'categoryPackaging';
+      default:
+        return 'secondary'; // Fallback
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -144,31 +158,29 @@ export default function ProductsPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="flex-grow min-h-0">
-          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-            <div className="overflow-y-auto max-h-96">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                    <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+          <div className="overflow-y-auto max-h-96">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                    {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(7)].map((_, i) => (
-                    <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -195,69 +207,71 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0">
-        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-          <div className="overflow-y-auto max-h-96">
-            {filteredProducts.length > 0 ? (
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px]">Product ID</TableHead>
-                    <TableHead className="min-w-[180px]">Name</TableHead>
-                    <TableHead className="min-w-[120px]">SKU</TableHead>
-                    <TableHead className="min-w-[120px]">Category</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Stock</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Cost</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Sale Price</TableHead>
-                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
+        <div className="overflow-y-auto max-h-96">
+          {filteredProducts.length > 0 ? (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="min-w-[100px]">Product ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[120px]">SKU</TableHead>
+                  <TableHead className="min-w-[120px]">Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Sale Price</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product, index) => (
+                  <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                    <TableCell className="font-medium">{product.id}</TableCell>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell>{product.sku}</TableCell>
+                    <TableCell>
+                      <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
+                        {product.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={cn(
+                      "text-right font-medium",
+                      product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
+                    )}>
+                      {product.stockLevel} {product.unitType}
+                    </TableCell>
+                    <TableCell className="text-right">${product.costPrice.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${product.salePrice.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                         <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {/* <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button> */}
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product, index) => (
-                    <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium">{product.id}</TableCell>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell>{product.sku}</TableCell>
-                      <TableCell><Badge variant="secondary">{product.category}</Badge></TableCell>
-                      <TableCell className={cn(
-                        "text-right font-medium",
-                        product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
-                      )}>
-                        {product.stockLevel} {product.unitType}
-                      </TableCell>
-                      <TableCell className="text-right">${product.costPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${product.salePrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          {/* <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button> */}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="h-full flex items-center justify-center p-8">
-                <DataPlaceholder
-                  title="No Products Found"
-                  message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-                  action={!searchTerm ? (
-                    <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                    </Button>
-                  ) : undefined}
-                />
-              </div>
-            )}
-          </div>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="h-full flex items-center justify-center p-8">
+              <DataPlaceholder
+                title="No Products Found"
+                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
+                action={!searchTerm ? (
+                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -305,7 +319,12 @@ export default function ProductsPage() {
               </Card>
                <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
-                  <div><strong>Category:</strong></div> <div><Badge variant="outline">{productToView.category}</Badge></div>
+                  <div><strong>Category:</strong></div> 
+                  <div>
+                    <Badge variant={getCategoryBadgeVariant(productToView.category)} className="text-xs">
+                      {productToView.category}
+                    </Badge>
+                  </div>
                   <div><strong>Unit Type:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge></div>
                 </CardContent>
               </Card>
@@ -354,5 +373,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    

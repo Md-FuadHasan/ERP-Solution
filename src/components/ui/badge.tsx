@@ -16,7 +16,7 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
-        // New specific variants for invoice statuses
+        // Invoice Status Colors
         statusPaid: 
           "border-transparent bg-status-paid text-status-paid-foreground hover:bg-status-paid/80",
         statusPartiallyPaid: 
@@ -27,11 +27,18 @@ const badgeVariants = cva(
           "border-transparent bg-status-overdue text-status-overdue-foreground hover:bg-status-overdue/80",
         statusCancelled: 
           "border-transparent bg-status-cancelled text-status-cancelled-foreground hover:bg-status-cancelled/80",
-        // New variants for customer types
+        // Customer Type Colors
         creditCustomer:
           "border-transparent bg-primary/70 text-primary-foreground hover:bg-primary/60",
         cashCustomer:
           "border-transparent bg-status-paid/70 text-status-paid-foreground hover:bg-status-paid/60",
+        // Product Category Colors
+        categoryFinishedGoods:
+          "border-transparent bg-[hsl(var(--category-finished-goods-bg))] text-[hsl(var(--category-finished-goods-fg))] hover:bg-[hsl(var(--category-finished-goods-bg))]/80",
+        categoryRawMaterials:
+          "border-transparent bg-[hsl(var(--category-raw-materials-bg))] text-[hsl(var(--category-raw-materials-fg))] hover:bg-[hsl(var(--category-raw-materials-bg))]/80",
+        categoryPackaging:
+          "border-transparent bg-[hsl(var(--category-packaging-bg))] text-[hsl(var(--category-packaging-fg))] hover:bg-[hsl(var(--category-packaging-bg))]/80",
       },
     },
     defaultVariants: {
