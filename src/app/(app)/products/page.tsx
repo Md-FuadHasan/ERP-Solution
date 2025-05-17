@@ -151,9 +151,9 @@ export default function ProductsPage() {
       case 'Packaging':
         return 'categoryPackaging';
       case 'Beverages':
-        return 'categoryFinishedGoods'; // Example, adjust as needed
+        return 'categoryFinishedGoods';
       case 'Dairy':
-        return 'categoryFinishedGoods'; // Example, adjust as needed
+        return 'categoryFinishedGoods';
       default:
         return 'secondary';
     }
@@ -169,6 +169,11 @@ export default function ProductsPage() {
       basePriceForCalc = product.salePrice * product.itemsPerPackagingUnit;
       priceUnit = product.packagingUnit;
     }
+    
+    if (priceUnit.toLowerCase() === 'carton' || priceUnit.toLowerCase() === 'cartons') {
+        priceUnit = 'Ctn';
+    }
+
 
     return {
       priceWithVat: basePriceForCalc * vatMultiplier,
@@ -203,7 +208,7 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[140px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
                 </TableRow>
               </TableHeader>
@@ -254,7 +259,7 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[100px] text-right">Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right">Cost</TableHead>
                   <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
-                  <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
