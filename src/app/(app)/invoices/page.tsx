@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, Coins, Scale, Briefcase, Clock3, CircleDollarSign, ArrowLeft } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, ChevronsUpDown, Check, Filter } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +46,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 
 export default function InvoicesPage() {
@@ -82,46 +83,42 @@ export default function InvoicesPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [qrCodeValueForModal, setQrCodeValueForModal] = useState('');
 
-  // Effect to open form modal based on URL parameters
+
   useEffect(() => {
     const action = searchParams.get('action');
     const invoiceIdParam = searchParams.get('id');
     const customerIdParam = searchParams.get('customerId');
     const customerNameParam = searchParams.get('customerName');
 
-    let intentKeyFromUrl: string | null = null;
+    let currentUrlIntentKey: string | null = null;
     if (action === 'new' && customerIdParam) {
-      intentKeyFromUrl = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
+      currentUrlIntentKey = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
     } else if (action === 'edit' && invoiceIdParam) {
-      intentKeyFromUrl = `action=edit&id=${invoiceIdParam}`;
+      currentUrlIntentKey = `action=edit&id=${invoiceIdParam}`;
     }
 
-    if (intentKeyFromUrl) {
-      // If there's an actionable intent in the URL
-      if (!isFormModalOpen && urlParamsProcessedIntentKey !== intentKeyFromUrl) {
-        // And modal is closed, and this intent hasn't been processed yet to open it
+    if (currentUrlIntentKey) {
+      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
         if (action === 'new') {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
         } else { // action === 'edit'
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-          setEditingInvoice(invoiceToEdit || null); // If not found, modal will open with no initialData (effectively a new form)
+          setEditingInvoice(invoiceToEdit || null);
           setCurrentPrefillValues(null);
         }
         setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(intentKeyFromUrl);
+        setUrlParamsProcessedIntentKey(currentUrlIntentKey);
       }
     } else {
-      // No actionable intent in the URL
-      if (urlParamsProcessedIntentKey) {
-        // If we previously processed an intent, but now the URL is clean, reset the key.
-        // This is crucial for the modal to stay closed after URL cleanup.
-        setUrlParamsProcessedIntentKey(null);
-      }
+       if (urlParamsProcessedIntentKey && !currentUrlIntentKey && !isFormModalOpen) {
+         setUrlParamsProcessedIntentKey(null);
+       }
     }
   }, [
     searchParams,
     isFormModalOpen,
+    editingInvoice,
     urlParamsProcessedIntentKey,
     invoices,
     setCurrentPrefillValues,
@@ -136,37 +133,30 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      // The urlParamsProcessedIntentKey will be reset by the useEffect when it sees the cleaned URL.
-
+      
       const currentAction = searchParams.get('action');
       const currentInvoiceId = searchParams.get('id');
       const currentCustomerId = searchParams.get('customerId');
 
-      // Only clear URL params if they were for an action that opens this modal.
-      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId)) {
+      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId) || currentAction === 'view') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        // Important: Reset the processed key when URL is cleared and modal closes
+        setUrlParamsProcessedIntentKey(null); 
       }
     }
-  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues]);
+  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues, setUrlParamsProcessedIntentKey]);
 
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
-    newSearchParams.delete('action');
-    newSearchParams.delete('customerId');
-    newSearchParams.delete('customerName');
+    newSearchParams.set('action', 'new');
     newSearchParams.delete('id');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-
-    setEditingInvoice(null);
-    setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null); // Clear intent key as this is a manual open
-    setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
   const filteredInvoices = useMemo(() => {
@@ -202,7 +192,6 @@ export default function InvoicesPage() {
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    // The useEffect hook will pick this up and open the modal
   }, [searchParams, router, pathname]);
 
   const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
@@ -264,7 +253,7 @@ export default function InvoicesPage() {
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
-      if (paymentAmount > 0) {
+      if (paymentAmount >= 0) { // Ensure paymentAmount is not negative if already overpaid
         newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -278,8 +267,8 @@ export default function InvoicesPage() {
             onlineTransactionNumber: data.onlineTransactionNumber,
           }),
         });
+         newAmountPaid = calculatedTotalAmount;
       }
-      newAmountPaid = calculatedTotalAmount;
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
@@ -312,7 +301,7 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { 
+    } else { // Default case, e.g. if newAmountPaid covers totalAmount exactly
       finalStatus = 'Paid';
     }
 
@@ -328,7 +317,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus,
+      paymentProcessingStatus: data.paymentProcessingStatus, // Store the form's processing status
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -364,36 +353,36 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
-                <TableRow>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                  <TableHead className="min-w-[120px] text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(7)].map((_, i) => (
-                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+        <div className="flex-grow min-h-0">
+          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
+            <div className="overflow-y-auto max-h-96">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-muted">
+                  <TableRow>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                    <TableHead className="min-w-[150px] text-right"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {[...Array(7)].map((_, i) => (
+                    <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
       </div>
@@ -425,12 +414,11 @@ export default function InvoicesPage() {
                   <TableRow>
                     <TableHead className="min-w-[120px]">Invoice ID</TableHead>
                     <TableHead className="min-w-[180px]">Customer</TableHead>
-                    <TableHead className="min-w-[100px]">Due Date</TableHead>
                     <TableHead className="min-w-[100px] text-right">Amount</TableHead>
                     <TableHead className="min-w-[100px] text-right">Paid</TableHead>
                     <TableHead className="min-w-[100px] text-right">Balance</TableHead>
                     <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="min-w-[120px] text-right">Actions</TableHead>
+                    <TableHead className="min-w-[150px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -438,7 +426,6 @@ export default function InvoicesPage() {
                     <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
                       <TableCell className="font-medium">{invoice.id}</TableCell>
                       <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                      <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
                       <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
                       <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
@@ -455,27 +442,9 @@ export default function InvoicesPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete invoice "{invoiceToDelete?.id}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                           <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -510,7 +479,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && ( 
+            {isFormModalOpen && (
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -530,28 +499,28 @@ export default function InvoicesPage() {
       <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => {
         setIsViewModalOpen(isOpen);
         if (!isOpen) {
-          setInvoiceToViewInModal(null); 
+          setInvoiceToViewInModal(null);
           setQrCodeValueForModal('');
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          {isDataContextLoading && isViewModalOpen && ( 
+          {(isDataContextLoading && isViewModalOpen) && (
             <div className="p-6 space-y-6 animate-pulse">
-              <Skeleton className="h-8 w-1/2 mb-2" /> 
-              <Skeleton className="h-4 w-3/4 mb-6" /> 
+              <Skeleton className="h-8 w-1/2 mb-2" />
+              <Skeleton className="h-4 w-3/4 mb-6" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <div><Skeleton className="h-24 w-full" /></div> 
+                <div><Skeleton className="h-24 w-full" /></div>
                 <div><Skeleton className="h-24 w-full" /></div>
               </div>
-              <Skeleton className="h-16 w-full mb-8" /> 
-              <Skeleton className="h-40 w-full mb-8" /> 
+              <Skeleton className="h-16 w-full mb-8" />
+              <Skeleton className="h-40 w-full mb-8" />
               <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
-                <Skeleton className="h-32 w-32" /> 
-                <Skeleton className="h-48 w-full md:max-w-sm" /> 
+                <Skeleton className="h-32 w-32" />
+                <Skeleton className="h-48 w-full md:max-w-sm" />
               </div>
             </div>
           )}
-          {!isDataContextLoading && invoiceToViewInModal && ( 
+          {(!isDataContextLoading && invoiceToViewInModal) && (
             <>
               <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
@@ -587,7 +556,7 @@ export default function InvoicesPage() {
                         <p className="text-muted-foreground">{customerForModal.email} | {customerForModal.phone}</p>
                       </div>
                     </section>
-                    
+
                     <Separator className="my-8" />
 
                     <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
@@ -650,7 +619,7 @@ export default function InvoicesPage() {
                           <span className="font-medium text-foreground">${invoiceToViewInModal.subtotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
+                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span>
                           <span className="font-medium text-foreground">${invoiceToViewInModal.taxAmount.toFixed(2)}</span>
                         </div>
                         {invoiceToViewInModal.vatAmount > 0 && (
@@ -712,16 +681,16 @@ export default function InvoicesPage() {
                 )}
               </div>
               <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
-                <Button variant="outline" onClick={() => { /* Placeholder for Print */ toast({ title: "Print Action", description: "Print functionality would be implemented here." }) }} className="w-full sm:w-auto">
+                <Button variant="outline" onClick={() => { toast({ title: "Print Action", description: "Print functionality would be implemented here." }) }} className="w-full sm:w-auto">
                   <Printer className="mr-2 h-4 w-4" /> Print Invoice
                 </Button>
-                <Button variant="outline" onClick={() => { /* Placeholder for Download */ toast({ title: "Download PDF Action", description: "PDF download functionality would be implemented here." }) }} className="w-full sm:w-auto">
+                <Button variant="outline" onClick={() => { toast({ title: "Download PDF Action", description: "PDF download functionality would be implemented here." }) }} className="w-full sm:w-auto">
                   <Download className="mr-2 h-4 w-4" /> Download PDF
                 </Button>
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
                     setIsViewModalOpen(false);
-                    setTimeout(() => {
+                    setTimeout(() => { 
                       handleEditInvoice(invoiceToViewInModal);
                     }, 100);
                   }
@@ -731,7 +700,7 @@ export default function InvoicesPage() {
               </DialogFooter>
             </>
           )}
-          {!invoiceToViewInModal && isViewModalOpen && ( 
+          {(!invoiceToViewInModal && isViewModalOpen) && (
              <div className="p-6"><DialogTitle>Loading...</DialogTitle></div>
           )}
         </DialogContent>
@@ -742,7 +711,8 @@ export default function InvoicesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete invoice "{invoiceToDelete?.id}".
+              This action cannot be undone. This will permanently delete the invoice
+              "{invoiceToDelete?.id}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

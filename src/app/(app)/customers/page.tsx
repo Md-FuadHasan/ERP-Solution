@@ -35,7 +35,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -162,7 +161,7 @@ export default function CustomersPage() {
       let customerId = data.id;
       if (!customerId) {
         customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
-        while (customers.find(c => c.id === customerId)) { 
+        while (customers.find(c => c.id === customerId)) {
             customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
         }
       } else {
@@ -172,7 +171,7 @@ export default function CustomersPage() {
             description: `Customer ID ${customerId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
             variant: "destructive",
           });
-          return; 
+          return;
         }
       }
 
@@ -210,35 +209,35 @@ export default function CustomersPage() {
         </div>
         <div className="flex-grow min-h-0">
           <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-            <div className="overflow-y-auto max-h-96 h-full">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto bg-primary/50" /></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(7)].map((_, i) => (
-                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+            <div className="overflow-y-auto max-h-96">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                  <TableRow>
+                    <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-28 ml-auto bg-primary/50" /></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {[...Array(7)].map((_, i) => (
+                    <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>
@@ -280,7 +279,7 @@ export default function CustomersPage() {
                     <TableHead className="min-w-[140px]">Phone</TableHead>
                     <TableHead className="min-w-[80px]">Type</TableHead>
                     <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
-                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -320,30 +319,12 @@ export default function CustomersPage() {
                             <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteCustomerConfirm(customer);
-                                  }}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete customer "{customerToDelete?.name}" and all associated invoices.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCustomerConfirm(customer);
+                              }}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -542,4 +523,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
