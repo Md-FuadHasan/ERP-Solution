@@ -43,6 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 export default function CustomersPage() {
   const {
@@ -51,7 +52,8 @@ export default function CustomersPage() {
     updateCustomer,
     deleteCustomer,
     isLoading,
-    getInvoicesByCustomerId
+    getInvoicesByCustomerId,
+    getOutstandingBalanceByCustomerId
   } = useData();
   const router = useRouter();
 
@@ -70,8 +72,10 @@ export default function CustomersPage() {
     return customers.filter(
       (customer) =>
         customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+        (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (customer.registrationNumber && customer.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (customer.vatNumber && customer.vatNumber.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [customers, searchTerm]);
 
@@ -90,14 +94,14 @@ export default function CustomersPage() {
     }
     const totalPurchased = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
-    const remainingBalance = invoices.reduce((sum, inv) => sum + inv.remainingBalance, 0);
+    const remainingBalance = getOutstandingBalanceByCustomerId(selectedCustomerForDetails.id);
     return {
       totalInvoices: invoices.length,
       totalPurchased,
       totalPaid,
       remainingBalance
     };
-  }, [selectedCustomerForDetails, getInvoicesByCustomerId]);
+  }, [selectedCustomerForDetails, getInvoicesByCustomerId, getOutstandingBalanceByCustomerId]);
 
 
   const handleAddCustomer = () => {
@@ -129,7 +133,6 @@ export default function CustomersPage() {
 
   const closeCustomerDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    // Delay clearing selected customer to allow modal fade-out animation
     setTimeout(() => setSelectedCustomerForDetails(null), 300);
   };
 
@@ -147,6 +150,9 @@ export default function CustomersPage() {
       const updatedCustomerData: Customer = {
         ...editingCustomer,
         ...data,
+        registrationNumber: data.registrationNumber || undefined,
+        vatNumber: data.vatNumber || undefined,
+        shippingAddress: data.shippingAddress || undefined,
         creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
         invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
       };
@@ -155,20 +161,18 @@ export default function CustomersPage() {
     } else {
       let customerId = data.id;
       if (!customerId) {
-        // Generate a more robust unique ID
         customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
-        while (customers.find(c => c.id === customerId)) { // Ensure uniqueness
+        while (customers.find(c => c.id === customerId)) { 
             customerId = `CUST${String(Date.now()).slice(-4)}${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`;
         }
       } else {
-        // Check if manually entered ID already exists for a *different* customer
         if (customers.find(c => c.id === customerId && (!editingCustomer || editingCustomer.id !== customerId))) {
           toast({
             title: "Error: Customer ID exists",
             description: `Customer ID ${customerId} is already in use. Please choose a different ID or leave it blank for auto-generation.`,
             variant: "destructive",
           });
-          return; // Prevent form submission
+          return; 
         }
       }
 
@@ -176,6 +180,9 @@ export default function CustomersPage() {
         ...data,
         id: customerId,
         createdAt: new Date().toISOString(),
+        registrationNumber: data.registrationNumber || undefined,
+        vatNumber: data.vatNumber || undefined,
+        shippingAddress: data.shippingAddress || undefined,
         creditLimit: data.customerType === 'Credit' ? data.creditLimit : undefined,
         invoiceAgingDays: data.customerType === 'Credit' ? data.invoiceAgingDays : undefined,
       };
@@ -204,19 +211,25 @@ export default function CustomersPage() {
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
           <div className="overflow-y-auto max-h-96">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[200px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[150px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto bg-primary/50" /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
-                  <TableRow key={i}><TableCell><Skeleton className="h-5 w-3/4" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-3/4" /></TableCell><TableCell><Skeleton className="h-5 w-2/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell></TableRow>
+                  <TableRow key={i} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
+                    {[...Array(8)].map((_, j) => (
+                         <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>
+                    ))}
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -241,7 +254,7 @@ export default function CustomersPage() {
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search by name, email, or ID..."
+          placeholder="Search by name, ID, CR, VAT..."
           className="w-full md:w-80"
         />
       </div>
@@ -250,19 +263,21 @@ export default function CustomersPage() {
         <div className="overflow-y-auto max-h-96">
           {filteredCustomers.length > 0 ? (
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]">Customer ID</TableHead>
+                  <TableHead className="min-w-[100px]">Cust. ID</TableHead>
                   <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[200px]">Email</TableHead>
+                  <TableHead className="min-w-[120px]">CR No.</TableHead>
+                  <TableHead className="min-w-[120px]">VAT No.</TableHead>
                   <TableHead className="min-w-[140px]">Phone</TableHead>
-                  <TableHead className="min-w-[120px]">Type</TableHead>
+                  <TableHead className="min-w-[100px]">Type</TableHead>
+                  <TableHead className="min-w-[150px] text-right">Outstanding</TableHead>
                   <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                {filteredCustomers.map((customer, index) => (
+                  <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
                     <TableCell className="font-medium">{customer.id}</TableCell>
                     <TableCell
                       className="cursor-pointer hover:text-primary hover:underline"
@@ -270,12 +285,16 @@ export default function CustomersPage() {
                     >
                       {customer.name}
                     </TableCell>
-                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.registrationNumber || '-'}</TableCell>
+                    <TableCell>{customer.vatNumber || '-'}</TableCell>
                     <TableCell>{customer.phone}</TableCell>
                     <TableCell>
-                      <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'}>
+                      <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'} className="text-xs">
                         {customer.customerType}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      ${getOutstandingBalanceByCustomerId(customer.id).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
@@ -358,7 +377,7 @@ export default function CustomersPage() {
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Customer Profile: {selectedCustomerForDetails?.name}</DialogTitle>
             <DialogDescription>
-              Financial overview and invoice history for {selectedCustomerForDetails?.email}.
+              Contact, financial overview, and invoice history for {selectedCustomerForDetails?.email}.
             </DialogDescription>
           </DialogHeader>
           {selectedCustomerForDetails && (
@@ -367,7 +386,9 @@ export default function CustomersPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Customer Information</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div><strong>CR No:</strong> {selectedCustomerForDetails.registrationNumber || 'N/A'}</div>
+                  <div><strong>VAT No:</strong> {selectedCustomerForDetails.vatNumber || 'N/A'}</div>
                   <div className="flex items-center">
                     <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" />
                     <strong>Type:</strong>&nbsp;{selectedCustomerForDetails.customerType} Customer
@@ -412,7 +433,7 @@ export default function CustomersPage() {
                     <Coins className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${customerAggregates.totalPaid.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">${customerAggregates.totalPaid.toFixed(2)}</div>
                   </CardContent>
                 </Card>
                 <Card>
@@ -421,7 +442,7 @@ export default function CustomersPage() {
                     <Scale className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className={`text-2xl font-bold ${customerAggregates.remainingBalance > 0 ? 'text-destructive' : ''}`}>
+                    <div className={cn("text-2xl font-bold", customerAggregates.remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400')}>
                       ${customerAggregates.remainingBalance.toFixed(2)}
                     </div>
                   </CardContent>
@@ -439,19 +460,19 @@ export default function CustomersPage() {
                             <TableHead className="min-w-[120px]">Invoice ID</TableHead>
                             <TableHead className="min-w-[120px]">Issue Date</TableHead>
                             <TableHead className="min-w-[120px]">Due Date</TableHead>
-                            <TableHead className="min-w-[100px]">Total</TableHead>
+                            <TableHead className="min-w-[100px] text-right">Total</TableHead>
                             <TableHead className="min-w-[100px]">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {customerInvoices.map((invoice) => (
-                            <TableRow key={invoice.id}>
+                          {customerInvoices.map((invoice, index) => (
+                            <TableRow key={invoice.id} className={index % 2 === 0 ? 'bg-card' : 'bg-muted/50'}>
                               <TableCell className="font-medium">{invoice.id}</TableCell>
                               <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
                               <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                              <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
                               <TableCell>
-                                <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
+                                <Badge variant={getStatusBadgeVariant(invoice.status)} className="text-xs">{invoice.status}</Badge>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -483,7 +504,6 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
        <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

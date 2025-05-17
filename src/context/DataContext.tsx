@@ -19,7 +19,8 @@ interface DataContextType {
   updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
   getInvoicesByCustomerId: (customerId: string) => Invoice[];
   getCustomerById: (customerId: string) => Customer | undefined;
-  getInvoiceById: (invoiceId: string) => Invoice | undefined; // Added
+  getInvoiceById: (invoiceId: string) => Invoice | undefined;
+  getOutstandingBalanceByCustomerId: (customerId: string) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -149,6 +150,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return invoices.find(invoice => invoice.id === invoiceId);
   }, [invoices]);
 
+  const getOutstandingBalanceByCustomerId = useCallback((customerId: string) => {
+    return invoices
+      .filter(invoice => invoice.customerId === customerId && invoice.status !== 'Paid' && invoice.status !== 'Cancelled')
+      .reduce((sum, invoice) => sum + invoice.remainingBalance, 0);
+  }, [invoices]);
+
   return (
     <DataContext.Provider
       value={{
@@ -166,6 +173,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getInvoicesByCustomerId,
         getCustomerById,
         getInvoiceById,
+        getOutstandingBalanceByCustomerId,
       }}
     >
       {children}

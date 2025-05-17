@@ -1,7 +1,7 @@
 
 'use client';
 
-import * as React from 'react'; // Added React import
+import * as React from 'react'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -16,10 +16,12 @@ import { CUSTOMER_TYPES, INVOICE_AGING_OPTIONS } from '@/types';
 const customerFormSchema = z.object({
   id: z.string().max(50).optional(),
   name: z.string().min(2, { message: "Name must be at least 2 characters." }).max(100),
+  registrationNumber: z.string().max(50, "CR Number cannot exceed 50 characters.").optional().nullable(),
+  vatNumber: z.string().max(50, "VAT Number cannot exceed 50 characters.").optional().nullable(),
   email: z.string().email({ message: "Invalid email address." }).max(100),
   phone: z.string().min(7, { message: "Phone number seems too short." }).max(20),
   billingAddress: z.string().min(5, { message: "Billing address is required." }).max(255),
-  shippingAddress: z.string().max(255).optional(),
+  shippingAddress: z.string().max(255).optional().nullable(),
   customerType: z.enum(CUSTOMER_TYPES, { required_error: "Customer type is required." }),
   creditLimit: z.coerce.number().positive("Credit limit must be a positive number.").optional(),
   invoiceAgingDays: z.coerce.number().optional().transform(val => val ? Number(val) as InvoiceAgingDays : undefined),
@@ -57,6 +59,8 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
     defaultValues: initialData ? {
       id: initialData.id,
       name: initialData.name,
+      registrationNumber: initialData.registrationNumber || '',
+      vatNumber: initialData.vatNumber || '',
       email: initialData.email,
       phone: initialData.phone,
       billingAddress: initialData.billingAddress,
@@ -67,6 +71,8 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
     } : {
       id: '',
       name: '',
+      registrationNumber: '',
+      vatNumber: '',
       email: '',
       phone: '',
       billingAddress: '',
@@ -79,7 +85,6 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
 
   const watchedCustomerType = form.watch("customerType");
 
-  // Reset credit fields if customer type changes to Cash
   React.useEffect(() => {
     if (watchedCustomerType === 'Cash') {
       form.setValue('creditLimit', undefined);
@@ -122,6 +127,34 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
             </FormItem>
           )}
         />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="registrationNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Customer Registration Number (CR)</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter CR Number" {...field} value={field.value || ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="vatNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>VAT Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter VAT Number" {...field} value={field.value || ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -170,7 +203,7 @@ export function CustomerForm({ initialData, onSubmit, onCancel, isSubmitting }: 
             <FormItem>
               <FormLabel>Shipping Address (Optional)</FormLabel>
               <FormControl>
-                <Textarea placeholder="Leave blank if same as billing" {...field} className="min-h-[80px]" />
+                <Textarea placeholder="Leave blank if same as billing" {...field} value={field.value || ''} className="min-h-[80px]" />
               </FormControl>
               <FormMessage />
             </FormItem>
