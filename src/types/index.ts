@@ -103,31 +103,33 @@ export interface ReportSummary {
   actionableInsights?: string;
 }
 
-export type ProductCategory = 'Finished Goods' | 'Raw Materials' | 'Packaging';
-export type ProductUnitType = 'PCS' | 'Cartons' | 'Liters' | 'Kgs' | 'Units';
+export type ProductCategory = 'Finished Goods' | 'Raw Materials' | 'Packaging' | 'Beverages' | 'Dairy';
+export type ProductUnitType = 'PCS' | 'Cartons' | 'Liters' | 'Kgs' | 'Units' | 'ML';
 
 export interface Product {
-  id: string;
-  name: string;
-  sku: string;
+  id: string; // Can be the 'Code' from the sheet
+  name: string; // From 'Item Description'
+  sku: string; // Usually same as 'Code' or a variation
   category: ProductCategory;
-  unitType: ProductUnitType; // Base unit for stock keeping
-  packagingUnit?: string; // e.g., "Carton", "Box", "Pack" - How it's often sold in multiples
-  itemsPerPackagingUnit?: number; // How many base units are in one packagingUnit
-  stockLevel: number;
-  reorderPoint: number;
-  costPrice: number;
-  salePrice: number;
+  unitType: ProductUnitType; // Base unit for stock keeping (e.g., PCS if the price is per piece)
+  packagingUnit?: string; // e.g., "Carton", "Box", "Pack"
+  itemsPerPackagingUnit?: number; // From 'Item QTY Per Carton'
+  stockLevel: number; // Dummy value
+  reorderPoint: number; // Dummy value
+  costPrice: number; // Cost to the company for one base unit
+  salePrice: number; // Selling price for one base unit (e.g., "PCS Price" from sheet)
 }
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'PROD001', name: 'Vanilla Ice Cream 1L Tub', sku: 'VIC001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 150, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 6 },
-  { id: 'PROD002', name: 'Orange Juice 500ml Bottle', sku: 'OJB002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 30, reorderPoint: 40, costPrice: 0.80, salePrice: 2.29, packagingUnit: 'Pack', itemsPerPackagingUnit: 12 },
-  { id: 'PROD003', name: 'Whole Milk 1L Carton (Single)', sku: 'WMK003', category: 'Finished Goods', unitType: 'PCS', stockLevel: 200, reorderPoint: 75, costPrice: 0.90, salePrice: 1.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 9 },
-  { id: 'PROD004', name: 'Raw Sugar 1kg Bag', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 500, reorderPoint: 100, costPrice: 1.20, salePrice: 0 }, // salePrice 0 for raw materials
-  { id: 'PROD005', name: 'Cardboard Cartons (Large, Empty)', sku: 'PKG001', category: 'Packaging', unitType: 'PCS', stockLevel: 1000, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
-  { id: 'PROD006', name: 'Chocolate Ice Cream 120ml Cup', sku: 'CIC002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 450, reorderPoint: 100, costPrice: 0.75, salePrice: 1.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 48 },
-  { id: 'PROD007', name: '10kg Vanilla Ice Cream Bucket', sku: 'VIB001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 20, reorderPoint: 5, costPrice: 20.00, salePrice: 45.00 }, // No explicit packagingUnit, sold as individual buckets
+  { id: '330012', name: 'Cooking Cream 1080ml (1x12 PCS)', sku: '330012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150, reorderPoint: 30, costPrice: 8.50, salePrice: 11.08 },
+  { id: '25027-ORG', name: 'Al Rabie Juice 125ml - Orange (1x18 PCS)', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200, reorderPoint: 50, costPrice: 0.45, salePrice: 0.69 },
+  { id: '80012-VAN', name: 'Ice Cream Tub 1.8L - Vanilla (1x6 PCS)', sku: '80012-VAN', category: 'Finished Goods', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80, reorderPoint: 20, costPrice: 9.00, salePrice: 12.00 },
+  { id: '59012', name: 'UHT Milk 200ml (1x18 PCS)', sku: '59012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 300, reorderPoint: 60, costPrice: 0.60, salePrice: 0.85 },
+  { id: '330011', name: 'Whipping Cream 1080ml (1x12 PCS)', sku: '330011', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120, reorderPoint: 25, costPrice: 6.00, salePrice: 7.83 }, // Example from sheet "1080 ML 1 X 12 PCS WHIPPING CREAM"
+  { id: '12024', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry (1x24 PCS)', sku: '12024-VS', category: 'Finished Goods', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240, reorderPoint: 48, costPrice: 0.70, salePrice: 1.04 }, // Example from sheet
+  { id: 'PROD001_OLD', name: 'Vanilla Ice Cream 1L Tub (Old)', sku: 'VIC001_OLD', category: 'Finished Goods', unitType: 'PCS', stockLevel: 10, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 6 },
+  { id: 'PROD004_OLD', name: 'Raw Sugar 1kg Bag (Old)', sku: 'SUG001_OLD', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 50, reorderPoint: 100, costPrice: 1.20, salePrice: 0 },
+  { id: 'PROD005_OLD', name: 'Cardboard Cartons (Large, Empty) (Old)', sku: 'PKG001_OLD', category: 'Packaging', unitType: 'PCS', stockLevel: 100, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
 ];
 
 
@@ -186,8 +188,8 @@ export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
   taxRate: 10, // 10%
-  vatRate: 5,   // 5%
-  excessTaxRate: 2 // 2%
+  vatRate: 15,   // 15% - updated to match spreadsheet
+  excessTaxRate: 0 // 0% - assuming excise tax is not global for now
 };
 
 export const MOCK_MANAGERS: Manager[] = [
