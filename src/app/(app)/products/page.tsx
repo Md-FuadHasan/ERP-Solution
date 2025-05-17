@@ -29,8 +29,8 @@ import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card'; // For view modal
-import { Separator } from '@/components/ui/separator'; // For view modal
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 export default function ProductsPage() {
   const {
@@ -148,16 +148,16 @@ export default function ProductsPage() {
           <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
             <div className="overflow-y-auto max-h-96">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                   <TableRow>
-                    <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto" /></TableHead>
+                    <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                    <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -200,7 +200,7 @@ export default function ProductsPage() {
           <div className="overflow-y-auto max-h-96">
             {filteredProducts.length > 0 ? (
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                   <TableRow>
                     <TableHead className="min-w-[100px]">Product ID</TableHead>
                     <TableHead className="min-w-[180px]">Name</TableHead>
