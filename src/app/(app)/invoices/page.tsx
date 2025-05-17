@@ -78,67 +78,72 @@ export default function InvoicesPage() {
 
   const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
 
-  // State for the View Invoice Modal
   const [invoiceToViewInModal, setInvoiceToViewInModal] = useState<Invoice | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [qrCodeValueForModal, setQrCodeValueForModal] = useState('');
 
+  // Effect to open form modal based on URL parameters
   useEffect(() => {
     const action = searchParams.get('action');
     const invoiceIdParam = searchParams.get('id');
     const customerIdParam = searchParams.get('customerId');
     const customerNameParam = searchParams.get('customerName');
 
-    let currentIntentKey: string | null = null;
-
+    let intentKeyFromUrl: string | null = null;
     if (action === 'new' && customerIdParam) {
-      currentIntentKey = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
+      intentKeyFromUrl = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
     } else if (action === 'edit' && invoiceIdParam) {
-      currentIntentKey = `action=edit&id=${invoiceIdParam}`;
+      intentKeyFromUrl = `action=edit&id=${invoiceIdParam}`;
     }
 
-    if (currentIntentKey) {
-      if (!isFormModalOpen && urlParamsProcessedIntentKey !== currentIntentKey) {
-        if (action === 'new' && customerIdParam) {
+    if (intentKeyFromUrl) {
+      // If there's an actionable intent in the URL
+      if (!isFormModalOpen && urlParamsProcessedIntentKey !== intentKeyFromUrl) {
+        // And modal is closed, and this intent hasn't been processed yet to open it
+        if (action === 'new') {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
-        } else if (action === 'edit' && invoiceIdParam) {
+        } else { // action === 'edit'
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-          setEditingInvoice(invoiceToEdit || null);
+          setEditingInvoice(invoiceToEdit || null); // If not found, modal will open with no initialData (effectively a new form)
           setCurrentPrefillValues(null);
         }
         setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(currentIntentKey);
+        setUrlParamsProcessedIntentKey(intentKeyFromUrl);
       }
     } else {
+      // No actionable intent in the URL
       if (urlParamsProcessedIntentKey) {
+        // If we previously processed an intent, but now the URL is clean, reset the key.
+        // This is crucial for the modal to stay closed after URL cleanup.
         setUrlParamsProcessedIntentKey(null);
       }
     }
-  }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey, invoices]);
+  }, [
+    searchParams,
+    isFormModalOpen,
+    urlParamsProcessedIntentKey,
+    invoices,
+    setCurrentPrefillValues,
+    setEditingInvoice,
+    setIsFormModalOpen,
+    setUrlParamsProcessedIntentKey,
+  ]);
+
 
   const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      // Immediately clear the processed intent key to prevent re-opening
-      setUrlParamsProcessedIntentKey(null); 
+      // The urlParamsProcessedIntentKey will be reset by the useEffect when it sees the cleaned URL.
 
       const currentAction = searchParams.get('action');
-      const currentCustomerId = searchParams.get('customerId');
       const currentInvoiceId = searchParams.get('id');
+      const currentCustomerId = searchParams.get('customerId');
 
-      let intentKeyToClear: string | null = null;
-      if (currentAction === 'new' && currentCustomerId) {
-        intentKeyToClear = `action=new&customerId=${currentCustomerId}&customerName=${searchParams.get('customerName') || ''}`;
-      } else if (currentAction === 'edit' && currentInvoiceId) {
-        intentKeyToClear = `action=edit&id=${currentInvoiceId}`;
-      }
-
-      // Clear URL params if they were responsible for opening the modal
-      // This ensures that if the user closes the modal, the URL is cleaned up
-      if (intentKeyToClear) {
+      // Only clear URL params if they were for an action that opens this modal.
+      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId)) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
@@ -147,7 +152,7 @@ export default function InvoicesPage() {
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
       }
     }
-  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues, setUrlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues]);
 
 
   const handleAddNewInvoice = useCallback(() => {
@@ -160,7 +165,7 @@ export default function InvoicesPage() {
 
     setEditingInvoice(null);
     setCurrentPrefillValues(null);
-    setUrlParamsProcessedIntentKey(null);
+    setUrlParamsProcessedIntentKey(null); // Clear intent key as this is a manual open
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
 
@@ -307,8 +312,8 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { // This else branch implies newRemainingBalance is 0 and newAmountPaid is also 0 or less than total (which shouldn't happen if logic above is correct)
-      finalStatus = 'Paid'; // Default to Paid if somehow conditions are met. Could be Pending if newRemainingBalance > 0 was missed.
+    } else { 
+      finalStatus = 'Paid';
     }
 
     const invoiceToSave: Invoice = {
@@ -505,7 +510,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && ( // Conditionally render form to reset state on open/close
+            {isFormModalOpen && ( 
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -525,28 +530,28 @@ export default function InvoicesPage() {
       <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => {
         setIsViewModalOpen(isOpen);
         if (!isOpen) {
-          setInvoiceToViewInModal(null); // Clear invoice data when modal closes
+          setInvoiceToViewInModal(null); 
           setQrCodeValueForModal('');
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          {isDataContextLoading && isViewModalOpen && ( // Show skeleton if data is loading AND modal is open
+          {isDataContextLoading && isViewModalOpen && ( 
             <div className="p-6 space-y-6 animate-pulse">
-              <Skeleton className="h-8 w-1/2 mb-2" /> {/* Title Skel */}
-              <Skeleton className="h-4 w-3/4 mb-6" /> {/* Desc Skel */}
+              <Skeleton className="h-8 w-1/2 mb-2" /> 
+              <Skeleton className="h-4 w-3/4 mb-6" /> 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <div><Skeleton className="h-24 w-full" /></div> {/* From/To Skel */}
+                <div><Skeleton className="h-24 w-full" /></div> 
                 <div><Skeleton className="h-24 w-full" /></div>
               </div>
-              <Skeleton className="h-16 w-full mb-8" /> {/* Details Row Skel */}
-              <Skeleton className="h-40 w-full mb-8" /> {/* Items Table Skel */}
+              <Skeleton className="h-16 w-full mb-8" /> 
+              <Skeleton className="h-40 w-full mb-8" /> 
               <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
-                <Skeleton className="h-32 w-32" /> {/* QR Skel */}
-                <Skeleton className="h-48 w-full md:max-w-sm" /> {/* Summary Skel */}
+                <Skeleton className="h-32 w-32" /> 
+                <Skeleton className="h-48 w-full md:max-w-sm" /> 
               </div>
             </div>
           )}
-          {!isDataContextLoading && invoiceToViewInModal && ( // Only render if data is loaded AND an invoice is selected
+          {!isDataContextLoading && invoiceToViewInModal && ( 
             <>
               <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
@@ -716,7 +721,6 @@ export default function InvoicesPage() {
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
                     setIsViewModalOpen(false);
-                    // Add a slight delay to ensure the view modal is fully closed before edit modal opens
                     setTimeout(() => {
                       handleEditInvoice(invoiceToViewInModal);
                     }, 100);
@@ -727,7 +731,7 @@ export default function InvoicesPage() {
               </DialogFooter>
             </>
           )}
-          {!invoiceToViewInModal && isViewModalOpen && ( // Fallback for safety
+          {!invoiceToViewInModal && isViewModalOpen && ( 
              <div className="p-6"><DialogTitle>Loading...</DialogTitle></div>
           )}
         </DialogContent>
