@@ -32,22 +32,33 @@ import { Badge, badgeVariants } from '@/components/ui/badge';
 import type { VariantProps } from 'class-variance-authority';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 export default function ProductsPage() {
   const {
     products,
     addProduct,
     updateProduct,
-    // deleteProduct, // We'll add delete functionality later
+    deleteProduct,
     isLoading,
-    companyProfile, // Get companyProfile for VAT rate
+    companyProfile,
   } = useData();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  // const [productToDelete, setProductToDelete] = useState<Product | null>(null); // For delete later
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const [productToView, setProductToView] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -78,20 +89,19 @@ export default function ProductsPage() {
     setIsViewModalOpen(true);
   };
 
-  // const handleDeleteProductConfirm = (product: Product) => {
-  //   setProductToDelete(product);
-  // };
+  const handleDeleteProductConfirm = (product: Product) => {
+    setProductToDelete(product);
+  };
 
-  // const confirmDelete = () => {
-  //   if (productToDelete) {
-  //     deleteProduct(productToDelete.id);
-  //     toast({ title: "Product Deleted", description: `${productToDelete.name} has been removed.` });
-  //     setProductToDelete(null);
-  //   }
-  // };
+  const confirmDelete = () => {
+    if (productToDelete) {
+      deleteProduct(productToDelete.id);
+      toast({ title: "Product Deleted", description: `${productToDelete.name} has been removed.` });
+      setProductToDelete(null);
+    }
+  };
 
   const handleSubmit = (data: ProductFormValues) => {
-    // Create base product data from form, excluding the ID from the form initially
     const productBaseData = {
       name: data.name,
       sku: data.sku,
@@ -107,57 +117,51 @@ export default function ProductsPage() {
 
     if (editingProduct) {
       const updatedProductData: Product = {
-        ...editingProduct, // Includes the original ID from the product being edited
-        ...productBaseData,   // Overwrites other fields with new values from the form
+        ...editingProduct,
+        ...productBaseData,
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
-    } else { // Adding new product
-      let finalProductId = data.id; // ID from the form field (optional)
-
+    } else {
+      let finalProductId = data.id;
       if (finalProductId && finalProductId.trim() !== '') {
-        // User provided an ID, check for uniqueness
         if (products.find(p => p.id === finalProductId)) {
           toast({
             title: "Error: Product ID exists",
             description: `Product ID ${finalProductId} is already in use. Please choose a different ID or leave blank.`,
             variant: "destructive",
           });
-          return; // Stop processing if ID exists
+          return;
         }
       } else {
-        // User did not provide an ID (or it was empty/whitespace), so generate one
         finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-        while (products.find(p => p.id === finalProductId)) { // Ensure uniqueness of generated ID
+        while (products.find(p => p.id === finalProductId)) {
           finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
         }
       }
-
       const newProduct: Product = {
         ...productBaseData,
-        id: finalProductId, // Assign the validated or generated ID
+        id: finalProductId,
       };
       addProduct(newProduct);
       toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
     }
     
     setIsFormModalOpen(false);
-    setEditingProduct(null); // Reset editing product state
+    setEditingProduct(null);
   };
 
 
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
       case 'Finished Goods':
+      case 'Beverages':
+      case 'Dairy':
         return 'categoryFinishedGoods';
       case 'Raw Materials':
         return 'categoryRawMaterials';
       case 'Packaging':
         return 'categoryPackaging';
-      case 'Beverages':
-        return 'categoryFinishedGoods'; // Assuming beverages are finished goods
-      case 'Dairy':
-        return 'categoryFinishedGoods'; // Assuming dairy products are finished goods
       default:
         return 'secondary';
     }
@@ -167,7 +171,7 @@ export default function ProductsPage() {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
     const vatMultiplier = 1 + (vatRatePercent / 100);
     let basePriceForCalc = product.salePrice;
-    let priceUnit = product.unitType;
+    let priceUnit: string = product.unitType;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       basePriceForCalc = product.salePrice * product.itemsPerPackagingUnit;
@@ -201,7 +205,7 @@ export default function ProductsPage() {
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96"> {/* Fixed height scrollable container */}
+          <div className="overflow-y-auto max-h-96">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -250,7 +254,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96"> {/* Fixed height scrollable container */}
+        <div className="overflow-y-auto max-h-96">
           {filteredProducts.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -296,9 +300,9 @@ export default function ProductsPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          {/* <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
                             <Trash2 className="h-4 w-4" />
-                          </Button> */}
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -413,7 +417,6 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* AlertDialog for delete confirmation - to be added later
       <AlertDialog open={!!productToDelete} onOpenChange={(isOpen) => !isOpen && setProductToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -431,9 +434,9 @@ export default function ProductsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      */}
     </div>
   );
 }
+    
 
     
