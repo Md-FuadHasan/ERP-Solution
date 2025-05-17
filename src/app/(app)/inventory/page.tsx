@@ -2,7 +2,7 @@
 'use client';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, PackageWarning, CalendarClock, Archive } from 'lucide-react';
+import { Coins, AlertTriangle, CalendarClock, Archive } from 'lucide-react'; // Changed PackageWarning to AlertTriangle
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -47,7 +47,7 @@ export default function InventoryPage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-            <PackageWarning className="h-5 w-5 text-destructive" />
+            <AlertTriangle className="h-5 w-5 text-destructive" /> {/* Changed PackageWarning to AlertTriangle */}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
