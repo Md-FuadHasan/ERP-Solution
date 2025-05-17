@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { DollarSign } from 'lucide-react';
+import * as React from 'react';
 
 const PRODUCT_CATEGORIES: ProductCategory[] = ['Finished Goods', 'Raw Materials', 'Packaging'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units'];
@@ -21,7 +22,7 @@ const productFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
   sku: z.string().min(1, "SKU is required.").max(50),
   category: z.enum(PRODUCT_CATEGORIES, { required_error: "Category is required."}),
-  unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Unit type is required."}), // This is the base unit for stock
+  unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Unit type is required."}),
   packagingUnit: z.string().max(50).optional().nullable(),
   itemsPerPackagingUnit: z.coerce.number().positive("Items per packaging unit must be a positive number.").optional().nullable(),
   stockLevel: z.coerce.number().min(0, "Stock level cannot be negative.").default(0),
@@ -184,12 +185,14 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
               <FormItem>
                 <FormLabel>Packaging Unit (Optional)</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
-                  <datalist id="packaging-suggestions">
-                    {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
-                        <option key={suggestion} value={suggestion} />
-                    ))}
-                  </datalist>
+                  <React.Fragment>
+                    <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
+                    <datalist id="packaging-suggestions">
+                      {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
+                          <option key={suggestion} value={suggestion} />
+                      ))}
+                    </datalist>
+                  </React.Fragment>
                 </FormControl>
                 <FormDescription>How this product is typically bundled for sale/shipping.</FormDescription>
                 <FormMessage />
@@ -296,4 +299,5 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
   );
 }
 
+    
     
