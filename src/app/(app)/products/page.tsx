@@ -49,7 +49,7 @@ export default function ProductsPage() {
     products,
     addProduct,
     updateProduct,
-    deleteProduct,
+    deleteProduct, // Added deleteProduct here
     isLoading,
     companyProfile,
   } = useData();
@@ -437,6 +437,8 @@ export default function ProductsPage() {
     </div>
   );
 }
+    
+
     
 
     
