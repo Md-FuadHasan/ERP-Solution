@@ -47,7 +47,6 @@ export interface PaymentRecord {
   onlineTransactionNumber?: string;
 }
 
-// Updated InvoiceStatus type and const
 export type InvoiceStatus = 'Pending' | 'Partially Paid' | 'Overdue' | 'Paid' | 'Cancelled';
 export const ALL_INVOICE_STATUSES: InvoiceStatus[] = ['Pending', 'Partially Paid', 'Overdue', 'Paid', 'Cancelled'];
 
@@ -91,7 +90,6 @@ export interface Manager {
   role: string; // e.g., 'Admin', 'Invoice Manager'
 }
 
-// For dashboard charts
 export interface ChartDataPoint {
   name: string;
   value: number;
@@ -113,7 +111,9 @@ export interface Product {
   name: string;
   sku: string;
   category: ProductCategory;
-  unitType: ProductUnitType;
+  unitType: ProductUnitType; // Base unit for stock keeping
+  packagingUnit?: string; // e.g., "Carton", "Box", "Pack" - How it's often sold in multiples
+  itemsPerPackagingUnit?: number; // How many base units are in one packagingUnit
   stockLevel: number;
   reorderPoint: number;
   costPrice: number;
@@ -121,12 +121,13 @@ export interface Product {
 }
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'PROD001', name: 'Vanilla Ice Cream 1L Tub', sku: 'VIC001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 150, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99 },
-  { id: 'PROD002', name: 'Orange Juice 500ml Bottle', sku: 'OJB002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 30, reorderPoint: 40, costPrice: 0.80, salePrice: 2.29 },
-  { id: 'PROD003', name: 'Whole Milk 1L Carton', sku: 'WMK003', category: 'Finished Goods', unitType: 'Cartons', stockLevel: 200, reorderPoint: 75, costPrice: 0.90, salePrice: 1.99 },
+  { id: 'PROD001', name: 'Vanilla Ice Cream 1L Tub', sku: 'VIC001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 150, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 6 },
+  { id: 'PROD002', name: 'Orange Juice 500ml Bottle', sku: 'OJB002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 30, reorderPoint: 40, costPrice: 0.80, salePrice: 2.29, packagingUnit: 'Pack', itemsPerPackagingUnit: 12 },
+  { id: 'PROD003', name: 'Whole Milk 1L Carton (Single)', sku: 'WMK003', category: 'Finished Goods', unitType: 'PCS', stockLevel: 200, reorderPoint: 75, costPrice: 0.90, salePrice: 1.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 9 },
   { id: 'PROD004', name: 'Raw Sugar 1kg Bag', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 500, reorderPoint: 100, costPrice: 1.20, salePrice: 0 }, // salePrice 0 for raw materials
-  { id: 'PROD005', name: 'Cardboard Cartons (Large)', sku: 'PKG001', category: 'Packaging', unitType: 'PCS', stockLevel: 1000, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
-  { id: 'PROD006', name: 'Chocolate Ice Cream 1L Tub', sku: 'CIC002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 45, reorderPoint: 50, costPrice: 2.75, salePrice: 6.49 },
+  { id: 'PROD005', name: 'Cardboard Cartons (Large, Empty)', sku: 'PKG001', category: 'Packaging', unitType: 'PCS', stockLevel: 1000, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
+  { id: 'PROD006', name: 'Chocolate Ice Cream 120ml Cup', sku: 'CIC002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 450, reorderPoint: 100, costPrice: 0.75, salePrice: 1.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 48 },
+  { id: 'PROD007', name: '10kg Vanilla Ice Cream Bucket', sku: 'VIB001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 20, reorderPoint: 5, costPrice: 20.00, salePrice: 45.00 }, // No explicit packagingUnit, sold as individual buckets
 ];
 
 

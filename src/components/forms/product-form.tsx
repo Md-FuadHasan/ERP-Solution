@@ -13,6 +13,7 @@ import { DollarSign } from 'lucide-react';
 
 const PRODUCT_CATEGORIES: ProductCategory[] = ['Finished Goods', 'Raw Materials', 'Packaging'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units'];
+const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray'];
 
 
 const productFormSchema = z.object({
@@ -20,11 +21,28 @@ const productFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
   sku: z.string().min(1, "SKU is required.").max(50),
   category: z.enum(PRODUCT_CATEGORIES, { required_error: "Category is required."}),
-  unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Unit type is required."}),
+  unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Unit type is required."}), // This is the base unit for stock
+  packagingUnit: z.string().max(50).optional().nullable(),
+  itemsPerPackagingUnit: z.coerce.number().positive("Items per packaging unit must be a positive number.").optional().nullable(),
   stockLevel: z.coerce.number().min(0, "Stock level cannot be negative.").default(0),
   reorderPoint: z.coerce.number().min(0, "Reorder point cannot be negative.").default(0),
   costPrice: z.coerce.number().min(0, "Cost price cannot be negative.").default(0),
   salePrice: z.coerce.number().min(0, "Sale price cannot be negative.").default(0),
+}).superRefine((data, ctx) => {
+  if (data.itemsPerPackagingUnit && !data.packagingUnit) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Packaging unit is required if specifying items per packaging unit.",
+      path: ["packagingUnit"],
+    });
+  }
+  if (data.packagingUnit && (!data.itemsPerPackagingUnit || data.itemsPerPackagingUnit <=0 )) {
+    ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Items per packaging unit is required and must be positive if packaging unit is specified.",
+        path: ["itemsPerPackagingUnit"],
+    })
+  }
 });
 
 export type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -43,18 +61,24 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       ...initialData,
       category: initialData.category || PRODUCT_CATEGORIES[0],
       unitType: initialData.unitType || PRODUCT_UNIT_TYPES[0],
+      packagingUnit: initialData.packagingUnit || '',
+      itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
     } : {
       id: '',
       name: '',
       sku: '',
       category: PRODUCT_CATEGORIES[0],
       unitType: PRODUCT_UNIT_TYPES[0],
+      packagingUnit: '',
+      itemsPerPackagingUnit: undefined,
       stockLevel: 0,
       reorderPoint: 0,
       costPrice: 0,
       salePrice: 0,
     },
   });
+
+  const watchedPackagingUnit = form.watch("packagingUnit");
 
   return (
     <Form {...form}>
@@ -66,10 +90,10 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             <FormItem>
               <FormLabel>Product ID</FormLabel>
               <FormControl>
-                <Input 
-                  placeholder="Leave blank for auto-generation" 
-                  {...field} 
-                  readOnly={!!initialData} 
+                <Input
+                  placeholder="Leave blank for auto-generation"
+                  {...field}
+                  readOnly={!!initialData}
                   disabled={!!initialData}
                 />
               </FormControl>
@@ -132,7 +156,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="unitType"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Unit Type</FormLabel>
+                <FormLabel>Base Unit Type (for Stock)</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -145,18 +169,64 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                     ))}
                   </SelectContent>
                 </Select>
+                <FormDescription>The smallest unit inventory is tracked in.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="packagingUnit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Packaging Unit (Optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
+                  <datalist id="packaging-suggestions">
+                    {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
+                        <option key={suggestion} value={suggestion} />
+                    ))}
+                  </datalist>
+                </FormControl>
+                <FormDescription>How this product is typically bundled for sale/shipping.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="itemsPerPackagingUnit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Items per Packaging Unit</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 48 (if Packaging Unit is set)"
+                    {...field}
+                    value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    disabled={!watchedPackagingUnit}
+                  />
+                </FormControl>
+                <FormDescription>Number of base units in one packaging unit.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
             name="stockLevel"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Current Stock Level</FormLabel>
+                <FormLabel>Current Stock Level (in Base Units)</FormLabel>
                 <FormControl>
                   <Input type="number" placeholder="e.g. 150" {...field} />
                 </FormControl>
@@ -169,7 +239,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="reorderPoint"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Reorder Point</FormLabel>
+                <FormLabel>Reorder Point (in Base Units)</FormLabel>
                 <FormControl>
                   <Input type="number" placeholder="e.g. 50" {...field} />
                 </FormControl>
@@ -184,7 +254,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="costPrice"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Cost Price</FormLabel>
+                <FormLabel>Cost Price (per Base Unit)</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -200,7 +270,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="salePrice"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Sale Price</FormLabel>
+                <FormLabel>Sale Price (per Base Unit)</FormLabel>
                 <FormControl>
                    <div className="relative">
                     <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -225,3 +295,5 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
     </Form>
   );
 }
+
+    

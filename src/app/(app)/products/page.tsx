@@ -90,12 +90,25 @@ export default function ProductsPage() {
   // };
 
   const handleSubmit = (data: ProductFormValues) => {
+    const productData: Product = {
+      id: data.id || '', // Will be overridden for new products
+      name: data.name,
+      sku: data.sku,
+      category: data.category,
+      unitType: data.unitType,
+      packagingUnit: data.packagingUnit || undefined,
+      itemsPerPackagingUnit: data.itemsPerPackagingUnit || undefined,
+      stockLevel: data.stockLevel,
+      reorderPoint: data.reorderPoint,
+      costPrice: data.costPrice,
+      salePrice: data.salePrice,
+    };
+
+
     if (editingProduct) {
       const updatedProductData: Product = {
         ...editingProduct,
-        ...data,
-        category: data.category as ProductCategory,
-        unitType: data.unitType as ProductUnitType,
+        ...productData,
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -118,10 +131,8 @@ export default function ProductsPage() {
       }
 
       const newProduct: Product = {
-        ...data,
+        ...productData,
         id: productId,
-        category: data.category as ProductCategory,
-        unitType: data.unitType as ProductUnitType,
       };
       addProduct(newProduct);
       toast({ title: "Product Added", description: `${data.name} has been successfully added.` });
@@ -139,7 +150,7 @@ export default function ProductsPage() {
       case 'Packaging':
         return 'categoryPackaging';
       default:
-        return 'secondary'; // Fallback
+        return 'secondary'; 
     }
   };
 
@@ -226,22 +237,22 @@ export default function ProductsPage() {
               <TableBody>
                 {filteredProducts.map((product, index) => (
                   <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="font-medium">{product.id}</TableCell>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell>{product.sku}</TableCell>
+                    <TableCell className="font-medium text-xs">{product.id}</TableCell>
+                    <TableCell className="text-xs">{product.name}</TableCell>
+                    <TableCell className="text-xs">{product.sku}</TableCell>
                     <TableCell>
                       <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                         {product.category}
                       </Badge>
                     </TableCell>
                     <TableCell className={cn(
-                      "text-right font-medium",
+                      "text-right font-medium text-xs",
                       product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
                     )}>
                       {product.stockLevel} {product.unitType}
                     </TableCell>
-                    <TableCell className="text-right">${product.costPrice.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${product.salePrice.toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-xs">${product.costPrice.toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-xs">${product.salePrice.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
                          <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
@@ -319,28 +330,34 @@ export default function ProductsPage() {
               </Card>
                <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
-                  <div><strong>Category:</strong></div> 
+                  <div><strong>Category:</strong></div>
                   <div>
                     <Badge variant={getCategoryBadgeVariant(productToView.category)} className="text-xs">
                       {productToView.category}
                     </Badge>
                   </div>
-                  <div><strong>Unit Type:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge></div>
+                  <div><strong>Base Unit:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge></div>
+                   {productToView.packagingUnit && (
+                    <>
+                      <div><strong>Packaging Unit:</strong></div><div><Badge variant="outline">{productToView.packagingUnit}</Badge></div>
+                      <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit}</div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
                <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Stock Level:</strong></div>
                   <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
-                    {productToView.stockLevel}
+                    {productToView.stockLevel} {productToView.unitType}
                   </div>
-                  <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint}</div>
+                  <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {productToView.unitType}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
-                  <div><strong>Cost Price:</strong></div><div>${productToView.costPrice.toFixed(2)}</div>
-                  <div><strong>Sale Price:</strong></div><div>${productToView.salePrice.toFixed(2)}</div>
+                  <div><strong>Cost Price:</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
+                  <div><strong>Sale Price:</strong></div><div>${productToView.salePrice.toFixed(2)} / {productToView.unitType}</div>
                 </CardContent>
               </Card>
             </div>
@@ -373,3 +390,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
