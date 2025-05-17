@@ -27,6 +27,11 @@ const badgeVariants = cva(
           "border-transparent bg-status-overdue text-status-overdue-foreground hover:bg-status-overdue/80",
         statusCancelled: 
           "border-transparent bg-status-cancelled text-status-cancelled-foreground hover:bg-status-cancelled/80",
+        // New variants for customer types
+        creditCustomer:
+          "border-transparent bg-primary/70 text-primary-foreground hover:bg-primary/60",
+        cashCustomer:
+          "border-transparent bg-status-paid/70 text-status-paid-foreground hover:bg-status-paid/60",
       },
     },
     defaultVariants: {

@@ -208,16 +208,17 @@ export default function CustomersPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96">
+        <div className="flex-grow min-h-0">
+          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
+            <div className="overflow-y-auto max-h-96 h-full">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
                   <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto bg-primary/50" /></TableHead>
@@ -233,11 +234,12 @@ export default function CustomersPage() {
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         </div>
       </div>
@@ -264,100 +266,105 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96">
-          {filteredCustomers.length > 0 ? (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px]">Cust. ID</TableHead>
-                  <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">CR No.</TableHead>
-                  <TableHead className="min-w-[120px]">VAT No.</TableHead>
-                  <TableHead className="min-w-[140px]">Phone</TableHead>
-                  <TableHead className="min-w-[80px]">Type</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
-                  <TableHead className="text-right min-w-[120px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer, index) => {
-                  const outstandingBalance = getOutstandingBalanceByCustomerId(customer.id);
-                  return (
-                    <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium">{customer.id}</TableCell>
-                      <TableCell
-                        className="cursor-pointer hover:text-primary hover:underline"
-                        onClick={() => handleViewCustomerDetails(customer)}
-                      >
-                        {customer.name}
-                      </TableCell>
-                      <TableCell>{customer.registrationNumber || '-'}</TableCell>
-                      <TableCell>{customer.vatNumber || '-'}</TableCell>
-                      <TableCell>{customer.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant={customer.customerType === 'Credit' ? 'secondary' : 'outline'} className="text-xs">
-                          {customer.customerType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-semibold",
-                        outstandingBalance > 0 ? "text-destructive" : "text-foreground"
-                      )}>
-                        ${outstandingBalance.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary" title="View Customer">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteCustomerConfirm(customer);
-                                }}>
-                                  <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete customer "{customerToDelete?.name}" and all associated invoices.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="h-full flex items-center justify-center p-8">
-              <DataPlaceholder
-                title="No Customers Found"
-                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
-                action={!searchTerm ? (
-                  <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-                  </Button>
-                ) : undefined}
-              />
-            </div>
-          )}
+      <div className="flex-grow min-h-0">
+        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
+          <div className="overflow-y-auto max-h-96">
+            {filteredCustomers.length > 0 ? (
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                  <TableRow>
+                    <TableHead className="min-w-[100px]">Cust. ID</TableHead>
+                    <TableHead className="min-w-[180px]">Name</TableHead>
+                    <TableHead className="min-w-[120px]">CR No.</TableHead>
+                    <TableHead className="min-w-[120px]">VAT No.</TableHead>
+                    <TableHead className="min-w-[140px]">Phone</TableHead>
+                    <TableHead className="min-w-[80px]">Type</TableHead>
+                    <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer, index) => {
+                    const outstandingBalance = getOutstandingBalanceByCustomerId(customer.id);
+                    return (
+                      <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                        <TableCell className="font-medium">{customer.id}</TableCell>
+                        <TableCell
+                          className="cursor-pointer hover:text-primary hover:underline"
+                          onClick={() => handleViewCustomerDetails(customer)}
+                        >
+                          {customer.name}
+                        </TableCell>
+                        <TableCell>{customer.registrationNumber || '-'}</TableCell>
+                        <TableCell>{customer.vatNumber || '-'}</TableCell>
+                        <TableCell>{customer.phone}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={customer.customerType === 'Credit' ? 'creditCustomer' : 'cashCustomer'}
+                            className="text-xs"
+                          >
+                            {customer.customerType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-right font-semibold",
+                          outstandingBalance > 0 ? "text-destructive" : "text-foreground"
+                        )}>
+                          ${outstandingBalance.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary" title="View Customer">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomerConfirm(customer);
+                                  }}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete customer "{customerToDelete?.name}" and all associated invoices.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="h-full flex items-center justify-center p-8">
+                <DataPlaceholder
+                  title="No Customers Found"
+                  message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
+                  action={!searchTerm ? (
+                    <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+                    </Button>
+                  ) : undefined}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
