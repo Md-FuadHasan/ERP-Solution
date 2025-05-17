@@ -62,7 +62,7 @@ export interface Invoice {
   taxAmount: number;
   vatAmount: number;
   totalAmount: number;
-  status: InvoiceStatus; 
+  status: InvoiceStatus;
   paymentProcessingStatus: PaymentProcessingStatus;
   amountPaid: number;
   remainingBalance: number;
@@ -105,6 +105,30 @@ export interface ReportSummary {
   actionableInsights?: string;
 }
 
+export type ProductCategory = 'Finished Goods' | 'Raw Materials' | 'Packaging';
+export type ProductUnitType = 'PCS' | 'Cartons' | 'Liters' | 'Kgs' | 'Units';
+
+export interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  category: ProductCategory;
+  unitType: ProductUnitType;
+  stockLevel: number;
+  reorderPoint: number;
+  costPrice: number;
+  salePrice: number;
+}
+
+export const MOCK_PRODUCTS: Product[] = [
+  { id: 'PROD001', name: 'Vanilla Ice Cream 1L Tub', sku: 'VIC001', category: 'Finished Goods', unitType: 'PCS', stockLevel: 150, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99 },
+  { id: 'PROD002', name: 'Orange Juice 500ml Bottle', sku: 'OJB002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 30, reorderPoint: 40, costPrice: 0.80, salePrice: 2.29 },
+  { id: 'PROD003', name: 'Whole Milk 1L Carton', sku: 'WMK003', category: 'Finished Goods', unitType: 'Cartons', stockLevel: 200, reorderPoint: 75, costPrice: 0.90, salePrice: 1.99 },
+  { id: 'PROD004', name: 'Raw Sugar 1kg Bag', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 500, reorderPoint: 100, costPrice: 1.20, salePrice: 0 }, // salePrice 0 for raw materials
+  { id: 'PROD005', name: 'Cardboard Cartons (Large)', sku: 'PKG001', category: 'Packaging', unitType: 'PCS', stockLevel: 1000, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
+  { id: 'PROD006', name: 'Chocolate Ice Cream 1L Tub', sku: 'CIC002', category: 'Finished Goods', unitType: 'PCS', stockLevel: 45, reorderPoint: 50, costPrice: 2.75, salePrice: 6.49 },
+];
+
 
 export const MOCK_CUSTOMERS: Customer[] = [
   { id: 'CUST001', name: 'Alpha Solutions', email: 'contact@alpha.com', phone: '555-0101', billingAddress: '123 Tech Road, Silicon Valley, CA', createdAt: new Date().toISOString(), customerType: 'Credit', creditLimit: 5000, invoiceAgingDays: 30, registrationNumber: 'CRN12345ALPHA', vatNumber: 'VATALPHA001' },
@@ -113,43 +137,43 @@ export const MOCK_CUSTOMERS: Customer[] = [
 ];
 
 export const MOCK_INVOICES: Invoice[] = [
-  { 
-    id: 'INV-2024001', customerId: 'CUST001', customerName: 'Alpha Solutions', 
-    issueDate: '2024-07-01', dueDate: '2024-07-31', 
+  {
+    id: 'INV-2024001', customerId: 'CUST001', customerName: 'Alpha Solutions',
+    issueDate: '2024-07-01', dueDate: '2024-07-31',
     items: [{ id: 'item1', description: 'Web Development', quantity: 1, unitPrice: 1200, total: 1200, unitType: 'PCS' }],
-    subtotal: 1200, taxAmount: 120, vatAmount: 60, totalAmount: 1380, status: 'Paid', 
+    subtotal: 1200, taxAmount: 120, vatAmount: 60, totalAmount: 1380, status: 'Paid',
     paymentProcessingStatus: 'Fully Paid', amountPaid: 1380, remainingBalance: 0,
-    paymentHistory: [{ 
+    paymentHistory: [{
       id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1380, status: 'Full Payment',
       paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
     }],
     paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
   },
-  { 
+  {
     id: 'INV-2024002', customerId: 'CUST002', customerName: 'Beta Innovations',
-    issueDate: '2024-07-05', dueDate: '2024-08-04', 
+    issueDate: '2024-07-05', dueDate: '2024-08-04',
     items: [{ id: 'item1', description: 'Cloud Consulting', quantity: 10, unitPrice: 300, total: 3000, unitType: 'Cartons' }],
-    subtotal: 3000, taxAmount: 300, vatAmount: 150, totalAmount: 3450, status: 'Partially Paid', 
+    subtotal: 3000, taxAmount: 300, vatAmount: 150, totalAmount: 3450, status: 'Partially Paid',
     paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2450,
-    paymentHistory: [{ 
+    paymentHistory: [{
       id: 'PAY-HIST-002', paymentDate: '2024-07-20T14:30:00Z', amount: 1000, status: 'Partial Payment',
       paymentMethod: 'Cash', cashVoucherNumber: 'CVN00123'
     }],
     paymentMethod: 'Cash', cashVoucherNumber: 'CVN00123'
   },
-  { 
+  {
     id: 'INV-2024003', customerId: 'CUST001', customerName: 'Alpha Solutions',
-    issueDate: '2024-06-10', dueDate: '2024-07-10', 
+    issueDate: '2024-06-10', dueDate: '2024-07-10',
     items: [{ id: 'item1', description: 'Graphic Design', quantity: 5, unitPrice: 150, total: 750, unitType: 'PCS' }],
-    subtotal: 750, taxAmount: 75, vatAmount: 37.5, totalAmount: 862.5, status: 'Overdue', 
+    subtotal: 750, taxAmount: 75, vatAmount: 37.5, totalAmount: 862.5, status: 'Overdue',
     paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 862.5,
     paymentHistory: []
   },
-   { 
+   {
     id: 'INV-2024004', customerId: 'CUST003', customerName: 'Gamma Services',
-    issueDate: '2024-07-15', dueDate: '2024-08-15', 
+    issueDate: '2024-07-15', dueDate: '2024-08-15',
     items: [{ id: 'item1', description: 'SEO Optimization', quantity: 1, unitPrice: 500, total: 500, unitType: 'PCS' }],
-    subtotal: 500, taxAmount: 50, vatAmount: 25, totalAmount: 575, status: 'Pending', 
+    subtotal: 500, taxAmount: 50, vatAmount: 25, totalAmount: 575, status: 'Pending',
     paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 575,
     paymentHistory: []
   },
@@ -169,3 +193,5 @@ export const MOCK_MANAGERS: Manager[] = [
   { id: 'MGR001', name: 'Alice Wonderland', email: 'alice@invoiceflow.com', role: 'Administrator' },
   { id: 'MGR002', name: 'Bob The Builder', email: 'bob@invoiceflow.com', role: 'Invoice Manager' },
 ];
+
+    

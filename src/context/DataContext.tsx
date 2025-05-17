@@ -2,12 +2,13 @@
 'use client';
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Customer, Invoice, CompanyProfile, PaymentRecord } from '@/types';
-import { MOCK_CUSTOMERS, MOCK_INVOICES, MOCK_COMPANY_PROFILE } from '@/types';
+import type { Customer, Invoice, CompanyProfile, PaymentRecord, Product } from '@/types';
+import { MOCK_CUSTOMERS, MOCK_INVOICES, MOCK_COMPANY_PROFILE, MOCK_PRODUCTS } from '@/types';
 
 interface DataContextType {
   customers: Customer[];
   invoices: Invoice[];
+  products: Product[];
   companyProfile: CompanyProfile;
   isLoading: boolean;
   addCustomer: (customer: Customer) => void;
@@ -21,6 +22,7 @@ interface DataContextType {
   getCustomerById: (customerId: string) => Customer | undefined;
   getInvoiceById: (invoiceId: string) => Invoice | undefined;
   getOutstandingBalanceByCustomerId: (customerId: string) => number;
+  // Add product-related functions if needed for full CRUD later
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -29,11 +31,13 @@ const LOCAL_STORAGE_KEYS = {
   CUSTOMERS: 'invoiceflow_customers',
   INVOICES: 'invoiceflow_invoices',
   COMPANY_PROFILE: 'invoiceflow_company_profile',
+  PRODUCTS: 'invoiceflow_products',
 };
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(MOCK_COMPANY_PROFILE);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,27 +49,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedCustomers) {
         setCustomers(JSON.parse(storedCustomers));
       } else {
-        setCustomers(MOCK_CUSTOMERS); 
+        setCustomers(MOCK_CUSTOMERS);
       }
 
       const storedInvoices = localStorage.getItem(LOCAL_STORAGE_KEYS.INVOICES);
       if (storedInvoices) {
         setInvoices(JSON.parse(storedInvoices));
       } else {
-        setInvoices(MOCK_INVOICES); 
+        setInvoices(MOCK_INVOICES);
       }
 
       const storedProfile = localStorage.getItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE);
       if (storedProfile) {
         setCompanyProfile(JSON.parse(storedProfile));
       } else {
-        setCompanyProfile(MOCK_COMPANY_PROFILE); 
+        setCompanyProfile(MOCK_COMPANY_PROFILE);
       }
+
+      const storedProducts = localStorage.getItem(LOCAL_STORAGE_KEYS.PRODUCTS);
+      if (storedProducts) {
+        setProducts(JSON.parse(storedProducts));
+      } else {
+        setProducts(MOCK_PRODUCTS);
+      }
+
     } catch (error) {
       console.error("DataContext: Failed to load data from localStorage, using mocks:", error);
       setCustomers(MOCK_CUSTOMERS);
       setInvoices(MOCK_INVOICES);
       setCompanyProfile(MOCK_COMPANY_PROFILE);
+      setProducts(MOCK_PRODUCTS);
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +116,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   }, [companyProfile, isLoading]);
+
+  // Save products to localStorage whenever they change
+  useEffect(() => {
+    if (!isLoading) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+      } catch (error) {
+        console.error("Failed to save products to localStorage:", error);
+      }
+    }
+  }, [products, isLoading]);
 
 
   const addCustomer = useCallback((customer: Customer) => {
@@ -161,6 +185,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         customers,
         invoices,
+        products,
         companyProfile,
         isLoading,
         addCustomer,
@@ -188,3 +213,5 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
+    
