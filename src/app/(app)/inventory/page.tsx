@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link'; // Added import for Link
 
 export default function InventoryPage() {
   const { products, isLoading } = useData();
@@ -80,8 +81,10 @@ export default function InventoryPage() {
         title="Inventory Management"
         description="Overview of your product stock levels, item status, and inventory value."
         actions={
-          <Button className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/products">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+            </Link>
           </Button>
         }
       />
@@ -158,5 +161,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    
