@@ -206,19 +206,17 @@ export default function CustomersPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
-                  {[...Array(6)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[200px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="text-right min-w-[120px]"><Skeleton className="h-8 w-24 ml-auto" /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-2/4" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                  </TableRow>
+                  <TableRow key={i}><TableCell><Skeleton className="h-5 w-3/4" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-3/4" /></TableCell><TableCell><Skeleton className="h-5 w-2/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell></TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -259,7 +257,7 @@ export default function CustomersPage() {
                   <TableHead className="min-w-[200px]">Email</TableHead>
                   <TableHead className="min-w-[140px]">Phone</TableHead>
                   <TableHead className="min-w-[120px]">Type</TableHead>
-                  <TableHead className="text-right min-w-[120px]">Actions</TableHead> {/* Increased min-width for 3 icons */}
+                  <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
