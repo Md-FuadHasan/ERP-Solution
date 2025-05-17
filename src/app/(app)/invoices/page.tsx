@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, Coins, Scale, Briefcase, Clock3, CircleDollarSign, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,12 +19,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
 import { SearchInput } from '@/components/common/search-input';
 import { StatusFilterDropdown, type InvoiceFilterStatus } from '@/components/common/status-filter-dropdown';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Invoice, Customer, PaymentRecord, InvoiceStatus, PaymentProcessingStatus, PaymentMethod } from '@/types';
+import type { Invoice, Customer, PaymentRecord, InvoiceStatus, PaymentProcessingStatus, PaymentMethod, CompanyProfile, InvoiceItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+
 
 export default function InvoicesPage() {
   const {
@@ -50,7 +56,7 @@ export default function InvoicesPage() {
     addInvoice,
     updateInvoice,
     deleteInvoice,
-    isLoading,
+    isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
   } = useData();
@@ -72,11 +78,15 @@ export default function InvoicesPage() {
 
   const [urlParamsProcessedIntentKey, setUrlParamsProcessedIntentKey] = useState<string | null>(null);
 
+  // State for the View Invoice Modal
+  const [invoiceToViewInModal, setInvoiceToViewInModal] = useState<Invoice | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [qrCodeValueForModal, setQrCodeValueForModal] = useState('');
 
   useEffect(() => {
     const action = searchParams.get('action');
-    const invoiceIdParam = searchParams.get('id'); // For editing
-    const customerIdParam = searchParams.get('customerId'); // For new from customer
+    const invoiceIdParam = searchParams.get('id');
+    const customerIdParam = searchParams.get('customerId');
     const customerNameParam = searchParams.get('customerName');
 
     let currentIntentKey: string | null = null;
@@ -101,14 +111,13 @@ export default function InvoicesPage() {
         setUrlParamsProcessedIntentKey(currentIntentKey);
       }
     } else {
-        if (urlParamsProcessedIntentKey) {
-            setUrlParamsProcessedIntentKey(null);
-        }
+      if (urlParamsProcessedIntentKey) {
+        setUrlParamsProcessedIntentKey(null);
+      }
     }
   }, [searchParams, isFormModalOpen, editingInvoice, urlParamsProcessedIntentKey, invoices]);
 
-
- const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
@@ -132,14 +141,12 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        setUrlParamsProcessedIntentKey(null); // Explicitly reset the key after clearing params
+        setUrlParamsProcessedIntentKey(null);
       } else if (!intentKeyToClear && urlParamsProcessedIntentKey) {
-         // If no specific intent to clear but a key was processed, reset it
         setUrlParamsProcessedIntentKey(null);
       }
     }
-  }, [searchParams, router, pathname, urlParamsProcessedIntentKey ]);
-
+  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -154,7 +161,6 @@ export default function InvoicesPage() {
     setUrlParamsProcessedIntentKey(null);
     setIsFormModalOpen(true);
   }, [searchParams, router, pathname]);
-
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(invoice => {
@@ -183,19 +189,26 @@ export default function InvoicesPage() {
   }, [invoices, searchTerm, statusFilter, getCustomerById]);
 
   const handleEditInvoice = useCallback((invoice: Invoice) => {
-    // Navigate to edit by setting URL params, which useEffect will pick up
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'edit');
     newSearchParams.set('id', invoice.id);
-    newSearchParams.delete('customerId'); // Clear any new invoice params
+    newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    // useEffect will handle setting editingInvoice and opening the modal
   }, [searchParams, router, pathname]);
 
-  const handleViewInvoice = useCallback((invoice: Invoice) => {
-    router.push(`/invoices/${invoice.id}/view`);
-  }, [router]);
+  const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
+    setInvoiceToViewInModal(invoice);
+    setIsViewModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (invoiceToViewInModal) {
+      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${invoiceToViewInModal.totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
+    } else {
+      setQrCodeValueForModal('');
+    }
+  }, [invoiceToViewInModal]);
 
   const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
@@ -292,9 +305,8 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else {
-      finalStatus = 'Paid'; // Fallback if newRemainingBalance is 0 but somehow didn't hit first 'Paid'
+      finalStatus = 'Paid';
     }
-
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -325,11 +337,14 @@ export default function InvoicesPage() {
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
     handleFormModalOpenChange(false);
-
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
-  if (isLoading) {
+  const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
+  const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
+  const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
+
+  if (isDataContextLoading) {
     return (
       <div className="flex flex-col h-full">
         <PageHeader
@@ -343,7 +358,7 @@ export default function InvoicesPage() {
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
           <div className="overflow-y-auto max-h-96">
-             <Table>
+            <Table>
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
                   <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
@@ -358,7 +373,16 @@ export default function InvoicesPage() {
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
-                  <TableRow key={i}><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell><TableCell><Skeleton className="h-5 w-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -384,88 +408,91 @@ export default function InvoicesPage() {
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96">
-          {filteredInvoices.length > 0 ? (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
-                <TableRow>
-                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                  <TableHead className="min-w-[180px]">Customer</TableHead>
-                  <TableHead className="min-w-[100px]">Due Date</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
-                  <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[120px] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                    <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(invoice)} className="hover:text-primary" title="View Invoice">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete invoice "{invoiceToDelete?.id}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
+      <div className="flex-grow min-h-0">
+        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
+          <div className="overflow-y-auto max-h-96">
+            {filteredInvoices.length > 0 ? (
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-muted">
+                  <TableRow>
+                    <TableHead className="min-w-[120px]">Invoice ID</TableHead>
+                    <TableHead className="min-w-[180px]">Customer</TableHead>
+                    <TableHead className="min-w-[100px]">Due Date</TableHead>
+                    <TableHead className="min-w-[100px] text-right">Amount</TableHead>
+                    <TableHead className="min-w-[100px] text-right">Paid</TableHead>
+                    <TableHead className="min-w-[100px] text-right">Balance</TableHead>
+                    <TableHead className="min-w-[120px]">Status</TableHead>
+                    <TableHead className="min-w-[120px] text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-             <div className="h-full flex items-center justify-center p-8">
-              <DataPlaceholder
-                title="No Invoices Found"
-                message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
-                icon={PlusCircle}
-                action={!searchTerm && statusFilter === 'all' ? (
-                  <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
-                  </Button>
-                ) : undefined}
-              />
-            </div>
-          )}
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices.map((invoice) => (
+                    <TableRow key={invoice.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{invoice.id}</TableCell>
+                      <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                      <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                          {invoice.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete invoice "{invoiceToDelete?.id}".
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="h-full flex items-center justify-center p-8">
+                <DataPlaceholder
+                  title="No Invoices Found"
+                  message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
+                  icon={PlusCircle}
+                  action={!searchTerm && statusFilter === 'all' ? (
+                    <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
+                    </Button>
+                  ) : undefined}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Edit/Create Form Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={handleFormModalOpenChange}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -488,6 +515,218 @@ export default function InvoicesPage() {
               />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Invoice Details Modal */}
+      <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => {
+        setIsViewModalOpen(isOpen);
+        if (!isOpen) {
+          setInvoiceToViewInModal(null);
+          setQrCodeValueForModal('');
+        }
+      }}>
+        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
+          {isDataContextLoading && isViewModalOpen && (
+            <div className="p-6 space-y-6 animate-pulse">
+              <Skeleton className="h-8 w-1/2 mb-2" /> {/* Title Skel */}
+              <Skeleton className="h-4 w-3/4 mb-6" /> {/* Desc Skel */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div><Skeleton className="h-24 w-full" /></div> {/* From/To Skel */}
+                <div><Skeleton className="h-24 w-full" /></div>
+              </div>
+              <Skeleton className="h-16 w-full mb-8" /> {/* Details Row Skel */}
+              <Skeleton className="h-40 w-full mb-8" /> {/* Items Table Skel */}
+              <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
+                <Skeleton className="h-32 w-32" /> {/* QR Skel */}
+                <Skeleton className="h-48 w-full md:max-w-sm" /> {/* Summary Skel */}
+              </div>
+            </div>
+          )}
+          {!isDataContextLoading && invoiceToViewInModal && (
+            <>
+              <DialogHeader className="p-6 pb-4 border-b">
+                <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
+                <DialogDescription>
+                  Viewing details for invoice #{invoiceToViewInModal.id}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-grow overflow-y-auto p-6 space-y-6">
+                {!customerForModal && <div className="text-destructive p-4">Error: Customer not found for this invoice.</div>}
+                {customerForModal && (
+                  <>
+                    <header className="mb-8">
+                      <div className="flex justify-between items-center mb-2">
+                        <h1 className="text-3xl md:text-4xl font-bold text-foreground">INVOICE</h1>
+                        <Badge variant={getStatusBadgeVariant(invoiceToViewInModal.status)} className="text-base px-4 py-1.5">
+                          {invoiceToViewInModal.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Invoice # {invoiceToViewInModal.id}</p>
+                    </header>
+
+                    <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
+                      <div>
+                        <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">From</h3>
+                        <p className="font-semibold text-lg text-foreground">{companyProfile.name}</p>
+                        <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{companyProfile.address}</p>
+                        <p className="text-muted-foreground">{companyProfile.email} | {companyProfile.phone}</p>
+                      </div>
+                      <div className="md:text-left">
+                        <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">Bill To</h3>
+                        <p className="font-semibold text-lg text-foreground">{customerForModal.name}</p>
+                        <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{customerForModal.billingAddress}</p>
+                        <p className="text-muted-foreground">{customerForModal.email} | {customerForModal.phone}</p>
+                      </div>
+                    </section>
+                    
+                    <Separator className="my-8" />
+
+                    <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
+                      <div className="grid grid-cols-3 gap-x-4 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
+                          <p className="font-medium text-base text-foreground">{format(new Date(invoiceToViewInModal.issueDate), 'MMMM d, yyyy')}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Due Date</p>
+                          <p className="font-medium text-base text-foreground">{format(new Date(invoiceToViewInModal.dueDate), 'MMMM d, yyyy')}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Invoice Total</p>
+                          <p className="font-bold text-base text-primary">${invoiceToViewInModal.totalAmount.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="mb-8">
+                      <h2 className="text-xl font-semibold mb-4 text-foreground">Order Summary</h2>
+                      <div className="overflow-x-auto rounded-lg border">
+                        <Table>
+                          <TableHeader className="bg-muted/50">
+                            <TableRow>
+                              <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
+                              <TableHead className="text-center w-24">Qty</TableHead>
+                              <TableHead className="text-right w-32">Unit Price</TableHead>
+                              <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {invoiceToViewInModal.items.map((item: InvoiceItem, index: number) => (
+                              <TableRow key={item.id || index} className="even:bg-muted/20">
+                                <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
+                                <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
+                                <TableCell className="text-right text-muted-foreground py-3">${item.unitPrice.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${item.total.toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </section>
+
+                    <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
+                      <div className="w-full md:w-auto flex flex-col items-center md:items-start print:hidden">
+                        {qrCodeValueForModal && (
+                          <>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center"><QrCode className="w-4 h-4 mr-2"/>Scan for Quick Details</h3>
+                            <div className="p-3 border rounded-lg inline-block bg-white shadow-sm">
+                              <QRCodeCanvas value={qrCodeValueForModal} size={128} bgColor="#ffffff" fgColor="#000000" level="Q" />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Subtotal:</span>
+                          <span className="font-medium text-foreground">${invoiceToViewInModal.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
+                          <span className="font-medium text-foreground">${invoiceToViewInModal.taxAmount.toFixed(2)}</span>
+                        </div>
+                        {invoiceToViewInModal.vatAmount > 0 && (
+                          <div className="flex justify-between">
+                              <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
+                              <span className="font-medium text-foreground">${invoiceToViewInModal.vatAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator className="my-3 !bg-border" />
+                        <div className="flex justify-between text-base font-semibold">
+                          <span className="text-foreground">Total Amount:</span>
+                          <span className="text-foreground">${invoiceToViewInModal.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between mt-2 text-green-600 dark:text-green-400">
+                          <span className="font-medium">Amount Paid:</span>
+                          <span className="font-semibold">${invoiceToViewInModal.amountPaid.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold">
+                          <span className="text-foreground">Balance Due:</span>
+                          <span className={`${invoiceToViewInModal.remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
+                            ${invoiceToViewInModal.remainingBalance.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+
+                    {invoiceToViewInModal.paymentHistory && invoiceToViewInModal.paymentHistory.length > 0 && (
+                      <section className="mb-8 print:hidden">
+                        <Separator className="my-8" />
+                        <h3 className="text-lg font-semibold text-foreground mb-3">Payment History</h3>
+                          <div className="rounded-md border">
+                          {invoiceToViewInModal.paymentHistory.map((record, index) => (
+                              <div key={record.id} className={`p-3 ${index < invoiceToViewInModal.paymentHistory!.length -1 ? 'border-b' : ''} ${index % 2 === 0 ? 'bg-muted/20' : 'bg-card'}`}>
+                                  <div className="flex justify-between items-center text-sm">
+                                      <div>
+                                          <p className="font-medium">{record.status} {record.paymentMethod ? `(${record.paymentMethod})` : ''}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                              {format(new Date(record.paymentDate), "MMM d, yyyy 'at' hh:mm a")}
+                                          </p>
+                                      </div>
+                                      <p className="font-semibold text-primary">${record.amount.toFixed(2)}</p>
+                                  </div>
+                                  {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
+                                      <p className="text-xs text-muted-foreground mt-1">Voucher: {record.cashVoucherNumber}</p>
+                                  )}
+                                  {record.paymentMethod === 'Bank Transfer' && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                      {record.bankName && <p>Bank: {record.bankName}</p>}
+                                      {record.bankAccountNumber && <p>Acc: {record.bankAccountNumber}</p>}
+                                      {record.onlineTransactionNumber && <p>TxN: {record.onlineTransactionNumber}</p>}
+                                      </div>
+                                  )}
+                              </div>
+                          ))}
+                          </div>
+                      </section>
+                    )}
+                  </>
+                )}
+              </div>
+              <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button variant="outline" onClick={() => { /* Placeholder for Print */ toast({ title: "Print Action", description: "Print functionality would be implemented here." }) }} className="w-full sm:w-auto">
+                  <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                </Button>
+                <Button variant="outline" onClick={() => { /* Placeholder for Download */ toast({ title: "Download PDF Action", description: "PDF download functionality would be implemented here." }) }} className="w-full sm:w-auto">
+                  <Download className="mr-2 h-4 w-4" /> Download PDF
+                </Button>
+                <Button onClick={() => {
+                  if (invoiceToViewInModal) {
+                    setIsViewModalOpen(false);
+                    // Add a slight delay to ensure the view modal is fully closed before edit modal opens
+                    setTimeout(() => {
+                      handleEditInvoice(invoiceToViewInModal);
+                    }, 100);
+                  }
+                }} className="w-full sm:w-auto">
+                  <Edit className="mr-2 h-4 w-4" /> Edit Invoice
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+          {!invoiceToViewInModal && isViewModalOpen && ( // Fallback for safety
+             <div className="p-6"><DialogTitle>Loading...</DialogTitle></div>
+          )}
         </DialogContent>
       </Dialog>
 
