@@ -23,7 +23,7 @@ import {
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Product, ProductCategory } from '@/types';
+import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,7 +106,7 @@ export default function ProductsPage() {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
 
-    const productDataForStorage: Omit<Product, 'id'> = { // Omit id as it's handled below
+    const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = { 
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -116,7 +116,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice, // Always store the base unit price
+      salePrice: actualBaseUnitPrice, 
     };
 
     if (editingProduct) {
@@ -146,6 +146,7 @@ export default function ProductsPage() {
       const newProduct: Product = {
         ...productDataForStorage,
         id: finalProductId,
+        createdAt: new Date().toISOString(),
       };
       addProduct(newProduct);
       toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
@@ -158,10 +159,10 @@ export default function ProductsPage() {
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
       case 'Frozen': return 'categoryFrozen';
-      case 'Raw Materials': return 'categoryRawMaterials';
-      case 'Packaging': return 'categoryPackaging';
       case 'Dairy': return 'categoryDairy';
       case 'Beverages': return 'categoryBeverages';
+      case 'Raw Materials': return 'categoryRawMaterials';
+      case 'Packaging': return 'categoryPackaging';
       default: return 'secondary';
     }
   };
@@ -197,16 +198,21 @@ export default function ProductsPage() {
           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px]">Product ID</TableHead>
-                  <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">SKU</TableHead>
-                  <TableHead className="min-w-[120px]">Category</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price / PCS (VAT incl.)</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price / Ctn (VAT incl.)</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
-                </TableRow>
+                 <TableRow>
+                    <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
+                    <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
+                    <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                    <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
+                    <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
+                    <TableHead className="min-w-[280px] text-center" colSpan={2}>
+                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                    </TableHead>
+                    <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="min-w-[140px] text-right">PCS Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right">Carton Price</TableHead>
+                  </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
@@ -234,16 +240,21 @@ export default function ProductsPage() {
            <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px]">Product ID</TableHead>
-                  <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">SKU</TableHead>
-                  <TableHead className="min-w-[120px]">Category</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price / PCS (VAT incl.)</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price / Ctn (VAT incl.)</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
-                </TableRow>
+                  <TableRow>
+                    <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
+                    <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
+                    <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                    <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
+                    <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
+                    <TableHead className="min-w-[280px] text-center" colSpan={2}>
+                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                    </TableHead>
+                    <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="min-w-[140px] text-right">PCS Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right">Carton Price</TableHead>
+                  </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
@@ -252,8 +263,7 @@ export default function ProductsPage() {
                   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
                     const cartonPriceExVat = product.salePrice * product.itemsPerPackagingUnit;
                     const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat);
-                    const packagingUnitDisplay = product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : product.packagingUnit;
-                    cartonPriceWithVatText = `$${cartonPriceInclVat.toFixed(2)} / ${packagingUnitDisplay}`;
+                    cartonPriceWithVatText = `$${cartonPriceInclVat.toFixed(2)}`;
                   }
 
                   return (
@@ -272,7 +282,7 @@ export default function ProductsPage() {
                       )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                      <TableCell className="text-right text-xs">${pcsPriceWithVat.toFixed(2)} / {product.unitType}</TableCell>
+                      <TableCell className="text-right text-xs">${pcsPriceWithVat.toFixed(2)}</TableCell>
                       <TableCell className="text-right text-xs">{cartonPriceWithVatText}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
@@ -386,10 +396,10 @@ export default function ProductsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
-                  <div><strong>Cost Price (per Base Unit):</strong> ${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
+                  {/* Removed cost price display */}
                   <Separator />
                   <div>
-                    <strong>Sale Price / {productToView.unitType} (VAT incl.):</strong>
+                    <strong>Sale Price / PCS (VAT incl.):</strong>
                     &nbsp;${calculatePriceWithVAT(productToView.salePrice).toFixed(2)}
                   </div>
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
