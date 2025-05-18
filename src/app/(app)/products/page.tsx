@@ -117,7 +117,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice,
+      salePrice: actualBaseUnitPrice, // Always store the base unit price
     };
 
     if (editingProduct) {
@@ -211,7 +211,7 @@ export default function ProductsPage() {
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="h-full overflow-auto"> {/* This div handles scroll for skeleton */}
+          <div className="flex-grow overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -248,7 +248,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="h-full overflow-auto"> {/* This div handles scroll for actual table */}
+           <div className="flex-grow overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -314,7 +314,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state, ensures it uses the flex-grow space */}
+          <div className="h-full flex items-center justify-center p-8"> 
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}

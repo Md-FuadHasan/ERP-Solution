@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,31 +95,49 @@ export default function InvoicesPage() {
       currentUrlIntentKey = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
     } else if (action === 'edit' && invoiceIdParam) {
       currentUrlIntentKey = `action=edit&id=${invoiceIdParam}`;
+    } else if (action === 'view' && invoiceIdParam) {
+      currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
 
-    if (currentUrlIntentKey) {
-      if (!isFormModalOpen && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
-        if (action === 'new') {
+
+    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+      if (action === 'new') {
+        if (!isFormModalOpen && !editingInvoice) {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
-        } else { 
+          setIsFormModalOpen(true);
+          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+        }
+      } else if (action === 'edit') {
+        if (!isFormModalOpen && (!editingInvoice || editingInvoice.id !== invoiceIdParam)) {
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
           setEditingInvoice(invoiceToEdit || null);
           setCurrentPrefillValues(null);
+          setIsFormModalOpen(true);
+          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
         }
-        setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+      } else if (action === 'view') {
+         if (!isViewModalOpen && (!invoiceToViewInModal || invoiceToViewInModal.id !== invoiceIdParam)) {
+           const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
+           setInvoiceToViewInModal(invoiceToView || null);
+           setIsViewModalOpen(true);
+           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+         }
       }
-    } else {
-       if (urlParamsProcessedIntentKey && !isFormModalOpen) { 
-         setUrlParamsProcessedIntentKey(null);
-       }
+    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
+        // URL params have been cleared, reset intent key if modal isn't open
+        if (!isFormModalOpen && !isViewModalOpen) {
+             setUrlParamsProcessedIntentKey(null);
+        }
     }
   }, [
     searchParams,
     isFormModalOpen,
+    isViewModalOpen,
     urlParamsProcessedIntentKey,
     invoices,
+    editingInvoice,
+    invoiceToViewInModal
   ]);
 
 
@@ -131,18 +148,32 @@ export default function InvoicesPage() {
       setCurrentPrefillValues(null);
       
       const currentAction = searchParams.get('action');
-      const currentInvoiceId = searchParams.get('id');
-      const currentCustomerId = searchParams.get('customerId');
-
-      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId)) {
+      if (currentAction === 'edit' || currentAction === 'new') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        // Crucially, ensure the intent key is reset here ONLY if the modal was closed by this handler
+        // and not by some other effect. The useEffect listening to searchParams will finalize resetting if needed.
+        setUrlParamsProcessedIntentKey(null); 
       }
-      setUrlParamsProcessedIntentKey(null);
+    }
+  }, [searchParams, router, pathname]);
+  
+  const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
+    setIsViewModalOpen(isOpen);
+    if (!isOpen) {
+        setInvoiceToViewInModal(null);
+        const currentAction = searchParams.get('action');
+        if (currentAction === 'view') {
+            const newSearchParams = new URLSearchParams(searchParams.toString());
+            newSearchParams.delete('action');
+            newSearchParams.delete('id');
+            router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+            setUrlParamsProcessedIntentKey(null);
+        }
     }
   }, [searchParams, router, pathname]);
 
@@ -190,9 +221,11 @@ export default function InvoicesPage() {
   }, [searchParams, router, pathname]);
 
   const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
-    setInvoiceToViewInModal(invoice);
-    setIsViewModalOpen(true);
-  }, []);
+    const newSearchParams = new URLSearchParams(searchParams.toString());
+    newSearchParams.set('action', 'view');
+    newSearchParams.set('id', invoice.id);
+    router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+  }, [searchParams, router, pathname]);
 
   useEffect(() => {
     if (invoiceToViewInModal) {
@@ -202,7 +235,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -348,18 +381,18 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
-          <div className="flex-grow overflow-y-auto"> {/* This div scrolls its content (skeleton table) */}
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+          <div className="overflow-y-auto max-h-96"> 
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                  <TableHead className="min-w-[150px] text-right"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
+                  <TableHead className="min-w-[180px]">Customer</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
+                  <TableHead className="min-w-[120px]">Status</TableHead>
+                  <TableHead className="min-w-[150px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -371,7 +404,13 @@ export default function InvoicesPage() {
                     <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -398,11 +437,11 @@ export default function InvoicesPage() {
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
 
-       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
+       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {filteredInvoices.length > 0 ? (
-          <div className="flex-grow overflow-y-auto"> {/* This div scrolls its content (actual table) */}
+          <div className="overflow-y-auto max-h-96"> 
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
                   <TableHead className="min-w-[120px]">Invoice ID</TableHead>
                   <TableHead className="min-w-[180px]">Customer</TableHead>
@@ -434,7 +473,7 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -445,7 +484,7 @@ export default function InvoicesPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state */}
+          <div className="h-full flex items-center justify-center p-8"> 
             <DataPlaceholder
               title="No Invoices Found"
               message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
@@ -487,13 +526,7 @@ export default function InvoicesPage() {
       </Dialog>
 
       {/* View Invoice Details Modal */}
-      <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => {
-        setIsViewModalOpen(isOpen);
-        if (!isOpen) {
-          setInvoiceToViewInModal(null);
-          setQrCodeValueForModal('');
-        }
-      }}>
+      <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="p-6 space-y-6 animate-pulse">
@@ -680,10 +713,10 @@ export default function InvoicesPage() {
                 </Button>
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
-                    setIsViewModalOpen(false);
+                    handleViewModalOpenChange(false); // Close view modal
                     setTimeout(() => { 
-                      handleEditInvoice(invoiceToViewInModal);
-                    }, 100);
+                      handleEditInvoice(invoiceToViewInModal); // Open edit modal
+                    }, 100); // Slight delay
                   }
                 }} className="w-full sm:w-auto">
                   <Edit className="mr-2 h-4 w-4" /> Edit Invoice
@@ -691,7 +724,7 @@ export default function InvoicesPage() {
               </DialogFooter>
             </>
           )}
-          {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( // Only show if modal is open, no invoice selected, and not loading
+          {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( 
              <div className="p-6"><DialogTitle>Error</DialogTitle><DialogDescription>No invoice selected or invoice data is unavailable.</DialogDescription></div>
           )}
         </DialogContent>

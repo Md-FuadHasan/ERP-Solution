@@ -182,9 +182,28 @@ export default function DashboardPage() {
             <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0 sm:p-2">
-            <div className="space-y-2 p-4">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
+            <Table>
+              <TableHeader className="bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                  <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto bg-primary/50" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(3)].map((_, i) => (
+                  <TableRow key={`toi-skel-${i}`}>
+                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -193,9 +212,28 @@ export default function DashboardPage() {
                 <CardTitle>Recent Invoices</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0 sm:p-2">
-                <div className="space-y-2 p-4">
-                {[...Array(3)].map((_, i) => <Skeleton key={`ri-skel-${i}`} className="h-10 w-full" />)}
-                </div>
+                <Table>
+                  <TableHeader className="bg-primary text-primary-foreground">
+                    <TableRow>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                      <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto bg-primary/50" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                  {[...Array(3)].map((_, i) => (
+                    <TableRow key={`ri-skel-${i}`}>
+                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                    </TableRow>
+                  ))}
+                  </TableBody>
+                </Table>
             </CardContent>
           </Card>
           <div className="space-y-6">
@@ -233,7 +271,7 @@ export default function DashboardPage() {
         title="Dashboard" 
         description={`Overview of your invoicing activities. ${lastRefreshed ? `Last updated: ${format(lastRefreshed, "PPpp")}` : '' }`}
       />
-      <div className="flex-grow overflow-y-auto pb-6 pr-1"> {/* Added pr-1 for scrollbar spacing */}
+      <div className="flex-grow overflow-y-auto pb-6 pr-1"> 
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -384,7 +422,7 @@ export default function DashboardPage() {
           <CardContent className="overflow-x-auto p-0 sm:p-2">
             {outstandingInvoicesData.length > 0 ? (
               <Table className="min-w-[600px]">
-                <TableHeader>
+                <TableHeader className="bg-primary text-primary-foreground">
                   <TableRow>
                     <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
                     <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
@@ -419,9 +457,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* New Sections: Recent Invoices, Quick Actions, Top Customers */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {/* Recent Invoices Card */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Invoices</CardTitle>
@@ -432,7 +468,7 @@ export default function DashboardPage() {
             <CardContent className="overflow-x-auto p-0 sm:p-2">
               {recentInvoices.length > 0 ? (
                 <Table className="min-w-[600px]">
-                  <TableHeader>
+                  <TableHeader className="bg-primary text-primary-foreground">
                     <TableRow>
                       <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
                       <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
@@ -461,9 +497,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions & Top Customers Side Column */}
           <div className="space-y-6">
-            {/* Quick Actions Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
@@ -475,7 +509,7 @@ export default function DashboardPage() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full justify-start">
-                  <Link href="/customers"> {/* This will navigate to customers page, user can click Add Customer there */}
+                  <Link href="/customers"> 
                     <UserPlus className="mr-2 h-4 w-4 text-primary" /> Add New Customer
                   </Link>
                 </Button>
@@ -487,7 +521,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Top Customers Card */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Top Customers</CardTitle>
@@ -508,7 +541,7 @@ export default function DashboardPage() {
                         {customer.invoiceCount} invoices &bull; ${customer.totalInvoiced.toFixed(2)}
                       </p>
                     </div>
-                    <Link href={`/customers?action=view&id=${customer.id}`} passHref> {/* Placeholder, actual view might differ */}
+                    <Link href={`/customers?action=view&id=${customer.id}`} passHref> 
                       <Button variant="ghost" size="sm" className="px-2">
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -525,4 +558,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

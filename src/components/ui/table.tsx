@@ -6,17 +6,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, children, ...props }, ref) => {
-  return (
-    <div className="relative w-full rounded-lg overflow-hidden"> {/* Added overflow-hidden here */}
-      <table
-        ref={ref}
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      >
-        {children}
-      </table>
-    </div>
-  );
+  return <div className="relative w-full overflow-hidden rounded-lg"><table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props}>{children}</table></div>;
 });
 Table.displayName = "Table";
 
@@ -56,7 +46,7 @@ const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => {
-  return <th ref={ref} className={cn("h-10 px-2 py-2 text-left align-middle font-bold text-foreground sm:px-4 [&:has([role=checkbox])]:pr-0", className)} {...props}>{children}</th>;
+  return <th ref={ref} className={cn("h-10 px-2 py-2 text-left align-middle font-bold sm:px-4 [&:has([role=checkbox])]:pr-0", className)} {...props}>{children}</th>;
 });
 TableHead.displayName = "TableHead";
 

@@ -35,7 +35,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -208,19 +207,19 @@ export default function CustomersPage() {
         <div className="mb-6">
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
-          <div className="overflow-y-auto max-h-96"> {/* This div scrolls its content (skeleton table) */}
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+          <div className="overflow-y-auto max-h-96"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-28 ml-auto bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,9 +263,9 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {filteredCustomers.length > 0 ? (
-          <div className="overflow-y-auto max-h-96"> {/* This div scrolls its content (actual table) */}
+          <div className="overflow-y-auto max-h-96"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -332,7 +331,7 @@ export default function CustomersPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state */}
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Customers Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
@@ -387,7 +386,13 @@ export default function CustomersPage() {
                   <div><strong>VAT No:</strong> {selectedCustomerForDetails.vatNumber || 'N/A'}</div>
                   <div className="flex items-center">
                     <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <strong>Type:</strong>&nbsp;{selectedCustomerForDetails.customerType} Customer
+                    <strong>Type:</strong>&nbsp;
+                     <Badge
+                        variant={selectedCustomerForDetails.customerType === 'Credit' ? 'creditCustomer' : 'cashCustomer'}
+                        className="text-xs ml-1"
+                      >
+                        {selectedCustomerForDetails.customerType}
+                      </Badge>
                   </div>
                   {selectedCustomerForDetails.customerType === 'Credit' && (
                     <>
@@ -449,9 +454,9 @@ export default function CustomersPage() {
                 <h4 className="text-lg font-semibold mb-2 text-foreground">Invoice History</h4>
                 {customerInvoices.length > 0 ? (
                   <div className="rounded-md border bg-muted overflow-hidden max-h-60">
-                    <div className="overflow-y-auto h-full"> {/* Added h-full to make inner div scrollable */}
+                    <div className="overflow-y-auto h-full"> 
                       <Table>
-                        <TableHeader className="sticky top-0 bg-muted z-10">
+                        <TableHeader className="sticky top-0 bg-primary text-primary-foreground z-10">
                           <TableRow>
                             <TableHead className="min-w-[120px]">Invoice ID</TableHead>
                             <TableHead className="min-w-[120px]">Issue Date</TableHead>
