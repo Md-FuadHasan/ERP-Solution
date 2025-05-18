@@ -68,7 +68,7 @@ export default function ProductsPage() {
     return products.filter(
       (product) =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
         product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -80,14 +80,10 @@ export default function ProductsPage() {
   };
 
   const handleEditProduct = (product: Product) => {
-    // When editing, we want the form to show the price the user *thinks* in.
-    // If it's a packaged item, the stored salePrice is per base unit.
-    // We need to convert it back to package price for the form.
     let formSalePrice = product.salePrice;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       formSalePrice = product.salePrice * product.itemsPerPackagingUnit;
     }
-
     setEditingProduct({ ...product, salePrice: formSalePrice });
     setIsFormModalOpen(true);
   };
@@ -111,14 +107,11 @@ export default function ProductsPage() {
 
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
-
-    // If packaging is defined, the entered salePrice is for the package.
-    // Convert it to base unit price for storage.
     if (data.packagingUnit && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
 
-    const productDataForStorage: Omit<Product, 'id'> = {
+    const productDataForStorage: Omit<Product, 'id' | 'sku'> & { sku: string } = {
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -128,21 +121,20 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice, // Store the calculated base unit price
+      salePrice: actualBaseUnitPrice,
     };
 
     if (editingProduct) {
       const updatedProductData: Product = {
         ...editingProduct,
         ...productDataForStorage,
-        salePrice: actualBaseUnitPrice, // Ensure updatedProductData also gets the base unit price
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
     } else {
       let finalProductId = data.id;
       if (finalProductId && finalProductId.trim() !== '') {
-        if (products.find(p => p.id === finalProductId)) {
+        if (products.find(p => p.id === finalProductId && (!editingProduct || editingProduct.id !== finalProductId))) {
           toast({
             title: "Error: Product ID exists",
             description: `Product ID ${finalProductId} is already in use. Please choose a different ID or leave blank.`,
@@ -168,21 +160,14 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
 
-
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
-      case 'Frozen':
-        return 'categoryFrozen';
-      case 'Raw Materials':
-        return 'categoryRawMaterials';
-      case 'Packaging':
-        return 'categoryPackaging';
-      case 'Dairy':
-        return 'categoryDairy';
-      case 'Beverages':
-        return 'categoryBeverages';
-      default:
-        return 'secondary';
+      case 'Frozen': return 'categoryFrozen';
+      case 'Raw Materials': return 'categoryRawMaterials';
+      case 'Packaging': return 'categoryPackaging';
+      case 'Dairy': return 'categoryDairy';
+      case 'Beverages': return 'categoryBeverages';
+      default: return 'secondary';
     }
   };
 
@@ -190,12 +175,11 @@ export default function ProductsPage() {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
     const vatMultiplier = 1 + (vatRatePercent / 100);
     
-    // product.salePrice is always the base unit price
     let priceForCalc = product.salePrice;
     let priceUnit: string = product.unitType;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; // Calculate package price from base unit price
+      priceForCalc = product.salePrice * product.itemsPerPackagingUnit;
       priceUnit = product.packagingUnit;
     }
     
@@ -208,51 +192,6 @@ export default function ProductsPage() {
       unit: priceUnit
     };
   };
-
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-full">
-        <PageHeader
-          title="Products"
-          description="Manage your product catalog."
-          actions={
-            <Button onClick={handleAddProduct} disabled className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-            </Button>
-          }
-        />
-        <div className="mb-6">
-          <Skeleton className="h-10 w-full md:w-80" />
-        </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-          <div className="overflow-y-auto max-h-96">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[140px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(7)].map((_, i) => (
-                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">
@@ -274,9 +213,33 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="overflow-y-auto max-h-96">
-          {filteredProducts.length > 0 ? (
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden flex flex-col">
+        {isLoading ? (
+          <div className="flex-grow overflow-y-auto p-4">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[140px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
+                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(10)].map((_, i) => ( // Increased skeleton rows
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                    {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="flex-grow overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -340,23 +303,22 @@ export default function ProductsPage() {
                 })}
               </TableBody>
             </Table>
-          ) : (
-            <div className="h-full flex items-center justify-center p-8">
-              <DataPlaceholder
-                title="No Products Found"
-                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-                action={!searchTerm ? (
-                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                  </Button>
-                ) : undefined}
-              />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex-grow flex items-center justify-center p-8">
+            <DataPlaceholder
+              title="No Products Found"
+              message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
+              action={!searchTerm ? (
+                <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                </Button>
+              ) : undefined}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Add/Edit Product Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
           setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingProduct(null);
@@ -378,7 +340,6 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* View Product Details Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="w-[90vw] max-w-lg">
           <DialogHeader>
@@ -430,7 +391,7 @@ export default function ProductsPage() {
                   <div><strong>Cost Price (per Base Unit):</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
                   {(() => {
                     const { priceWithVat, unit } = calculateDisplaySalePrice(productToView);
-                    const baseUnitPriceExVat = productToView.salePrice; // This is already base unit price
+                    const baseUnitPriceExVat = productToView.salePrice; 
                     
                     return (
                       <>
@@ -472,6 +433,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-    
-    
-
