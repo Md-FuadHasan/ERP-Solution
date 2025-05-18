@@ -169,11 +169,11 @@ export default function ProductsPage() {
     }
   };
 
-  const calculatePriceWithVAT = (price: number, vatRatePercent: number) => {
+  const calculatePriceWithVAT = (price: number) => {
+    const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
     const vatMultiplier = 1 + (vatRatePercent / 100);
     return price * vatMultiplier;
   };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -197,7 +197,7 @@ export default function ProductsPage() {
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="h-full overflow-y-auto">
+           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -206,14 +206,14 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                  <TableHead className="min-w-[280px] text-center" colSpan={2}>
-                    Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                  <TableHead className="text-center" colSpan={2}>
+                     Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">CTN Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal">CTN Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,30 +242,29 @@ export default function ProductsPage() {
           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                  <TableHead className="min-w-[280px] text-center" colSpan={2}>
+                  <TableHead className="text-center" colSpan={2}>
                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">CTN Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal">CTN Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const vatRate = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
-                  const pcsPriceWithVat = calculatePriceWithVAT(product.salePrice, vatRate);
+                  const pcsPriceWithVat = calculatePriceWithVAT(product.salePrice);
                   let cartonPriceWithVatText = '-';
                   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
                     const cartonPriceExVat = product.salePrice * product.itemsPerPackagingUnit;
-                    const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat, vatRate);
+                    const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat);
                     cartonPriceWithVatText = `$${cartonPriceInclVat.toFixed(2)}`;
                   }
 
@@ -399,16 +398,14 @@ export default function ProductsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
-                  <div><strong>Cost Price / {productToView.unitType}:</strong> ${productToView.costPrice.toFixed(2)}</div>
-                  <Separator />
                   <div>
                     <strong>Sale Price / PCS (VAT incl.):</strong>
-                    &nbsp;${calculatePriceWithVAT(productToView.salePrice, typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0)).toFixed(2)}
+                    &nbsp;${calculatePriceWithVAT(productToView.salePrice).toFixed(2)}
                   </div>
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
                     <div>
                       <strong>Sale Price / {productToView.packagingUnit.toLowerCase() === 'carton' || productToView.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : productToView.packagingUnit} (VAT incl.):</strong>
-                      &nbsp;${calculatePriceWithVAT(productToView.salePrice * productToView.itemsPerPackagingUnit, typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0)).toFixed(2)}
+                      &nbsp;${calculatePriceWithVAT(productToView.salePrice * productToView.itemsPerPackagingUnit).toFixed(2)}
                     </div>
                   )}
                   <div className="text-muted-foreground text-xs italic pt-1">
