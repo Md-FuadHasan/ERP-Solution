@@ -101,7 +101,7 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
-    let formSalePrice = data.salePrice; // This is pre-excise, pre-VAT
+    let formSalePrice = data.salePrice;
     let formExciseTaxValue = data.exciseTax ?? 0;
 
     let storedBaseUnitPrice: number;
@@ -241,11 +241,11 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
-                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="text-center" colSpan={2}>
                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
+                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
                 <TableRow>
@@ -261,9 +261,9 @@ export default function ProductsPage() {
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
                         <Skeleton className="h-8 w-8" />
@@ -283,11 +283,11 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
-                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="text-center" colSpan={2}>
                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
+                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
                 <TableRow>
@@ -311,15 +311,15 @@ export default function ProductsPage() {
                           {product.category}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">{exciseTaxDisplay}</TableCell>
+                      <TableCell className="text-right">${pcsPriceWithVat.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{ctnPriceWithVat !== null ? `$${ctnPriceWithVat.toFixed(2)}` : '-'}</TableCell>
                       <TableCell className={cn(
                         "text-right font-medium",
                         product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
                       )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                       <TableCell className="text-right">{exciseTaxDisplay}</TableCell>
-                      <TableCell className="text-right">${pcsPriceWithVat.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{ctnPriceWithVat !== null ? `$${ctnPriceWithVat.toFixed(2)}` : '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
