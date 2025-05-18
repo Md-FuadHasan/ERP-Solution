@@ -22,7 +22,9 @@ interface DataContextType {
   getCustomerById: (customerId: string) => Customer | undefined;
   getInvoiceById: (invoiceId: string) => Invoice | undefined;
   getOutstandingBalanceByCustomerId: (customerId: string) => number;
-  // Add product-related functions if needed for full CRUD later
+  addProduct: (product: Product) => void;
+  updateProduct: (product: Product) => void;
+  deleteProduct: (productId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -162,6 +164,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCompanyProfile((prev) => ({ ...prev, ...profileUpdate }));
   }, []);
 
+  const addProduct = useCallback((product: Product) => {
+    setProducts((prev) => [product, ...prev]);
+  }, []);
+
+  const updateProduct = useCallback((updatedProduct: Product) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    );
+  }, []);
+
+  const deleteProduct = useCallback((productId: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+  }, []);
+
   const getInvoicesByCustomerId = useCallback((customerId: string) => {
     return invoices.filter(invoice => invoice.customerId === customerId);
   }, [invoices]);
@@ -199,6 +215,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getCustomerById,
         getInvoiceById,
         getOutstandingBalanceByCustomerId,
+        addProduct,
+        updateProduct,
+        deleteProduct,
       }}
     >
       {children}
@@ -213,5 +232,7 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
+    
 
     
