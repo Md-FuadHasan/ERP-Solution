@@ -101,12 +101,14 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
-    let formSalePrice = data.salePrice;
+    let formSalePrice = data.salePrice; // This is pre-excise, pre-VAT
     let formExciseTaxValue = data.exciseTax ?? 0;
 
     let storedBaseUnitPrice: number;
     let storedBaseUnitExciseTax: number | undefined = undefined;
 
+    // If packaging unit is defined, user input for salePrice and exciseTax is for the whole package.
+    // We need to convert them to per-base-unit for storage.
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       storedBaseUnitPrice = formSalePrice / data.itemsPerPackagingUnit;
       if (formExciseTaxValue > 0) {
@@ -129,8 +131,8 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseUnitPrice,
-      exciseTax: storedBaseUnitExciseTax,
+      salePrice: storedBaseUnitPrice, // Store base unit sale price (pre-excise, pre-VAT)
+      exciseTax: storedBaseUnitExciseTax, // Store base unit excise tax
     };
 
     if (editingProduct) {
@@ -180,13 +182,13 @@ export default function ProductsPage() {
       default: return 'secondary';
     }
   };
-
+  
   // Helper functions for new price breakdown
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       return {
         price: product.salePrice * product.itemsPerPackagingUnit,
-        unit: product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'CTN' : product.packagingUnit,
+        unit: product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : product.packagingUnit,
       };
     }
     return { price: product.salePrice, unit: product.unitType };
@@ -204,7 +206,7 @@ export default function ProductsPage() {
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       return {
         exciseAmount: baseExcise * product.itemsPerPackagingUnit,
-        unit: product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'CTN' : product.packagingUnit,
+        unit: product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : product.packagingUnit,
       };
     }
     return { exciseAmount: baseExcise, unit: product.unitType };
@@ -212,6 +214,8 @@ export default function ProductsPage() {
 
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
+    // product.salePrice is base unit price (pre-excise, pre-VAT)
+    // product.exciseTax is base unit excise tax
     const basePriceWithExcise = product.salePrice + (product.exciseTax || 0);
     const vatAmount = basePriceWithExcise * (vatRatePercent / 100);
     return basePriceWithExcise + vatAmount;
@@ -224,6 +228,7 @@ export default function ProductsPage() {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
     const cartonBasePrice = product.salePrice * product.itemsPerPackagingUnit;
     const cartonExciseTax = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
+    
     const cartonPriceWithExcise = cartonBasePrice + cartonExciseTax;
     const vatAmount = cartonPriceWithExcise * (vatRatePercent / 100);
     return cartonPriceWithExcise + vatAmount;
@@ -258,7 +263,7 @@ export default function ProductsPage() {
                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
-                  <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                  <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
@@ -301,10 +306,10 @@ export default function ProductsPage() {
           ) : filteredProducts.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
-                  <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                  <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
@@ -377,18 +382,18 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           ) : (
-          <div className="h-full flex items-center justify-center p-8">
-            <DataPlaceholder
-              title="No Products Found"
-              message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-              action={!searchTerm ? (
-                <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                </Button>
-              ) : undefined}
-            />
-          </div>
-        )}
+            <div className="flex-grow flex items-center justify-center p-8">
+              <DataPlaceholder
+                title="No Products Found"
+                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
+                action={!searchTerm ? (
+                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -464,7 +469,7 @@ export default function ProductsPage() {
                     <div>
                         <strong>Base Price:</strong>
                         &nbsp;${getDisplayBasePriceInfo(productToView).price.toFixed(2)} / {getDisplayBasePriceInfo(productToView).unit}
-                        <span className="text-muted-foreground text-xs italic"> (pre-tax, pre-excise)</span>
+                        <span className="text-muted-foreground text-xs italic"> (pre-VAT, pre-excise)</span>
                     </div>
                     <Separator className="my-1" />
                      <div>
@@ -483,7 +488,7 @@ export default function ProductsPage() {
                     </div>
                     {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
                         <div className="font-semibold">
-                        <strong>Final Sale Price / {getDisplayBasePriceInfo(productToView).unit} (VAT & Excise Incl.):</strong>
+                        <strong>Final Sale Price / {getDisplayExciseTaxInfo(productToView).unit} (VAT & Excise Incl.):</strong>
                         &nbsp;${calculateFinalCtnPriceWithVatAndExcise(productToView, companyProfile)?.toFixed(2) || 'N/A'}
                         </div>
                     )}
