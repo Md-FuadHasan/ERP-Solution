@@ -209,9 +209,11 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
+      {/* Table Section Container - This div grows and has min-h-0 */}
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="flex-grow overflow-y-auto"> 
+           // Scrollable Viewport for Skeleton
+          <div className="h-full overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -248,7 +250,8 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="flex-grow overflow-y-auto"> 
+          // Scrollable Viewport for Actual Table
+          <div className="h-full overflow-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -314,7 +317,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8">
+          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state */}
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -442,3 +445,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+
