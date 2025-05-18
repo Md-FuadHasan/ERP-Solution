@@ -81,6 +81,7 @@ export default function ProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     let formSalePrice = product.salePrice;
+    // If product is sold by package, the form should show package price
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       formSalePrice = product.salePrice * product.itemsPerPackagingUnit;
     }
@@ -107,6 +108,7 @@ export default function ProductsPage() {
 
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
+    // If user entered price for package, convert to base unit price for storage
     if (data.packagingUnit && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
@@ -121,7 +123,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice,
+      salePrice: actualBaseUnitPrice, // Store base unit price
     };
 
     if (editingProduct) {
@@ -175,11 +177,11 @@ export default function ProductsPage() {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
     const vatMultiplier = 1 + (vatRatePercent / 100);
     
-    let priceForCalc = product.salePrice;
+    let priceForCalc = product.salePrice; // This is base unit price
     let priceUnit: string = product.unitType;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      priceForCalc = product.salePrice * product.itemsPerPackagingUnit;
+      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; // Calculate package price from base unit price
       priceUnit = product.packagingUnit;
     }
     
@@ -213,9 +215,9 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card overflow-hidden flex flex-col">
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col overflow-hidden">
         {isLoading ? (
-          <div className="flex-grow overflow-y-auto p-4">
+          <div className="flex-grow overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -230,7 +232,7 @@ export default function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...Array(10)].map((_, i) => ( // Increased skeleton rows
+                {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
                   </TableRow>
@@ -305,7 +307,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="flex-grow flex items-center justify-center p-8">
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -433,3 +435,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+

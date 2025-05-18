@@ -121,15 +121,15 @@ export interface Product {
 }
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: '330012', name: 'Cooking Cream 1080ml (Carton of 12 PCS)', sku: '330012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150, reorderPoint: 30, costPrice: 8.50, salePrice: 11.08 },
-  { id: '25027-ORG', name: 'Al Rabie Juice 125ml - Orange (Carton of 18 PCS)', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200, reorderPoint: 50, costPrice: 0.45, salePrice: 0.69 },
-  { id: '80012-VAN', name: 'Ice Cream Tub 1.8L - Vanilla (Carton of 6 PCS)', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80, reorderPoint: 20, costPrice: 9.00, salePrice: 12.00 },
-  { id: '59012', name: 'UHT Milk 200ml (Carton of 18 PCS)', sku: '59012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 300, reorderPoint: 60, costPrice: 0.60, salePrice: 0.85 },
-  { id: '330011', name: 'Whipping Cream 1080ml (Carton of 12 PCS)', sku: '330011', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120, reorderPoint: 25, costPrice: 6.00, salePrice: 7.83 },
-  { id: '12024-VS', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry (Carton of 24 PCS)', sku: '12024-VS', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240, reorderPoint: 48, costPrice: 0.70, salePrice: 1.04 },
+  { id: 'PROD3645224', name: 'Ice Cream Cone (vanilla ) -120ml', sku: 'ICCV12030', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 50, reorderPoint: 10, costPrice: 0.00, salePrice: 1.00 },
+  { id: 'PROD5216208', name: 'LABAN - 900 ML', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 100, reorderPoint: 20, costPrice: 0.00, salePrice: 7.50 },
+  { id: '330012', name: 'Cooking Cream 1080ml (1x12 PCS)', sku: '330012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150, reorderPoint: 30, costPrice: 8.50, salePrice: 10.50 },
+  { id: '25027-ORG', name: 'Al Rabie Juice 125ml - Orange (1x18 PCS)', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200, reorderPoint: 50, costPrice: 0.45, salePrice: 0.60 },
+  { id: '80012-VAN', name: 'Ice Cream Tub 1.8L - Vanilla (1x6 PCS)', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80, reorderPoint: 20, costPrice: 9.00, salePrice: 11.50 },
+  { id: '59012', name: 'UHT Milk 200ml (1x18 PCS)', sku: '59012', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 300, reorderPoint: 60, costPrice: 0.60, salePrice: 0.75 },
+  { id: '330011', name: 'Whipping Cream 1080ml (1x12 PCS)', sku: '330011', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120, reorderPoint: 25, costPrice: 6.00, salePrice: 7.50 },
+  { id: '12024', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry (1x24 PCS)', sku: '12024-VS', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240, reorderPoint: 48, costPrice: 0.70, salePrice: 0.90 },
   { id: 'PROD001_OLD', name: 'Vanilla Ice Cream 1L Tub (Old)', sku: 'VIC001_OLD', category: 'Frozen', unitType: 'PCS', stockLevel: 10, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 6 },
-  { id: 'PROD004_OLD', name: 'Raw Sugar 1kg Bag (Old)', sku: 'SUG001_OLD', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 50, reorderPoint: 100, costPrice: 1.20, salePrice: 0 }, // Assuming salePrice 0 for raw materials not sold directly
-  { id: 'PROD005_OLD', name: 'Cardboard Cartons (Large, Empty) (Old)', sku: 'PKG001_OLD', category: 'Packaging', unitType: 'PCS', stockLevel: 100, reorderPoint: 200, costPrice: 0.15, salePrice: 0 }, // Assuming salePrice 0 for packaging not sold directly
 ];
 
 
@@ -198,5 +198,6 @@ export const MOCK_MANAGERS: Manager[] = [
 ];
     
     
+
 
 
