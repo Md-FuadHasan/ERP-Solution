@@ -102,11 +102,13 @@ export default function ProductsPage() {
 
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
+    // If packaging unit is specified and itemsPerPackagingUnit is a valid positive number,
+    // the entered salePrice is for the whole package. Convert it to base unit price.
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
 
-    const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = { 
+    const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = {
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -115,8 +117,8 @@ export default function ProductsPage() {
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
-      costPrice: data.costPrice, // Cost price is still stored, just not displayed in the main table
-      salePrice: actualBaseUnitPrice, 
+      costPrice: data.costPrice,
+      salePrice: actualBaseUnitPrice, // Store the calculated base unit price
     };
 
     if (editingProduct) {
@@ -151,11 +153,11 @@ export default function ProductsPage() {
       addProduct(newProduct);
       toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
     }
-    
+
     setIsFormModalOpen(false);
     setEditingProduct(null);
   };
-  
+
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
       case 'Frozen': return 'categoryFrozen';
@@ -167,8 +169,7 @@ export default function ProductsPage() {
     }
   };
 
-  const calculatePriceWithVAT = (price: number) => {
-    const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
+  const calculatePriceWithVAT = (price: number, vatRatePercent: number) => {
     const vatMultiplier = 1 + (vatRatePercent / 100);
     return price * vatMultiplier;
   };
@@ -193,26 +194,27 @@ export default function ProductsPage() {
           className="w-full md:w-80"
         />
       </div>
+
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
-                    <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
-                    <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
-                    <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
-                    <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                    <TableHead className="min-w-[280px] text-center" colSpan={2}>
-                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                    <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
-                  </TableRow>
+                <TableRow>
+                  <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
+                  <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
+                  <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                  <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
+                  <TableHead className="min-w-[280px] text-center" colSpan={2}>
+                    Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                  </TableHead>
+                  <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
+                </TableRow>
+                <TableRow>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
@@ -237,32 +239,33 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-           <div className="h-full overflow-y-auto">
+          <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
-                    <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
-                    <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
-                    <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
-                    <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                    <TableHead className="min-w-[280px] text-center" colSpan={2}>
-                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
-                    </TableHead>
-                    <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                    <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
-                  </TableRow>
+                <TableRow>
+                  <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
+                  <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
+                  <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
+                  <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
+                  <TableHead className="min-w-[280px] text-center" colSpan={2}>
+                    Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                  </TableHead>
+                  <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
+                </TableRow>
+                <TableRow>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const pcsPriceWithVat = calculatePriceWithVAT(product.salePrice);
+                  const vatRate = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
+                  const pcsPriceWithVat = calculatePriceWithVAT(product.salePrice, vatRate);
                   let cartonPriceWithVatText = '-';
                   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
                     const cartonPriceExVat = product.salePrice * product.itemsPerPackagingUnit;
-                    const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat);
+                    const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat, vatRate);
                     cartonPriceWithVatText = `$${cartonPriceInclVat.toFixed(2)}`;
                   }
 
@@ -286,7 +289,7 @@ export default function ProductsPage() {
                       <TableCell className="text-right">{cartonPriceWithVatText}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
-                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
+                          <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
@@ -328,8 +331,8 @@ export default function ProductsPage() {
       </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
-          setIsFormModalOpen(isOpen);
-          if (!isOpen) setEditingProduct(null);
+        setIsFormModalOpen(isOpen);
+        if (!isOpen) setEditingProduct(null);
       }}>
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -367,7 +370,7 @@ export default function ProductsPage() {
                   </div>
                 </CardContent>
               </Card>
-               <Card>
+              <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Category:</strong></div>
                   <div>
@@ -376,16 +379,16 @@ export default function ProductsPage() {
                     </Badge>
                   </div>
                   <div><strong>Base Unit:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge> ({productToView.unitType} are tracked in stock)</div>
-                   {productToView.packagingUnit && (
+                  {productToView.packagingUnit && (
                     <>
-                      <div className="col-span-2"><Separator className="my-1"/></div>
+                      <div className="col-span-2"><Separator className="my-1" /></div>
                       <div><strong>Packaging Unit:</strong></div><div><Badge variant="outline">{productToView.packagingUnit}</Badge></div>
                       <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit} {productToView.unitType}</div>
                     </>
                   )}
                 </CardContent>
               </Card>
-               <Card>
+              <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Stock Level:</strong></div>
                   <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
@@ -396,17 +399,16 @@ export default function ProductsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
-                  {/* Cost price display removed from main table, but can be shown here if needed */}
                   <div><strong>Cost Price / {productToView.unitType}:</strong> ${productToView.costPrice.toFixed(2)}</div>
                   <Separator />
                   <div>
                     <strong>Sale Price / PCS (VAT incl.):</strong>
-                    &nbsp;${calculatePriceWithVAT(productToView.salePrice).toFixed(2)}
+                    &nbsp;${calculatePriceWithVAT(productToView.salePrice, typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0)).toFixed(2)}
                   </div>
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
                     <div>
                       <strong>Sale Price / {productToView.packagingUnit.toLowerCase() === 'carton' || productToView.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : productToView.packagingUnit} (VAT incl.):</strong>
-                      &nbsp;${calculatePriceWithVAT(productToView.salePrice * productToView.itemsPerPackagingUnit).toFixed(2)}
+                      &nbsp;${calculatePriceWithVAT(productToView.salePrice * productToView.itemsPerPackagingUnit, typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0)).toFixed(2)}
                     </div>
                   )}
                   <div className="text-muted-foreground text-xs italic pt-1">
@@ -442,4 +444,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
