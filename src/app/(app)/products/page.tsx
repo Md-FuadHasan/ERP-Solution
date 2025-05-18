@@ -23,7 +23,7 @@ import {
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { Product, ProductCategory, ProductUnitType } from '@/types';
+import type { Product, ProductCategory } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,7 +106,7 @@ export default function ProductsPage() {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
 
-    const productDataForStorage = {
+    const productDataForStorage: Omit<Product, 'id'> = { // Omit id as it's handled below
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -166,30 +166,15 @@ export default function ProductsPage() {
     }
   };
 
-  const calculateDisplaySalePrice = (product: Product) => {
+  const calculatePriceWithVAT = (price: number) => {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
     const vatMultiplier = 1 + (vatRatePercent / 100);
-    
-    let priceForCalc = product.salePrice; 
-    let priceUnit: string = product.unitType;
-
-    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; 
-      priceUnit = product.packagingUnit;
-    }
-    
-    if (priceUnit.toLowerCase() === 'carton' || priceUnit.toLowerCase() === 'cartons') {
-        priceUnit = 'Ctn';
-    }
-
-    return {
-      priceWithVat: priceForCalc * vatMultiplier,
-      unit: priceUnit
-    };
+    return price * vatMultiplier;
   };
 
+
   return (
-    <div className="max-h-[610px] flex flex-col">
+    <div className="flex flex-col h-full">
       <PageHeader
         title="Products"
         description="Manage your product catalog."
@@ -207,12 +192,10 @@ export default function ProductsPage() {
           className="w-full md:w-80"
         />
       </div>
-{/* main table starts */}
-      <div className="relative flex-grow h-full overflow-hidden rounded-lg border shadow-sm bg-card flex flex-col">
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="relative flex-grow"> 
-{/* Suggested code may be subject to a license. Learn more: ~LicenseLog:2205773654. */}
-            <Table className="relative overflow-y-auto max-h-auto">
+          <div className="h-full overflow-y-auto">
+            <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
                   <TableHead className="min-w-[100px]">Product ID</TableHead>
@@ -220,12 +203,12 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]">SKU</TableHead>
                   <TableHead className="min-w-[120px]">Category</TableHead>
                   <TableHead className="min-w-[100px] text-right">Stock</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price / PCS (VAT incl.)</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price / Ctn (VAT incl.)</TableHead>
                   <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="overscroll-auto">
+              <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
@@ -233,7 +216,7 @@ export default function ProductsPage() {
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
@@ -248,7 +231,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-           <div className="flex-grow overflow-y-auto relative"> 
+           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -257,14 +240,22 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]">SKU</TableHead>
                   <TableHead className="min-w-[120px]">Category</TableHead>
                   <TableHead className="min-w-[100px] text-right">Stock</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
-                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price / PCS (VAT incl.)</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price / Ctn (VAT incl.)</TableHead>
                   <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="overscroll-contain">
+              <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const { priceWithVat, unit } = calculateDisplaySalePrice(product);
+                  const pcsPriceWithVat = calculatePriceWithVAT(product.salePrice);
+                  let cartonPriceWithVatText = '-';
+                  if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+                    const cartonPriceExVat = product.salePrice * product.itemsPerPackagingUnit;
+                    const cartonPriceInclVat = calculatePriceWithVAT(cartonPriceExVat);
+                    const packagingUnitDisplay = product.packagingUnit.toLowerCase() === 'carton' || product.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : product.packagingUnit;
+                    cartonPriceWithVatText = `$${cartonPriceInclVat.toFixed(2)} / ${packagingUnitDisplay}`;
+                  }
+
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                       <TableCell className="font-medium text-xs">{product.id}</TableCell>
@@ -281,10 +272,8 @@ export default function ProductsPage() {
                       )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                      <TableCell className="text-right text-xs">${product.costPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-xs">
-                        ${priceWithVat.toFixed(2)} / {unit}
-                      </TableCell>
+                      <TableCell className="text-right text-xs">${pcsPriceWithVat.toFixed(2)} / {product.unitType}</TableCell>
+                      <TableCell className="text-right text-xs">{cartonPriceWithVatText}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
                            <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
@@ -293,14 +282,14 @@ export default function ProductsPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="hover:text-destructive" 
-                            title="Delete Product" 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              handleDeleteProductConfirm(product); 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="hover:text-destructive"
+                            title="Delete Product"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteProductConfirm(product);
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -314,7 +303,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> 
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -396,22 +385,22 @@ export default function ProductsPage() {
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
-                  <div><strong>Cost Price (per Base Unit):</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
-                  {(() => {
-                    const { priceWithVat, unit } = calculateDisplaySalePrice(productToView);
-                    const baseUnitPriceExVat = productToView.salePrice; 
-                    
-                    return (
-                      <>
-                        <div><strong>Sale Price (incl. VAT):</strong></div>
-                        <div>${priceWithVat.toFixed(2)} / {unit}</div>
-                        <div className="col-span-2 text-muted-foreground text-xs italic">
-                          (Base unit sale price ex-VAT: ${baseUnitPriceExVat.toFixed(2)} / {productToView.unitType})
-                        </div>
-                      </>
-                    );
-                  })()}
+                <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
+                  <div><strong>Cost Price (per Base Unit):</strong> ${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
+                  <Separator />
+                  <div>
+                    <strong>Sale Price / {productToView.unitType} (VAT incl.):</strong>
+                    &nbsp;${calculatePriceWithVAT(productToView.salePrice).toFixed(2)}
+                  </div>
+                  {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
+                    <div>
+                      <strong>Sale Price / {productToView.packagingUnit.toLowerCase() === 'carton' || productToView.packagingUnit.toLowerCase() === 'cartons' ? 'Ctn' : productToView.packagingUnit} (VAT incl.):</strong>
+                      &nbsp;${calculatePriceWithVAT(productToView.salePrice * productToView.itemsPerPackagingUnit).toFixed(2)}
+                    </div>
+                  )}
+                  <div className="text-muted-foreground text-xs italic pt-1">
+                    (Base unit sale price ex-VAT: ${productToView.salePrice.toFixed(2)} / {productToView.unitType})
+                  </div>
                 </CardContent>
               </Card>
             </div>
