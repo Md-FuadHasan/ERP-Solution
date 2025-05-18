@@ -49,7 +49,7 @@ export default function ProductsPage() {
     products,
     addProduct,
     updateProduct,
-    deleteProduct, // Ensured deleteProduct is destructured
+    deleteProduct,
     isLoading,
     companyProfile,
   } = useData();
@@ -300,7 +300,16 @@ export default function ProductsPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Product" onClick={() => handleDeleteProductConfirm(product)}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="hover:text-destructive" 
+                            title="Delete Product" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              handleDeleteProductConfirm(product); 
+                            }}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
