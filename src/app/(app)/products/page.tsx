@@ -115,7 +115,7 @@ export default function ProductsPage() {
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
-      costPrice: data.costPrice,
+      costPrice: data.costPrice, // Cost price is still stored, just not displayed in the main table
       salePrice: actualBaseUnitPrice, 
     };
 
@@ -155,7 +155,7 @@ export default function ProductsPage() {
     setIsFormModalOpen(false);
     setEditingProduct(null);
   };
-
+  
   const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
       case 'Frozen': return 'categoryFrozen';
@@ -198,7 +198,7 @@ export default function ProductsPage() {
           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
+                  <TableRow>
                     <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                     <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                     <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
@@ -210,8 +210,8 @@ export default function ProductsPage() {
                     <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                   </TableRow>
                   <TableRow>
-                    <TableHead className="min-w-[140px] text-right">PCS Price</TableHead>
-                    <TableHead className="min-w-[140px] text-right">Carton Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
                   </TableRow>
               </TableHeader>
               <TableBody>
@@ -252,8 +252,8 @@ export default function ProductsPage() {
                     <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                   </TableRow>
                   <TableRow>
-                    <TableHead className="min-w-[140px] text-right">PCS Price</TableHead>
-                    <TableHead className="min-w-[140px] text-right">Carton Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
+                    <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
                   </TableRow>
               </TableHeader>
               <TableBody>
@@ -268,22 +268,22 @@ export default function ProductsPage() {
 
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium text-xs">{product.id}</TableCell>
-                      <TableCell className="text-xs">{product.name}</TableCell>
-                      <TableCell className="text-xs">{product.sku}</TableCell>
+                      <TableCell className="font-medium">{product.id}</TableCell>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell>{product.sku}</TableCell>
                       <TableCell>
                         <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                           {product.category}
                         </Badge>
                       </TableCell>
                       <TableCell className={cn(
-                        "text-right font-medium text-xs",
+                        "text-right font-medium",
                         product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
                       )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                      <TableCell className="text-right text-xs">${pcsPriceWithVat.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-xs">{cartonPriceWithVatText}</TableCell>
+                      <TableCell className="text-right">${pcsPriceWithVat.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{cartonPriceWithVatText}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
                            <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
@@ -396,7 +396,8 @@ export default function ProductsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
-                  {/* Removed cost price display */}
+                  {/* Cost price display removed from main table, but can be shown here if needed */}
+                  <div><strong>Cost Price / {productToView.unitType}:</strong> ${productToView.costPrice.toFixed(2)}</div>
                   <Separator />
                   <div>
                     <strong>Sale Price / PCS (VAT incl.):</strong>
@@ -441,3 +442,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+
