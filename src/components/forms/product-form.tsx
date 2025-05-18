@@ -198,15 +198,13 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
               <FormItem>
                 <FormLabel>Packaging Unit (Optional)</FormLabel>
                 <FormControl>
-                  <React.Fragment>
-                    <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
-                    <datalist id="packaging-suggestions">
-                      {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
-                          <option key={suggestion} value={suggestion} />
-                      ))}
-                    </datalist>
-                  </React.Fragment>
+                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
                 </FormControl>
+                <datalist id="packaging-suggestions">
+                  {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
+                      <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
                 <FormDescription>How this product is typically bundled for sale/shipping.</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -317,3 +315,4 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 }
     
     
+
