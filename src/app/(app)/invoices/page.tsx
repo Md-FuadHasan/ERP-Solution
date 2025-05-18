@@ -39,6 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -98,11 +99,11 @@ export default function InvoicesPage() {
     }
 
     if (currentUrlIntentKey) {
-      if (!isFormModalOpen && !editingInvoice && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+      if (!isFormModalOpen && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
         if (action === 'new') {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
-        } else { // action === 'edit'
+        } else { 
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
           setEditingInvoice(invoiceToEdit || null);
           setCurrentPrefillValues(null);
@@ -111,20 +112,15 @@ export default function InvoicesPage() {
         setUrlParamsProcessedIntentKey(currentUrlIntentKey);
       }
     } else {
-       if (urlParamsProcessedIntentKey && !currentUrlIntentKey && !isFormModalOpen) {
+       if (urlParamsProcessedIntentKey && !isFormModalOpen) { 
          setUrlParamsProcessedIntentKey(null);
        }
     }
   }, [
     searchParams,
     isFormModalOpen,
-    editingInvoice,
     urlParamsProcessedIntentKey,
     invoices,
-    setCurrentPrefillValues,
-    setEditingInvoice,
-    setIsFormModalOpen,
-    setUrlParamsProcessedIntentKey,
   ]);
 
 
@@ -138,18 +134,17 @@ export default function InvoicesPage() {
       const currentInvoiceId = searchParams.get('id');
       const currentCustomerId = searchParams.get('customerId');
 
-      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId) || currentAction === 'view') {
+      if ((currentAction === 'edit' && currentInvoiceId) || (currentAction === 'new' && currentCustomerId)) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // Important: Reset the processed key when URL is cleared and modal closes
-        setUrlParamsProcessedIntentKey(null); 
       }
+      setUrlParamsProcessedIntentKey(null);
     }
-  }, [searchParams, router, pathname, setIsFormModalOpen, setEditingInvoice, setCurrentPrefillValues, setUrlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname]);
 
 
   const handleAddNewInvoice = useCallback(() => {
@@ -253,7 +248,7 @@ export default function InvoicesPage() {
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
-      if (paymentAmount >= 0) { // Ensure paymentAmount is not negative if already overpaid
+      if (paymentAmount >= 0) { 
         newPaymentHistory.push({
           id: `PAY-${Date.now()}`,
           paymentDate: new Date().toISOString(),
@@ -301,7 +296,7 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { // Default case, e.g. if newAmountPaid covers totalAmount exactly
+    } else { 
       finalStatus = 'Paid';
     }
 
@@ -317,7 +312,7 @@ export default function InvoicesPage() {
       vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, // Store the form's processing status
+      paymentProcessingStatus: data.paymentProcessingStatus, 
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -353,36 +348,34 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-80" />
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
-        <div className="flex-grow min-h-0">
-          <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-            <div className="overflow-y-auto max-h-96">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
-                  <TableRow>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                    <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                    <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
-                    <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
-                    <TableHead className="min-w-[150px] text-right"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
+        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
+          <div className="flex-grow overflow-y-auto"> {/* This div scrolls its content (skeleton table) */}
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-3/4" /></TableHead>
+                  <TableHead className="min-w-[150px] text-right"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(7)].map((_, i) => (
-                    <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -405,68 +398,66 @@ export default function InvoicesPage() {
         <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
       </div>
 
-       <div className="flex-grow min-h-0">
-        <div className="rounded-lg border shadow-sm bg-card overflow-hidden h-full">
-          <div className="overflow-y-auto max-h-96">
-            {filteredInvoices.length > 0 ? (
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted">
-                  <TableRow>
-                    <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                    <TableHead className="min-w-[180px]">Customer</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Amount</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Paid</TableHead>
-                    <TableHead className="min-w-[100px] text-right">Balance</TableHead>
-                    <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="min-w-[150px] text-right">Actions</TableHead>
+       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
+        {filteredInvoices.length > 0 ? (
+          <div className="flex-grow overflow-y-auto"> {/* This div scrolls its content (actual table) */}
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-muted">
+                <TableRow>
+                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
+                  <TableHead className="min-w-[180px]">Customer</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
+                  <TableHead className="min-w-[120px]">Status</TableHead>
+                  <TableHead className="min-w-[150px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInvoices.map((invoice, index) => (
+                  <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
+                    <TableCell className="font-medium">{invoice.id}</TableCell>
+                    <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                    <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                        {invoice.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInvoices.map((invoice, index) => (
-                    <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
-                      <TableCell className="font-medium">{invoice.id}</TableCell>
-                      <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                      <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                           <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="h-full flex items-center justify-center p-8">
-                <DataPlaceholder
-                  title="No Invoices Found"
-                  message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
-                  icon={PlusCircle}
-                  action={!searchTerm && statusFilter === 'all' ? (
-                    <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
-                    </Button>
-                  ) : undefined}
-                />
-              </div>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
+        ) : (
+          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state */}
+            <DataPlaceholder
+              title="No Invoices Found"
+              message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
+              icon={PlusCircle}
+              action={!searchTerm && statusFilter === 'all' ? (
+                <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
+                </Button>
+              ) : undefined}
+            />
+          </div>
+        )}
       </div>
 
       {/* Edit/Create Form Modal */}
@@ -504,7 +495,7 @@ export default function InvoicesPage() {
         }
       }}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          {(isDataContextLoading && isViewModalOpen) && (
+          {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="p-6 space-y-6 animate-pulse">
               <Skeleton className="h-8 w-1/2 mb-2" />
               <Skeleton className="h-4 w-3/4 mb-6" />
@@ -529,7 +520,7 @@ export default function InvoicesPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-grow overflow-y-auto p-6 space-y-6">
-                {!customerForModal && <div className="text-destructive p-4">Error: Customer not found for this invoice.</div>}
+                {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
                 {customerForModal && (
                   <>
                     <header className="mb-8">
@@ -700,8 +691,8 @@ export default function InvoicesPage() {
               </DialogFooter>
             </>
           )}
-          {(!invoiceToViewInModal && isViewModalOpen) && (
-             <div className="p-6"><DialogTitle>Loading...</DialogTitle></div>
+          {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( // Only show if modal is open, no invoice selected, and not loading
+             <div className="p-6"><DialogTitle>Error</DialogTitle><DialogDescription>No invoice selected or invoice data is unavailable.</DialogDescription></div>
           )}
         </DialogContent>
       </Dialog>
@@ -738,4 +729,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-

@@ -80,12 +80,7 @@ export default function ProductsPage() {
   };
 
   const handleEditProduct = (product: Product) => {
-    let formSalePrice = product.salePrice;
-    // If product is sold by package, the form should show package price
-    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      formSalePrice = product.salePrice * product.itemsPerPackagingUnit;
-    }
-    setEditingProduct({ ...product, salePrice: formSalePrice });
+    setEditingProduct(product);
     setIsFormModalOpen(true);
   };
 
@@ -108,7 +103,6 @@ export default function ProductsPage() {
 
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
-    // If user entered price for package, convert to base unit price for storage
     if (data.packagingUnit && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
@@ -123,7 +117,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice, // Store base unit price
+      salePrice: actualBaseUnitPrice, 
     };
 
     if (editingProduct) {
@@ -177,11 +171,11 @@ export default function ProductsPage() {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
     const vatMultiplier = 1 + (vatRatePercent / 100);
     
-    let priceForCalc = product.salePrice; // This is base unit price
+    let priceForCalc = product.salePrice; 
     let priceUnit: string = product.unitType;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; // Calculate package price from base unit price
+      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; 
       priceUnit = product.packagingUnit;
     }
     
@@ -215,33 +209,46 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col overflow-hidden">
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col"> {/* REMOVED overflow-hidden */}
         {isLoading ? (
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[100px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="min-w-[140px] text-right"><Skeleton className="h-5 w-full bg-primary/50" /></TableHead>
-                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-32 ml-auto bg-primary/50" /></TableHead>
+                  <TableHead className="min-w-[100px]">Product ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[120px]">SKU</TableHead>
+                  <TableHead className="min-w-[120px]">Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    {[...Array(8)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-3/4" /></TableCell>)}
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -435,4 +442,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
