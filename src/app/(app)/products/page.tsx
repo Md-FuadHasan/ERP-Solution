@@ -213,7 +213,7 @@ export default function ProductsPage() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">CTN Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -249,13 +249,13 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
                   <TableHead className="min-w-[280px] text-center" colSpan={2}>
-                    Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
+                     Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="min-w-[140px] text-right text-xs font-normal">PCS Price</TableHead>
-                  <TableHead className="min-w-[140px] text-right text-xs font-normal">Carton Price</TableHead>
+                  <TableHead className="min-w-[140px] text-right text-xs font-normal">CTN Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
