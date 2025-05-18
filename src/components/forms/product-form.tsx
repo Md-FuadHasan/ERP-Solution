@@ -28,8 +28,8 @@ const productFormSchema = z.object({
   stockLevel: z.coerce.number().min(0, "Stock level cannot be negative.").default(0),
   reorderPoint: z.coerce.number().min(0, "Reorder point cannot be negative.").default(0),
   costPrice: z.coerce.number().min(0, "Cost price cannot be negative.").default(0),
-  salePrice: z.coerce.number().min(0, "Sale price cannot be negative.").default(0), // This is price before excise and VAT
-  exciseTax: z.coerce.number().min(0, "Excise tax cannot be negative.").optional().nullable(), // User input for excise tax
+  salePrice: z.coerce.number().min(0, "Sale price cannot be negative.").default(0),
+  exciseTax: z.coerce.number().min(0, "Excise tax cannot be negative.").optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.itemsPerPackagingUnit && (!data.packagingUnit || data.packagingUnit.trim() === '')) {
     ctx.addIssue({
@@ -64,7 +64,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       packagingUnit: initialData.packagingUnit || '',
       itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
       salePrice: initialData.salePrice, // This is base unit price, pre-excise, pre-VAT
-      // To display excise tax in the form (which user entered as potentially per-package):
+      // Display excise tax in the form based on how user likely thinks of it (per package if applicable)
       exciseTax: initialData.exciseTax !== undefined && initialData.exciseTax !== null && initialData.packagingUnit && initialData.itemsPerPackagingUnit && initialData.itemsPerPackagingUnit > 0
                    ? initialData.exciseTax * initialData.itemsPerPackagingUnit
                    : initialData.exciseTax,
@@ -72,7 +72,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       id: '',
       name: '',
       sku: '',
-      category: PRODUCT_CATEGORIES[0],
+      category: undefined, // Ensure category has a placeholder or default
       unitType: PRODUCT_UNIT_TYPES[0],
       packagingUnit: '',
       itemsPerPackagingUnit: undefined,
@@ -207,7 +207,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
               <FormItem>
                 <FormLabel>Packaging Unit (Optional)</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
+                    <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
                 </FormControl>
                 <datalist id="packaging-suggestions">
                   {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
@@ -348,3 +348,5 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
     </Form>
   );
 }
+
+    

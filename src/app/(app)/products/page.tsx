@@ -101,24 +101,23 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
-    // User enters salePrice which is either per base unit or per packaging unit (BEFORE excise, BEFORE VAT)
-    // User enters exciseTax which is either per base unit or per packaging unit
-    
     let formSalePrice = data.salePrice;
-    let formExciseTax = data.exciseTax ?? 0;
+    let formExciseTaxValue = data.exciseTax ?? 0;
 
     let storedBaseUnitPrice: number;
     let storedBaseUnitExciseTax: number | undefined = undefined;
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
+      // User entered salePrice and exciseTax for the whole package
       storedBaseUnitPrice = formSalePrice / data.itemsPerPackagingUnit;
-      if (formExciseTax > 0) {
-        storedBaseUnitExciseTax = formExciseTax / data.itemsPerPackagingUnit;
+      if (formExciseTaxValue > 0) {
+        storedBaseUnitExciseTax = formExciseTaxValue / data.itemsPerPackagingUnit;
       }
     } else {
+      // User entered salePrice and exciseTax for the base unit
       storedBaseUnitPrice = formSalePrice;
-      if (formExciseTax > 0) {
-        storedBaseUnitExciseTax = formExciseTax;
+      if (formExciseTaxValue > 0) {
+        storedBaseUnitExciseTax = formExciseTaxValue;
       }
     }
 
@@ -186,7 +185,7 @@ export default function ProductsPage() {
 
   const calculatePcsPriceWithVat = (product: Product) => {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
-    const basePriceWithExcise = product.salePrice + (product.exciseTax || 0);
+    const basePriceWithExcise = product.salePrice + (product.exciseTax || 0); // product.salePrice is base, product.exciseTax is base
     const vatAmount = basePriceWithExcise * (vatRatePercent / 100);
     return basePriceWithExcise + vatAmount;
   };
@@ -201,6 +200,14 @@ export default function ProductsPage() {
     const cartonPriceWithExcise = cartonBasePrice + cartonExciseTax;
     const vatAmount = cartonPriceWithExcise * (vatRatePercent / 100);
     return cartonPriceWithExcise + vatAmount;
+  };
+
+  const getDisplayExciseTax = (product: Product): string => {
+    const baseExcise = product.exciseTax || 0;
+    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      return `$${(baseExcise * product.itemsPerPackagingUnit).toFixed(2)}`;
+    }
+    return `$${baseExcise.toFixed(2)}`;
   };
 
 
@@ -226,10 +233,10 @@ export default function ProductsPage() {
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-           <div className="h-full overflow-y-auto">
+          <div className="flex-grow overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
@@ -270,16 +277,16 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="h-full overflow-y-auto">
+          <div className="flex-grow overflow-y-auto">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax <span className="text-xs font-normal opacity-75">(per PCS)</span></TableHead>
+                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="text-center" colSpan={2}>
                      Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT)</span>
                   </TableHead>
@@ -294,7 +301,7 @@ export default function ProductsPage() {
                 {filteredProducts.map((product, index) => {
                   const pcsPriceWithVat = calculatePcsPriceWithVat(product);
                   const ctnPriceWithVat = calculateCtnPriceWithVat(product);
-                  const exciseTaxDisplay = product.exciseTax ? `$${product.exciseTax.toFixed(2)}` : '-';
+                  const exciseTaxDisplay = getDisplayExciseTax(product);
 
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
@@ -344,7 +351,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8">
+          <div className="flex-grow flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -428,8 +435,13 @@ export default function ProductsPage() {
               <Card>
                  <CardContent className="pt-6 grid grid-cols-1 gap-y-2">
                     <div>
-                      <strong>Excise Tax (per Base Unit):</strong>
-                      &nbsp;{productToView.exciseTax ? `$${productToView.exciseTax.toFixed(2)}` : 'N/A'}
+                        <strong>Excise Tax:</strong>
+                        &nbsp;{getDisplayExciseTax(productToView)}
+                        <span className="text-muted-foreground text-xs italic">
+                            &nbsp;({productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0
+                                ? `per ${productToView.packagingUnit}`
+                                : `per ${productToView.unitType}`})
+                        </span>
                     </div>
                     <Separator className="my-1" />
                     <div>
@@ -475,3 +487,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
