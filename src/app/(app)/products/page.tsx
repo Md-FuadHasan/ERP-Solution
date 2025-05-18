@@ -101,7 +101,7 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
-    let formSalePrice = data.salePrice;
+    let formSalePrice = data.salePrice; // This is pre-excise, pre-VAT
     let formExciseTaxValue = data.exciseTax ?? 0;
 
     let storedBaseUnitPrice: number;
@@ -131,8 +131,8 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseUnitPrice, // Always store base unit price, pre-excise, pre-VAT
-      exciseTax: storedBaseUnitExciseTax, // Always store base unit excise tax
+      salePrice: storedBaseUnitPrice, 
+      exciseTax: storedBaseUnitExciseTax,
     };
 
     if (editingProduct) {
@@ -183,9 +183,17 @@ export default function ProductsPage() {
     }
   };
 
+  const getDisplayExciseTax = (product: Product): string => {
+    const baseExcise = product.exciseTax || 0;
+    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      return `$${(baseExcise * product.itemsPerPackagingUnit).toFixed(2)}`;
+    }
+    return `$${baseExcise.toFixed(2)}`;
+  };
+
   const calculatePcsPriceWithVat = (product: Product) => {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
-    const basePriceWithExcise = product.salePrice + (product.exciseTax || 0); // product.salePrice is base, product.exciseTax is base
+    const basePriceWithExcise = product.salePrice + (product.exciseTax || 0);
     const vatAmount = basePriceWithExcise * (vatRatePercent / 100);
     return basePriceWithExcise + vatAmount;
   };
@@ -200,14 +208,6 @@ export default function ProductsPage() {
     const cartonPriceWithExcise = cartonBasePrice + cartonExciseTax;
     const vatAmount = cartonPriceWithExcise * (vatRatePercent / 100);
     return cartonPriceWithExcise + vatAmount;
-  };
-
-  const getDisplayExciseTax = (product: Product): string => {
-    const baseExcise = product.exciseTax || 0;
-    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      return `$${(baseExcise * product.itemsPerPackagingUnit).toFixed(2)}`;
-    }
-    return `$${baseExcise.toFixed(2)}`;
   };
 
 
@@ -232,10 +232,10 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-        {isLoading ? (
-          <div className="flex-grow overflow-y-auto">
+        <div className="h-full overflow-y-auto">
+          {isLoading ? (
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
@@ -275,9 +275,7 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        ) : filteredProducts.length > 0 ? (
-          <div className="flex-grow overflow-y-auto">
+          ) : filteredProducts.length > 0 ? (
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
@@ -319,7 +317,7 @@ export default function ProductsPage() {
                       )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                      <TableCell className="text-right">{exciseTaxDisplay}</TableCell>
+                       <TableCell className="text-right">{exciseTaxDisplay}</TableCell>
                       <TableCell className="text-right">${pcsPriceWithVat.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{ctnPriceWithVat !== null ? `$${ctnPriceWithVat.toFixed(2)}` : '-'}</TableCell>
                       <TableCell className="text-right">
@@ -349,9 +347,8 @@ export default function ProductsPage() {
                 })}
               </TableBody>
             </Table>
-          </div>
-        ) : (
-          <div className="flex-grow flex items-center justify-center p-8">
+          ) : (
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -363,6 +360,7 @@ export default function ProductsPage() {
             />
           </div>
         )}
+        </div>
       </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
@@ -487,5 +485,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    
