@@ -58,12 +58,16 @@ body {
     --status-cancelled-foreground: 0 0% 98%;
 
     /* Product Category Colors */
-    --category-finished-goods-bg: 180 60% 90%; /* Light Teal */
-    --category-finished-goods-fg: 180 60% 25%; /* Darker Teal text */
-    --category-raw-materials-bg: 35 50% 90%; /* Light Beige/Tan */
-    --category-raw-materials-fg: 35 50% 25%; /* Darker Brown text */
-    --category-packaging-bg: 210 15% 92%; /* Light Bluish Gray */
-    --category-packaging-fg: 210 15% 25%; /* Darker Gray text */
+    --category-frozen-bg: 200 70% 90%; 
+    --category-frozen-fg: 200 70% 25%;
+    --category-raw-materials-bg: 35 50% 90%; 
+    --category-raw-materials-fg: 35 50% 25%; 
+    --category-packaging-bg: 210 15% 92%; 
+    --category-packaging-fg: 210 15% 25%; 
+    --category-dairy-bg: 50 80% 92%;
+    --category-dairy-fg: 50 60% 30%;
+    --category-beverages-bg: 100 60% 90%;
+    --category-beverages-fg: 100 50% 25%;
   }
   .dark {
     --background: 0 0% 10%; /* Dark Gray for dark mode background */
@@ -115,12 +119,16 @@ body {
     --status-cancelled-foreground: 0 0% 98%;
 
     /* Dark Product Category Colors */
-    --category-finished-goods-bg: 180 40% 20%; /* Dark Teal */
-    --category-finished-goods-fg: 180 40% 85%; /* Lighter Teal text */
-    --category-raw-materials-bg: 35 30% 22%; /* Dark Brown/Tan */
-    --category-raw-materials-fg: 35 30% 80%; /* Lighter Brown text */
-    --category-packaging-bg: 210 10% 25%; /* Dark Bluish Gray */
-    --category-packaging-fg: 210 10% 75%; /* Lighter Gray text */
+    --category-frozen-bg: 200 50% 25%;
+    --category-frozen-fg: 200 50% 85%;
+    --category-raw-materials-bg: 35 30% 22%; 
+    --category-raw-materials-fg: 35 30% 80%; 
+    --category-packaging-bg: 210 10% 25%; 
+    --category-packaging-fg: 210 10% 75%; 
+    --category-dairy-bg: 50 40% 28%;
+    --category-dairy-fg: 50 60% 88%;
+    --category-beverages-bg: 100 30% 25%;
+    --category-beverages-fg: 100 40% 85%;
   }
 }
 

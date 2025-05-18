@@ -33,12 +33,16 @@ const badgeVariants = cva(
         cashCustomer:
           "border-transparent bg-status-paid/70 text-status-paid-foreground hover:bg-status-paid/60",
         // Product Category Colors
-        categoryFinishedGoods:
-          "border-transparent bg-[hsl(var(--category-finished-goods-bg))] text-[hsl(var(--category-finished-goods-fg))] hover:bg-[hsl(var(--category-finished-goods-bg))]/80",
+        categoryFrozen:
+          "border-transparent bg-[hsl(var(--category-frozen-bg))] text-[hsl(var(--category-frozen-fg))] hover:bg-[hsl(var(--category-frozen-bg))]/80",
         categoryRawMaterials:
           "border-transparent bg-[hsl(var(--category-raw-materials-bg))] text-[hsl(var(--category-raw-materials-fg))] hover:bg-[hsl(var(--category-raw-materials-bg))]/80",
         categoryPackaging:
           "border-transparent bg-[hsl(var(--category-packaging-bg))] text-[hsl(var(--category-packaging-fg))] hover:bg-[hsl(var(--category-packaging-bg))]/80",
+        categoryDairy:
+          "border-transparent bg-[hsl(var(--category-dairy-bg))] text-[hsl(var(--category-dairy-fg))] hover:bg-[hsl(var(--category-dairy-bg))]/80",
+        categoryBeverages:
+          "border-transparent bg-[hsl(var(--category-beverages-bg))] text-[hsl(var(--category-beverages-fg))] hover:bg-[hsl(var(--category-beverages-bg))]/80",
       },
     },
     defaultVariants: {

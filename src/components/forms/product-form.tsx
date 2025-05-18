@@ -12,7 +12,7 @@ import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { DollarSign } from 'lucide-react';
 import * as React from 'react';
 
-const PRODUCT_CATEGORIES: ProductCategory[] = ['Finished Goods', 'Raw Materials', 'Packaging', 'Beverages', 'Dairy'];
+const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Raw Materials', 'Packaging', 'Beverages', 'Dairy'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML'];
 const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray'];
 
@@ -64,11 +64,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       unitType: initialData.unitType || PRODUCT_UNIT_TYPES[0],
       packagingUnit: initialData.packagingUnit || '',
       itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
-      // When editing, 'salePrice' in initialData is already the base unit price.
-      // If packaging is defined, we display the package price to the user for consistency.
-      salePrice: (initialData.packagingUnit && initialData.itemsPerPackagingUnit && initialData.itemsPerPackagingUnit > 0) 
-                  ? initialData.salePrice * initialData.itemsPerPackagingUnit 
-                  : initialData.salePrice,
+      salePrice: initialData.salePrice, // This is already the base unit price when initialData is present
     } : {
       id: '',
       name: '',
@@ -197,9 +193,9 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Packaging Unit (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
-                </FormControl>
+                 <FormControl>
+                   <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
+                 </FormControl>
                 <datalist id="packaging-suggestions">
                   {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
                       <option key={suggestion} value={suggestion} />
@@ -315,4 +311,3 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 }
     
     
-
