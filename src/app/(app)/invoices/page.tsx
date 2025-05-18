@@ -39,6 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -91,8 +92,8 @@ export default function InvoicesPage() {
     const customerNameParam = searchParams.get('customerName');
 
     let currentUrlIntentKey: string | null = null;
-    if (action === 'new' && customerIdParam) {
-      currentUrlIntentKey = `action=new&customerId=${customerIdParam}&customerName=${customerNameParam || ''}`;
+    if (action === 'new') { // No need to check customerIdParam here, prefillData handles it
+      currentUrlIntentKey = `action=new&customerId=${customerIdParam || ''}&customerName=${customerNameParam || ''}`;
     } else if (action === 'edit' && invoiceIdParam) {
       currentUrlIntentKey = `action=edit&id=${invoiceIdParam}`;
     } else if (action === 'view' && invoiceIdParam) {
@@ -125,7 +126,6 @@ export default function InvoicesPage() {
          }
       }
     } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
-        // URL params have been cleared, reset intent key if modal isn't open
         if (!isFormModalOpen && !isViewModalOpen) {
              setUrlParamsProcessedIntentKey(null);
         }
@@ -147,41 +147,42 @@ export default function InvoicesPage() {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
       
+      // Only clear URL if it was the source of the modal opening
       const currentAction = searchParams.get('action');
-      if (currentAction === 'edit' || currentAction === 'new') {
+      if ((currentAction === 'edit' || currentAction === 'new') && urlParamsProcessedIntentKey) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // Crucially, ensure the intent key is reset here ONLY if the modal was closed by this handler
-        // and not by some other effect. The useEffect listening to searchParams will finalize resetting if needed.
-        setUrlParamsProcessedIntentKey(null); 
+        // The useEffect will handle resetting urlParamsProcessedIntentKey when it sees the cleared URL
       }
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
         setInvoiceToViewInModal(null);
         const currentAction = searchParams.get('action');
-        if (currentAction === 'view') {
+        if (currentAction === 'view' && urlParamsProcessedIntentKey) {
             const newSearchParams = new URLSearchParams(searchParams.toString());
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-            setUrlParamsProcessedIntentKey(null);
+             // The useEffect will handle resetting urlParamsProcessedIntentKey
         }
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
 
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'new');
     newSearchParams.delete('id');
+    newSearchParams.delete('customerId');
+    newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
   }, [searchParams, router, pathname]);
 
@@ -235,7 +236,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -330,8 +331,9 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else { 
-      finalStatus = 'Paid';
+      finalStatus = 'Paid'; // Default to Paid if balance is zero and not explicitly cancelled.
     }
+
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -382,7 +384,7 @@ export default function InvoicesPage() {
           <Skeleton className="h-10 w-full md:w-[200px]" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-          <div className="overflow-y-auto max-h-96"> 
+          <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -439,7 +441,7 @@ export default function InvoicesPage() {
 
        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {filteredInvoices.length > 0 ? (
-          <div className="overflow-y-auto max-h-96"> 
+          <div className="h-full overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -473,9 +475,27 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the invoice "{invoice.id}".
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteInvoice(invoice)} className="bg-destructive hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -713,10 +733,10 @@ export default function InvoicesPage() {
                 </Button>
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
-                    handleViewModalOpenChange(false); // Close view modal
+                    handleViewModalOpenChange(false); 
                     setTimeout(() => { 
-                      handleEditInvoice(invoiceToViewInModal); // Open edit modal
-                    }, 100); // Slight delay
+                      handleEditInvoice(invoiceToViewInModal); 
+                    }, 100); 
                   }
                 }} className="w-full sm:w-auto">
                   <Edit className="mr-2 h-4 w-4" /> Edit Invoice
@@ -762,3 +782,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+

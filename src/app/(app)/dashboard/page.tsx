@@ -140,128 +140,132 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <>
+      <div className="flex flex-col h-full">
         <PageHeader title="Dashboard" description="Overview of your invoicing activities." />
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-6">
-          {[...Array(5)].map((_, i) => ( 
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="h-5 w-5" />
+        <div className="flex-grow overflow-y-auto pb-6 pr-1">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-6">
+            {[...Array(5)].map((_, i) => ( 
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-5 w-5" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-1/2 mb-1" />
+                  <Skeleton className="h-4 w-3/4" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 mb-6">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Financial Overview (Last 6 Months)</CardTitle>
+                <CardDescription>Monthly breakdown of total revenue, received amount, and outstanding balance.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-1/2 mb-1" />
-                <Skeleton className="h-4 w-3/4" />
+              <CardContent className="pl-0 pr-1 sm:pl-2 sm:pr-3">
+                <Skeleton className="h-[300px] sm:h-[350px] w-full" />
               </CardContent>
             </Card>
-          ))}
-        </div>
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 mb-6">
-          <Card className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice Statuses</CardTitle>
+                <CardDescription>Distribution of current invoice statuses.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-2 sm:p-4">
+                <Skeleton className="h-[300px] sm:h-[350px] w-full" />
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Financial Overview (Last 6 Months)</CardTitle>
-              <CardDescription>Monthly breakdown of total revenue, received amount, and outstanding balance.</CardDescription>
-            </CardHeader>
-            <CardContent className="pl-0 pr-1 sm:pl-2 sm:pr-3">
-              <Skeleton className="h-[300px] sm:h-[350px] w-full" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoice Statuses</CardTitle>
-              <CardDescription>Distribution of current invoice statuses.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-4">
-              <Skeleton className="h-[300px] sm:h-[350px] w-full" />
-            </CardContent>
-          </Card>
-        </div>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Top Outstanding Invoices</CardTitle>
-            <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto p-0 sm:p-2">
-            <Table>
-              <TableHeader className="bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                  <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                  <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto bg-primary/50" /></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(3)].map((_, i) => (
-                  <TableRow key={`toi-skel-${i}`}>
-                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-                <CardTitle>Recent Invoices</CardTitle>
+              <CardTitle>Top Outstanding Invoices</CardTitle>
+              <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0 sm:p-2">
+              <div className="max-h-72 overflow-y-auto">
                 <Table>
-                  <TableHeader className="bg-primary text-primary-foreground">
+                  <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                     <TableRow>
-                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
-                      <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto bg-primary/50" /></TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4 bg-primary/50" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                      <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                  {[...Array(3)].map((_, i) => (
-                    <TableRow key={`ri-skel-${i}`}>
-                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
-                    </TableRow>
-                  ))}
+                    {[...Array(3)].map((_, i) => (
+                      <TableRow key={`toi-skel-${i}`}>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
+              </div>
             </CardContent>
           </Card>
-          <div className="space-y-6">
-            <Card>
-                <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader><CardTitle>Top Customers</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle>Recent Invoices</CardTitle></CardHeader>
+              <CardContent className="overflow-x-auto p-0 sm:p-2">
+                <div className="max-h-72 overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                      <TableRow>
+                        <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                        <TableHead className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-1/2 ml-auto" /></TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                     {[...Array(3)].map((_, i) => (
-                        <div key={`tc-skel-${i}`} className="flex items-center gap-3">
-                            <Skeleton className="h-10 w-10 rounded-full" />
-                            <div className="flex-1 space-y-1">
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-3 w-1/2" />
-                            </div>
-                        </div>
+                      <TableRow key={`ri-skel-${i}`}>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="text-right py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                      </TableRow>
                     ))}
-                </CardContent>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
             </Card>
+            <div className="space-y-6">
+              <Card>
+                  <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+                  <CardContent className="flex flex-col gap-3">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader><CardTitle>Top Customers</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                      {[...Array(3)].map((_, i) => (
+                          <div key={`tc-skel-${i}`} className="flex items-center gap-3">
+                              <Skeleton className="h-10 w-10 rounded-full" />
+                              <div className="flex-1 space-y-1">
+                                  <Skeleton className="h-4 w-3/4" />
+                                  <Skeleton className="h-3 w-1/2" />
+                              </div>
+                          </div>
+                      ))}
+                  </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -421,32 +425,34 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="overflow-x-auto p-0 sm:p-2">
             {outstandingInvoicesData.length > 0 ? (
-              <Table className="min-w-[600px]">
-                <TableHeader className="bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
-                    <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
-                    <TableHead className="py-2 px-2 sm:px-4">Due Date</TableHead>
-                    <TableHead className="py-2 px-2 sm:px-4">Status</TableHead>
-                    <TableHead className="text-right py-2 px-2 sm:px-4">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {outstandingInvoicesData.map((invoice) => (
-                    <TableRow key={invoice.name}>
-                      <TableCell className="font-medium py-2 px-2 sm:px-4">{invoice.name}</TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4">{invoice.customerName}</TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4">{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                      <TableCell className="py-2 px-2 sm:px-4">
-                        <Badge variant={getStatusBadgeVariant(invoice.status as InvoiceStatus)}>
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold py-2 px-2 sm:px-4">${invoice.value.toFixed(2)}</TableCell>
+              <div className="max-h-72 overflow-y-auto">
+                <Table className="min-w-[600px]">
+                  <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                    <TableRow>
+                      <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4">Due Date</TableHead>
+                      <TableHead className="py-2 px-2 sm:px-4">Status</TableHead>
+                      <TableHead className="text-right py-2 px-2 sm:px-4">Balance</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {outstandingInvoicesData.map((invoice) => (
+                      <TableRow key={invoice.name}>
+                        <TableCell className="font-medium py-2 px-2 sm:px-4">{invoice.name}</TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4">{invoice.customerName}</TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4">{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                        <TableCell className="py-2 px-2 sm:px-4">
+                          <Badge variant={getStatusBadgeVariant(invoice.status as InvoiceStatus)}>
+                            {invoice.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold py-2 px-2 sm:px-4">${invoice.value.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Zap className="mx-auto h-12 w-12 mb-2 text-green-500 dark:text-green-400" />
@@ -467,30 +473,32 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="overflow-x-auto p-0 sm:p-2">
               {recentInvoices.length > 0 ? (
-                <Table className="min-w-[600px]">
-                  <TableHeader className="bg-primary text-primary-foreground">
-                    <TableRow>
-                      <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4">Due Date</TableHead>
-                      <TableHead className="text-right py-2 px-2 sm:px-4">Amount</TableHead>
-                      <TableHead className="py-2 px-2 sm:px-4">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentInvoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium py-2 px-2 sm:px-4">{invoice.id}</TableCell>
-                        <TableCell className="py-2 px-2 sm:px-4">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                        <TableCell className="py-2 px-2 sm:px-4">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                        <TableCell className="text-right py-2 px-2 sm:px-4">${invoice.totalAmount.toFixed(2)}</TableCell>
-                        <TableCell className="py-2 px-2 sm:px-4">
-                          <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
-                        </TableCell>
+                <div className="max-h-72 overflow-y-auto">
+                  <Table className="min-w-[600px]">
+                    <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                      <TableRow>
+                        <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4">Customer</TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4">Due Date</TableHead>
+                        <TableHead className="text-right py-2 px-2 sm:px-4">Amount</TableHead>
+                        <TableHead className="py-2 px-2 sm:px-4">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {recentInvoices.map((invoice) => (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-medium py-2 px-2 sm:px-4">{invoice.id}</TableCell>
+                          <TableCell className="py-2 px-2 sm:px-4">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                          <TableCell className="py-2 px-2 sm:px-4">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                          <TableCell className="text-right py-2 px-2 sm:px-4">${invoice.totalAmount.toFixed(2)}</TableCell>
+                          <TableCell className="py-2 px-2 sm:px-4">
+                            <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
                 <p className="p-4 text-center text-muted-foreground">No recent invoices.</p>
               )}
@@ -558,3 +566,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -105,7 +106,7 @@ export default function ProductsPage() {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
 
-    const productDataForStorage: Omit<Product, 'id'> = {
+    const productDataForStorage = {
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -115,7 +116,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice,
+      salePrice: actualBaseUnitPrice, // Always store the base unit price
     };
 
     if (editingProduct) {
@@ -187,9 +188,8 @@ export default function ProductsPage() {
     };
   };
 
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="max-h-[610px] flex flex-col">
       <PageHeader
         title="Products"
         description="Manage your product catalog."
@@ -207,115 +207,100 @@ export default function ProductsPage() {
           className="w-full md:w-80"
         />
       </div>
-
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+{/* main table starts */}
+      <div className="relative flex-grow h-full overflow-hidden rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="flex-grow flex flex-col">
-            <div className="h-full overflow-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="w-[12%]">Product ID</TableHead>
-                    <TableHead className="w-[20%]">Name</TableHead>
-                    <TableHead className="w-[15%]">SKU</TableHead>
-                    <TableHead className="w-[15%]">Category</TableHead>
-                    <TableHead className="w-[10%] text-right">Stock</TableHead>
-                    <TableHead className="w-[10%] text-right">Cost</TableHead>
-                    <TableHead className="w-[18%] text-right">Sale Price (incl. VAT)</TableHead>
-                    <TableHead className="w-[10%] text-right">Actions</TableHead>
+          <div className="relative flex-grow"> 
+{/* Suggested code may be subject to a license. Learn more: ~LicenseLog:2205773654. */}
+            <Table className="relative overflow-y-auto max-h-auto">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="min-w-[100px]">Product ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[120px]">SKU</TableHead>
+                  <TableHead className="min-w-[120px]">Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="overscroll-auto">
+                {[...Array(10)].map((_, i) => (
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(10)].map((_, i) => (
-                    <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                          <Skeleton className="h-8 w-8" />
-                          <Skeleton className="h-8 w-8" />
-                          <Skeleton className="h-8 w-8" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="flex-grow overflow-y-auto">
+           <div className="flex-grow overflow-y-auto relative"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="w-[12%]">Product ID</TableHead>
-                  <TableHead className="w-[20%]">Name</TableHead>
-                  <TableHead className="w-[15%]">SKU</TableHead>
-                  <TableHead className="w-[15%]">Category</TableHead>
-                  <TableHead className="w-[10%] text-right">Stock</TableHead>
-                  <TableHead className="w-[10%] text-right">Cost</TableHead>
-                  <TableHead className="w-[18%] text-right">Sale Price (incl. VAT)</TableHead>
-                  <TableHead className="w-[10%] text-right min-w-[120px]">Actions</TableHead>
+                  <TableHead className="min-w-[100px]">Product ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[120px]">SKU</TableHead>
+                  <TableHead className="min-w-[120px]">Category</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Stock</TableHead>
+                  <TableHead className="min-w-[100px] text-right">Cost</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Sale Price (incl. VAT)</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="overscroll-contain">
                 {filteredProducts.map((product, index) => {
                   const { priceWithVat, unit } = calculateDisplaySalePrice(product);
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium">{product.id}</TableCell>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell>{product.sku}</TableCell>
+                      <TableCell className="font-medium text-xs">{product.id}</TableCell>
+                      <TableCell className="text-xs">{product.name}</TableCell>
+                      <TableCell className="text-xs">{product.sku}</TableCell>
                       <TableCell>
                         <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                           {product.category}
                         </Badge>
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-medium",
-                          product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
-                        )}
-                      >
+                      <TableCell className={cn(
+                        "text-right font-medium text-xs",
+                        product.stockLevel <= product.reorderPoint ? "text-destructive" : "text-foreground"
+                      )}>
                         {product.stockLevel} {product.unitType}
                       </TableCell>
-                      <TableCell className="text-right">${product.costPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right text-xs">${product.costPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-xs">
                         ${priceWithVat.toFixed(2)} / {unit}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewProduct(product)}
-                            className="hover:text-primary"
-                            title="View Product"
-                          >
+                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditProduct(product)}
-                            className="hover:text-primary"
-                            title="Edit Product"
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="hover:text-destructive"
-                            title="Delete Product"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteProductConfirm(product);
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="hover:text-destructive" 
+                            title="Delete Product" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              handleDeleteProductConfirm(product); 
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -329,29 +314,24 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8">
+          <div className="h-full flex items-center justify-center p-8"> 
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-              action={
-                !searchTerm ? (
-                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                  </Button>
-                ) : undefined
-              }
+              action={!searchTerm ? (
+                <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                </Button>
+              ) : undefined}
             />
           </div>
         )}
       </div>
 
-      <Dialog
-        open={isFormModalOpen}
-        onOpenChange={(isOpen) => {
+      <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
           setIsFormModalOpen(isOpen);
           if (!isOpen) setEditingProduct(null);
-        }}
-      >
+      }}>
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
@@ -363,10 +343,7 @@ export default function ProductsPage() {
             <ProductForm
               initialData={editingProduct}
               onSubmit={handleSubmit}
-              onCancel={() => {
-                setIsFormModalOpen(false);
-                setEditingProduct(null);
-              }}
+              onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
             />
           </div>
         </DialogContent>
@@ -391,7 +368,7 @@ export default function ProductsPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+               <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Category:</strong></div>
                   <div>
@@ -400,16 +377,16 @@ export default function ProductsPage() {
                     </Badge>
                   </div>
                   <div><strong>Base Unit:</strong></div><div><Badge variant="outline">{productToView.unitType}</Badge> ({productToView.unitType} are tracked in stock)</div>
-                  {productToView.packagingUnit && (
+                   {productToView.packagingUnit && (
                     <>
-                      <div className="col-span-2"><Separator className="my-1" /></div>
+                      <div className="col-span-2"><Separator className="my-1"/></div>
                       <div><strong>Packaging Unit:</strong></div><div><Badge variant="outline">{productToView.packagingUnit}</Badge></div>
                       <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit} {productToView.unitType}</div>
                     </>
                   )}
                 </CardContent>
               </Card>
-              <Card>
+               <Card>
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Stock Level:</strong></div>
                   <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
@@ -423,7 +400,8 @@ export default function ProductsPage() {
                   <div><strong>Cost Price (per Base Unit):</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
                   {(() => {
                     const { priceWithVat, unit } = calculateDisplaySalePrice(productToView);
-                    const baseUnitPriceExVat = productToView.salePrice;
+                    const baseUnitPriceExVat = productToView.salePrice; 
+                    
                     return (
                       <>
                         <div><strong>Sale Price (incl. VAT):</strong></div>

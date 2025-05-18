@@ -35,6 +35,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -113,7 +114,7 @@ export default function CustomersPage() {
     setIsFormModalOpen(true);
   };
 
-  const handleDeleteCustomerConfirm = (customer: Customer) => {
+  const handleDeleteCustomer = (customer: Customer) => {
     setCustomerToDelete(customer);
   };
 
@@ -208,7 +209,7 @@ export default function CustomersPage() {
           <Skeleton className="h-10 w-full md:w-80" />
         </div>
         <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-          <div className="overflow-y-auto max-h-96"> 
+          <div className="h-full overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -265,7 +266,7 @@ export default function CustomersPage() {
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {filteredCustomers.length > 0 ? (
-          <div className="overflow-y-auto max-h-96"> 
+          <div className="h-full overflow-y-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -316,12 +317,27 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCustomerConfirm(customer);
-                            }}>
-                              <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the customer "{customer.name}" and all associated data (including invoices).
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteCustomer(customer)} className="bg-destructive hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -525,3 +541,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+
