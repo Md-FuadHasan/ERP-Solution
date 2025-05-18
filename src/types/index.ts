@@ -128,8 +128,8 @@ export const MOCK_PRODUCTS: Product[] = [
   { id: '330011', name: 'Whipping Cream 1080ml (Carton of 12 PCS)', sku: '330011', category: 'Dairy', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120, reorderPoint: 25, costPrice: 6.00, salePrice: 7.83 },
   { id: '12024', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry (Carton of 24 PCS)', sku: '12024-VS', category: 'Frozen', unitType: 'PCS', packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240, reorderPoint: 48, costPrice: 0.70, salePrice: 1.04 },
   { id: 'PROD001_OLD', name: 'Vanilla Ice Cream 1L Tub (Old)', sku: 'VIC001_OLD', category: 'Frozen', unitType: 'PCS', stockLevel: 10, reorderPoint: 50, costPrice: 2.50, salePrice: 5.99, packagingUnit: 'Carton', itemsPerPackagingUnit: 6 },
-  { id: 'PROD004_OLD', name: 'Raw Sugar 1kg Bag (Old)', sku: 'SUG001_OLD', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 50, reorderPoint: 100, costPrice: 1.20, salePrice: 0 },
-  { id: 'PROD005_OLD', name: 'Cardboard Cartons (Large, Empty) (Old)', sku: 'PKG001_OLD', category: 'Packaging', unitType: 'PCS', stockLevel: 100, reorderPoint: 200, costPrice: 0.15, salePrice: 0 },
+  { id: 'PROD004_OLD', name: 'Raw Sugar 1kg Bag (Old)', sku: 'SUG001_OLD', category: 'Raw Materials', unitType: 'Kgs', stockLevel: 50, reorderPoint: 100, costPrice: 1.20, salePrice: 0 }, // Assuming salePrice 0 for raw materials not sold directly
+  { id: 'PROD005_OLD', name: 'Cardboard Cartons (Large, Empty) (Old)', sku: 'PKG001_OLD', category: 'Packaging', unitType: 'PCS', stockLevel: 100, reorderPoint: 200, costPrice: 0.15, salePrice: 0 }, // Assuming salePrice 0 for packaging not sold directly
 ];
 
 
@@ -144,10 +144,10 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2024001', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-07-01', dueDate: '2024-07-31',
     items: [{ id: 'item1', description: 'Web Development', quantity: 1, unitPrice: 1200, total: 1200, unitType: 'PCS' }],
-    subtotal: 1200, taxAmount: 120, vatAmount: 60, totalAmount: 1380, status: 'Paid',
-    paymentProcessingStatus: 'Fully Paid', amountPaid: 1380, remainingBalance: 0,
+    subtotal: 1200, taxAmount: 120, vatAmount: 180, totalAmount: 1500, status: 'Paid', // Assuming 15% VAT for example
+    paymentProcessingStatus: 'Fully Paid', amountPaid: 1500, remainingBalance: 0,
     paymentHistory: [{
-      id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1380, status: 'Full Payment',
+      id: 'PAY-HIST-001', paymentDate: '2024-07-15T10:00:00Z', amount: 1500, status: 'Full Payment',
       paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
     }],
     paymentMethod: 'Bank Transfer', bankName: 'Global Trust Bank', bankAccountNumber: '**** **** **** 1234', onlineTransactionNumber: 'TXN7890123'
@@ -156,8 +156,8 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2024002', customerId: 'CUST002', customerName: 'Beta Innovations',
     issueDate: '2024-07-05', dueDate: '2024-08-04',
     items: [{ id: 'item1', description: 'Cloud Consulting', quantity: 10, unitPrice: 300, total: 3000, unitType: 'Cartons' }],
-    subtotal: 3000, taxAmount: 300, vatAmount: 150, totalAmount: 3450, status: 'Partially Paid',
-    paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2450,
+    subtotal: 3000, taxAmount: 300, vatAmount: 450, totalAmount: 3750, status: 'Partially Paid',
+    paymentProcessingStatus: 'Partially Paid', amountPaid: 1000, remainingBalance: 2750,
     paymentHistory: [{
       id: 'PAY-HIST-002', paymentDate: '2024-07-20T14:30:00Z', amount: 1000, status: 'Partial Payment',
       paymentMethod: 'Cash', cashVoucherNumber: 'CVN00123'
@@ -168,16 +168,16 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2024003', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-06-10', dueDate: '2024-07-10',
     items: [{ id: 'item1', description: 'Graphic Design', quantity: 5, unitPrice: 150, total: 750, unitType: 'PCS' }],
-    subtotal: 750, taxAmount: 75, vatAmount: 37.5, totalAmount: 862.5, status: 'Overdue',
-    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 862.5,
+    subtotal: 750, taxAmount: 75, vatAmount: 112.5, totalAmount: 937.5, status: 'Overdue',
+    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 937.5,
     paymentHistory: []
   },
    {
     id: 'INV-2024004', customerId: 'CUST003', customerName: 'Gamma Services',
     issueDate: '2024-07-15', dueDate: '2024-08-15',
     items: [{ id: 'item1', description: 'SEO Optimization', quantity: 1, unitPrice: 500, total: 500, unitType: 'PCS' }],
-    subtotal: 500, taxAmount: 50, vatAmount: 25, totalAmount: 575, status: 'Pending',
-    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 575,
+    subtotal: 500, taxAmount: 50, vatAmount: 75, totalAmount: 625, status: 'Pending',
+    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 625,
     paymentHistory: []
   },
 ];
@@ -196,5 +196,6 @@ export const MOCK_MANAGERS: Manager[] = [
   { id: 'MGR001', name: 'Alice Wonderland', email: 'alice@invoiceflow.com', role: 'Administrator' },
   { id: 'MGR002', name: 'Bob The Builder', email: 'bob@invoiceflow.com', role: 'Invoice Manager' },
 ];
-
     
+    
+

@@ -80,7 +80,15 @@ export default function ProductsPage() {
   };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
+    // When editing, we want the form to show the price the user *thinks* in.
+    // If it's a packaged item, the stored salePrice is per base unit.
+    // We need to convert it back to package price for the form.
+    let formSalePrice = product.salePrice;
+    if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      formSalePrice = product.salePrice * product.itemsPerPackagingUnit;
+    }
+
+    setEditingProduct({ ...product, salePrice: formSalePrice });
     setIsFormModalOpen(true);
   };
 
@@ -104,6 +112,8 @@ export default function ProductsPage() {
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
 
+    // If packaging is defined, the entered salePrice is for the package.
+    // Convert it to base unit price for storage.
     if (data.packagingUnit && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
@@ -118,13 +128,14 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice,
+      salePrice: actualBaseUnitPrice, // Store the calculated base unit price
     };
 
     if (editingProduct) {
       const updatedProductData: Product = {
         ...editingProduct,
         ...productDataForStorage,
+        salePrice: actualBaseUnitPrice, // Ensure updatedProductData also gets the base unit price
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -179,11 +190,12 @@ export default function ProductsPage() {
     const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
     const vatMultiplier = 1 + (vatRatePercent / 100);
     
+    // product.salePrice is always the base unit price
     let priceForCalc = product.salePrice;
     let priceUnit: string = product.unitType;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      priceForCalc = product.salePrice * product.itemsPerPackagingUnit;
+      priceForCalc = product.salePrice * product.itemsPerPackagingUnit; // Calculate package price from base unit price
       priceUnit = product.packagingUnit;
     }
     
@@ -417,26 +429,16 @@ export default function ProductsPage() {
                 <CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Cost Price (per Base Unit):</strong></div><div>${productToView.costPrice.toFixed(2)} / {productToView.unitType}</div>
                   {(() => {
-                    const baseUnitPriceExVat = productToView.salePrice;
-                    const vatRate = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) / 100 : companyProfile.vatRate / 100;
+                    const { priceWithVat, unit } = calculateDisplaySalePrice(productToView);
+                    const baseUnitPriceExVat = productToView.salePrice; // This is already base unit price
                     
-                    let displayPriceExVat = baseUnitPriceExVat;
-                    let displayUnit = productToView.unitType;
-
-                    if (productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0) {
-                      displayPriceExVat = baseUnitPriceExVat * productToView.itemsPerPackagingUnit;
-                      displayUnit = productToView.packagingUnit;
-                       if (displayUnit.toLowerCase() === 'carton' || displayUnit.toLowerCase() === 'cartons') {
-                        displayUnit = 'Ctn';
-                      }
-                    }
-                    const displayPriceIncVat = displayPriceExVat * (1 + vatRate);
-
                     return (
                       <>
                         <div><strong>Sale Price (incl. VAT):</strong></div>
-                        <div>${displayPriceIncVat.toFixed(2)} / {displayUnit}</div>
-                        <div className="col-span-2 text-muted-foreground text-xs italic">(Base unit sale price ex-VAT: ${baseUnitPriceExVat.toFixed(2)} / {productToView.unitType})</div>
+                        <div>${priceWithVat.toFixed(2)} / {unit}</div>
+                        <div className="col-span-2 text-muted-foreground text-xs italic">
+                          (Base unit sale price ex-VAT: ${baseUnitPriceExVat.toFixed(2)} / {productToView.unitType})
+                        </div>
                       </>
                     );
                   })()}
@@ -472,3 +474,4 @@ export default function ProductsPage() {
 }
     
     
+

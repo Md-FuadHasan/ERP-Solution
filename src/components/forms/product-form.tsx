@@ -12,7 +12,7 @@ import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { DollarSign } from 'lucide-react';
 import * as React from 'react';
 
-const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Raw Materials', 'Packaging', 'Beverages', 'Dairy'];
+const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Dairy', 'Beverages', 'Raw Materials', 'Packaging'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML'];
 const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray'];
 
@@ -64,7 +64,9 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       unitType: initialData.unitType || PRODUCT_UNIT_TYPES[0],
       packagingUnit: initialData.packagingUnit || '',
       itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
-      salePrice: initialData.salePrice, // This is already the base unit price when initialData is present
+      // When initialData is present, salePrice is already the base unit price.
+      // For display purposes, we might show package price if applicable (handled in handleSubmit on page level)
+      salePrice: initialData.salePrice, 
     } : {
       id: '',
       name: '',
@@ -82,13 +84,14 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 
   const watchedPackagingUnit = form.watch("packagingUnit");
   const watchedUnitType = form.watch("unitType");
+  const watchedItemsPerPackagingUnit = form.watch("itemsPerPackagingUnit");
 
   const salePriceLabel = React.useMemo(() => {
-    if (watchedPackagingUnit && watchedPackagingUnit.trim() !== '') {
+    if (watchedPackagingUnit && watchedPackagingUnit.trim() !== '' && watchedItemsPerPackagingUnit && watchedItemsPerPackagingUnit > 0) {
       return `Sale Price (per ${watchedPackagingUnit})`;
     }
     return `Sale Price (per ${watchedUnitType})`;
-  }, [watchedPackagingUnit, watchedUnitType]);
+  }, [watchedPackagingUnit, watchedUnitType, watchedItemsPerPackagingUnit]);
 
   return (
     <Form {...form}>
@@ -289,7 +292,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                 </FormControl>
                 <FormDescription>
                   Enter price for the unit indicated in the label above.
-                  {watchedPackagingUnit && watchedPackagingUnit.trim() !== '' && " It will be converted to base unit price for storage."}
+                  If packaging unit is set, this is the price for the whole package.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -311,3 +314,4 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 }
     
     
+
