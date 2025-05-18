@@ -12,6 +12,7 @@ import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { DollarSign } from 'lucide-react';
 import * as React from 'react';
 
+// Ensure these categories match the ProductCategory type in types/index.ts
 const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Dairy', 'Beverages', 'Raw Materials', 'Packaging'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML'];
 const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray'];
@@ -60,12 +61,8 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
     resolver: zodResolver(productFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      category: initialData.category || PRODUCT_CATEGORIES[0],
-      unitType: initialData.unitType || PRODUCT_UNIT_TYPES[0],
       packagingUnit: initialData.packagingUnit || '',
       itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
-      // When initialData is present, salePrice is already the base unit price.
-      // For display purposes, we might show package price if applicable (handled in handleSubmit on page level)
       salePrice: initialData.salePrice, 
     } : {
       id: '',
@@ -314,4 +311,5 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 }
     
     
+
 
