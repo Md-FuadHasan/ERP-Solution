@@ -6,9 +6,8 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, children, ...props }, ref) => {
-  // Removed overflow-auto from this div, page will handle scroll container
   return (
-    <div className="relative w-full rounded-lg"> 
+    <div className="relative w-full rounded-lg overflow-hidden"> {/* Added overflow-hidden here */}
       <table
         ref={ref}
         className={cn("w-full caption-bottom text-sm", className)}
@@ -57,8 +56,7 @@ const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => {
-  // Ensure this uses text-primary-foreground if the parent TableHeader has bg-primary
-  return <th ref={ref} className={cn("h-10 px-2 py-2 text-left align-middle font-bold sm:px-4 [&:has([role=checkbox])]:pr-0", className)} {...props}>{children}</th>;
+  return <th ref={ref} className={cn("h-10 px-2 py-2 text-left align-middle font-bold text-foreground sm:px-4 [&:has([role=checkbox])]:pr-0", className)} {...props}>{children}</th>;
 });
 TableHead.displayName = "TableHead";
 
@@ -87,4 +85,3 @@ export {
   TableCell,
   TableCaption,
 };
-

@@ -102,7 +102,6 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
-    // Determine actual base unit price
     let actualBaseUnitPrice = data.salePrice;
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
@@ -118,7 +117,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice, // Store the calculated base unit price
+      salePrice: actualBaseUnitPrice,
     };
 
     if (editingProduct) {
@@ -169,7 +168,7 @@ export default function ProductsPage() {
   };
 
   const calculateDisplaySalePrice = (product: Product) => {
-    const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate;
+    const vatRatePercent = typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : (companyProfile.vatRate || 0);
     const vatMultiplier = 1 + (vatRatePercent / 100);
     
     let priceForCalc = product.salePrice; 
@@ -212,7 +211,7 @@ export default function ProductsPage() {
 
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-          <div className="h-full overflow-auto">
+          <div className="h-full overflow-auto"> {/* This div handles scroll for skeleton */}
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -249,7 +248,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="h-full overflow-auto"> 
+          <div className="h-full overflow-auto"> {/* This div handles scroll for actual table */}
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -315,7 +314,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8">
+          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state, ensures it uses the flex-grow space */}
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
