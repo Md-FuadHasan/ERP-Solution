@@ -102,15 +102,13 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
+    // Determine actual base unit price
     let actualBaseUnitPrice = data.salePrice;
-    // If packaging unit is defined and items per unit is a positive number,
-    // the entered salePrice is for the package. Convert it to base unit price.
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
-    // else, the salePrice is already for the base unit
 
-    const productDataForStorage: Omit<Product, 'id' | 'sku'> & { sku: string } = {
+    const productDataForStorage = {
       name: data.name,
       sku: data.sku,
       category: data.category,
@@ -120,7 +118,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice,
+      salePrice: actualBaseUnitPrice, // Store the calculated base unit price
     };
 
     if (editingProduct) {
