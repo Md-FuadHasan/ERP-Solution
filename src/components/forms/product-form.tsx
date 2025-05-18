@@ -12,7 +12,6 @@ import type { Product, ProductCategory, ProductUnitType } from '@/types';
 import { DollarSign } from 'lucide-react';
 import * as React from 'react';
 
-// Ensure these categories match the ProductCategory type in types/index.ts
 const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Dairy', 'Beverages', 'Raw Materials', 'Packaging'];
 const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML'];
 const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray'];
@@ -29,7 +28,8 @@ const productFormSchema = z.object({
   stockLevel: z.coerce.number().min(0, "Stock level cannot be negative.").default(0),
   reorderPoint: z.coerce.number().min(0, "Reorder point cannot be negative.").default(0),
   costPrice: z.coerce.number().min(0, "Cost price cannot be negative.").default(0),
-  salePrice: z.coerce.number().min(0, "Sale price cannot be negative.").default(0),
+  salePrice: z.coerce.number().min(0, "Sale price cannot be negative.").default(0), // This is price before excise and VAT
+  exciseTax: z.coerce.number().min(0, "Excise tax cannot be negative.").optional().nullable(), // User input for excise tax
 }).superRefine((data, ctx) => {
   if (data.itemsPerPackagingUnit && (!data.packagingUnit || data.packagingUnit.trim() === '')) {
     ctx.addIssue({
@@ -63,7 +63,11 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       ...initialData,
       packagingUnit: initialData.packagingUnit || '',
       itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
-      salePrice: initialData.salePrice, 
+      salePrice: initialData.salePrice, // This is base unit price, pre-excise, pre-VAT
+      // To display excise tax in the form (which user entered as potentially per-package):
+      exciseTax: initialData.exciseTax !== undefined && initialData.exciseTax !== null && initialData.packagingUnit && initialData.itemsPerPackagingUnit && initialData.itemsPerPackagingUnit > 0
+                   ? initialData.exciseTax * initialData.itemsPerPackagingUnit
+                   : initialData.exciseTax,
     } : {
       id: '',
       name: '',
@@ -76,6 +80,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
       reorderPoint: 0,
       costPrice: 0,
       salePrice: 0,
+      exciseTax: undefined,
     },
   });
 
@@ -85,10 +90,18 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 
   const salePriceLabel = React.useMemo(() => {
     if (watchedPackagingUnit && watchedPackagingUnit.trim() !== '' && watchedItemsPerPackagingUnit && watchedItemsPerPackagingUnit > 0) {
-      return `Sale Price (per ${watchedPackagingUnit})`;
+      return `Sale Price (per ${watchedPackagingUnit}, before taxes)`;
     }
-    return `Sale Price (per ${watchedUnitType})`;
+    return `Sale Price (per ${watchedUnitType}, before taxes)`;
   }, [watchedPackagingUnit, watchedUnitType, watchedItemsPerPackagingUnit]);
+
+  const exciseTaxLabel = React.useMemo(() => {
+    if (watchedPackagingUnit && watchedPackagingUnit.trim() !== '' && watchedItemsPerPackagingUnit && watchedItemsPerPackagingUnit > 0) {
+      return `Excise Tax (per ${watchedPackagingUnit})`;
+    }
+    return `Excise Tax (per ${watchedUnitType})`;
+  }, [watchedPackagingUnit, watchedUnitType, watchedItemsPerPackagingUnit]);
+
 
   return (
     <Form {...form}>
@@ -193,9 +206,9 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Packaging Unit (Optional)</FormLabel>
-                 <FormControl>
-                   <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
-                 </FormControl>
+                <FormControl>
+                  <Input placeholder="e.g., Carton, Box, Pack" {...field} value={field.value || ''} list="packaging-suggestions" />
+                </FormControl>
                 <datalist id="packaging-suggestions">
                   {PACKAGING_UNIT_SUGGESTIONS.map(suggestion => (
                       <option key={suggestion} value={suggestion} />
@@ -288,14 +301,40 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                   </div>
                 </FormControl>
                 <FormDescription>
-                  Enter price for the unit indicated in the label above.
-                  If packaging unit is set, this is the price for the whole package.
+                  Enter price for the unit indicated in the label above (before Excise Tax and VAT).
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
+         <FormField
+            control={form.control}
+            name="exciseTax"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{exciseTaxLabel}</FormLabel>
+                <FormControl>
+                   <div className="relative">
+                    <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        type="number"
+                        placeholder="e.g. 0.50"
+                        {...field}
+                        value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                        step="0.01"
+                        className="pl-8"
+                    />
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  Fixed excise tax amount for the unit indicated (applied before VAT). Leave blank if no excise tax.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -309,7 +348,3 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
     </Form>
   );
 }
-    
-    
-
-

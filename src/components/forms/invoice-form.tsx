@@ -14,18 +14,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod, Product } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useData } from '@/context/DataContext'; // Import useData to access products
 
 
 const invoiceItemSchema = z.object({
-  id: z.string().optional(), 
+  id: z.string().optional(),
+  productId: z.string().optional(), // To link to Product
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
-  unitPrice: z.coerce.number().min(0.01, "Unit price must be positive."),
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."), // Price with product excise, before invoice tax/VAT
   unitType: z.enum(['Cartons', 'PCS']).default('PCS'),
 });
 
@@ -84,8 +86,8 @@ interface InvoiceFormProps {
   initialData?: Invoice | null;
   customers: Customer[];
   companyProfile: CompanyProfile;
-  invoices: Invoice[]; 
-  prefillData?: { customerId?: string | null; customerName?: string | null } | null; 
+  invoices: Invoice[];
+  prefillData?: { customerId?: string | null; customerName?: string | null } | null;
   onSubmit: (data: InvoiceFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -93,12 +95,12 @@ interface InvoiceFormProps {
 
 const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: string | null, customersArray?: Customer[]): InvoiceFormValues => {
   let defaultDueDate = new Date(new Date().setDate(new Date().getDate() + 30));
-  if (!invoice && prefillCustomerId && customersArray) { // For new invoice with prefill
+  if (!invoice && prefillCustomerId && customersArray) {
     const customer = customersArray.find(c => c.id === prefillCustomerId);
     if (customer && customer.customerType === 'Credit' && customer.invoiceAgingDays) {
       defaultDueDate = addDays(new Date(), customer.invoiceAgingDays);
     }
-  } else if (invoice) { // For existing invoice
+  } else if (invoice) {
      defaultDueDate = new Date(invoice.dueDate);
   }
 
@@ -109,24 +111,36 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
       customerId: invoice.customerId,
       issueDate: new Date(invoice.issueDate),
       dueDate: defaultDueDate,
-      items: invoice.items.map(item => ({...item, id: item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, unitType: item.unitType || 'PCS'})),
-      status: invoice.status, 
-      paymentProcessingStatus: 'Unpaid', 
-      partialAmountPaid: undefined, 
+      items: invoice.items.map(item => ({
+        ...item,
+        id: item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        unitType: item.unitType || 'PCS',
+        productId: (item as any).productId || undefined, // Keep productId if it exists
+      })),
+      status: invoice.status,
+      paymentProcessingStatus: 'Unpaid',
+      partialAmountPaid: undefined,
       paymentMethod: undefined,
-      cashVoucherNumber: '', 
-      bankName: '', 
-      bankAccountNumber: '', 
-      onlineTransactionNumber: '', 
+      cashVoucherNumber: '',
+      bankName: '',
+      bankAccountNumber: '',
+      onlineTransactionNumber: '',
     };
   }
-  
+
   return {
     id: `INV-${String(Date.now()).slice(-6)}`,
-    customerId: prefillCustomerId || '', 
+    customerId: prefillCustomerId || '',
     issueDate: new Date(),
     dueDate: defaultDueDate,
-    items: [{ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' }],
+    items: [{
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      description: '',
+      quantity: 1,
+      unitPrice: 0,
+      unitType: 'PCS',
+      productId: undefined
+    }],
     status: 'Pending',
     paymentProcessingStatus: 'Unpaid',
     partialAmountPaid: undefined,
@@ -140,12 +154,13 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
 
 
 export function InvoiceForm({ initialData, customers, companyProfile, invoices, prefillData, onSubmit, onCancel, isSubmitting: parentIsSubmitting }: InvoiceFormProps) {
+  const { products } = useData(); // Get products from DataContext
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: getDefaultFormValues(initialData, prefillData?.customerId, customers),
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "items",
   });
@@ -162,9 +177,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [currentCustomerSearchInput, setCurrentCustomerSearchInput] = useState('');
+  const [isProductPopoverOpen, setIsProductPopoverOpen] = useState<Record<number, boolean>>({});
+  const [currentProductSearchInput, setCurrentProductSearchInput] = useState<Record<number, string>>({});
+
 
   const prevInitialDataRef = useRef(initialData);
-  const prevPrefillDataRef = useRef(prefillData); 
+  const prevPrefillDataRef = useRef(prefillData);
 
   useEffect(() => {
     if (prevInitialDataRef.current !== initialData || prevPrefillDataRef.current !== prefillData ||
@@ -175,24 +193,23 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       form.reset(defaultVals);
 
       let customerForSearchInput: Customer | undefined;
-      if (!initialData && prefillData?.customerId) { 
+      if (!initialData && prefillData?.customerId) {
           customerForSearchInput = customers.find(c => c.id === prefillData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : (prefillData.customerName || ""));
-      } else if (initialData) { 
+      } else if (initialData) {
           customerForSearchInput = customers.find(c => c.id === initialData.customerId);
           setCurrentCustomerSearchInput(customerForSearchInput ? customerForSearchInput.name : "");
-      } else { 
+      } else {
           setCurrentCustomerSearchInput("");
       }
-      
+
       prevInitialDataRef.current = initialData;
       prevPrefillDataRef.current = prefillData;
     }
   }, [initialData, prefillData, customers, form]);
 
-  // Effect to update due date when customerId changes for a NEW invoice
   useEffect(() => {
-    if (!initialData && watchedCustomerId) { // Only for new invoices and when customerId is set
+    if (!initialData && watchedCustomerId) {
       const selectedCustomer = customers.find(c => c.id === watchedCustomerId);
       if (selectedCustomer && selectedCustomer.customerType === 'Credit' && selectedCustomer.invoiceAgingDays) {
         const issueDate = form.getValues('issueDate') || new Date();
@@ -200,8 +217,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
         form.setValue('dueDate', newDueDate, { shouldValidate: true });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedCustomerId, initialData, customers, form.setValue, form.getValues]);
+  }, [watchedCustomerId, initialData, customers, form]);
 
 
 
@@ -224,7 +240,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
       form.setValue('onlineTransactionNumber', '', { shouldValidate: false });
     } else if (currentMethod === 'Bank Transfer') {
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
-    } else if (currentMethod === undefined || currentMethod === null || currentMethod === '') { 
+    } else if (currentMethod === undefined || currentMethod === null || currentMethod === '') {
       form.setValue('cashVoucherNumber', '', { shouldValidate: false });
       form.setValue('bankName', '', { shouldValidate: false });
       form.setValue('bankAccountNumber', '', { shouldValidate: false });
@@ -232,28 +248,87 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     }
   }, [watchedPaymentMethod, form]);
 
+  const handleProductSelect = (index: number, product: Product) => {
+    const currentItem = form.getValues(`items.${index}`);
+    const unitType = currentItem.unitType || 'PCS'; // Default to PCS if not set
+
+    let unitPriceWithExcise: number;
+
+    if (unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      // Price for the whole carton, including total excise for the carton
+      const baseCartonPrice = product.salePrice * product.itemsPerPackagingUnit;
+      const totalExciseForCarton = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
+      unitPriceWithExcise = baseCartonPrice + totalExciseForCarton;
+    } else {
+      // Price per base unit (PCS), including excise for one base unit
+      unitPriceWithExcise = product.salePrice + (product.exciseTax || 0);
+    }
+
+    update(index, {
+      ...currentItem,
+      productId: product.id,
+      description: product.name,
+      unitPrice: unitPriceWithExcise,
+      unitType: unitType, // ensure unitType is preserved or updated
+    });
+    setCurrentProductSearchInput(prev => ({ ...prev, [index]: product.name }));
+    setIsProductPopoverOpen(prev => ({ ...prev, [index]: false }));
+  };
+
+  const handleUnitTypeChange = (index: number, newUnitType: 'PCS' | 'Cartons') => {
+    const currentItem = form.getValues(`items.${index}`);
+    const productId = currentItem.productId;
+    if (!productId) { // If no product linked, just update the unit type
+        update(index, {...currentItem, unitType: newUnitType});
+        return;
+    }
+
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    let unitPriceWithExcise: number;
+
+    if (newUnitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+      const baseCartonPrice = product.salePrice * product.itemsPerPackagingUnit;
+      const totalExciseForCarton = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
+      unitPriceWithExcise = baseCartonPrice + totalExciseForCarton;
+    } else { // PCS or product doesn't have packaging info
+      unitPriceWithExcise = product.salePrice + (product.exciseTax || 0);
+    }
+
+    update(index, {
+      ...currentItem,
+      unitPrice: unitPriceWithExcise,
+      unitType: newUnitType,
+    });
+  };
+
 
   const itemsToCalc = watchedItems || [];
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
 
-  const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10;
-  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05;
+  const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10; // General Tax
+  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05; // VAT
 
-  const taxAmountDisplay = subtotalDisplay * taxRate;
-  const vatAmountDisplay = subtotalDisplay * vatRate;
-  const totalAmountDisplay = subtotalDisplay + taxAmountDisplay + vatAmountDisplay;
+  // General tax is applied on subtotal (which already includes product-specific excise taxes)
+  const generalTaxAmountDisplay = subtotalDisplay * taxRate;
+  // VAT is applied on (subtotal + general tax)
+  const amountForVatCalculation = subtotalDisplay + generalTaxAmountDisplay;
+  const vatAmountDisplay = amountForVatCalculation * vatRate;
 
-  
+  const totalAmountDisplay = subtotalDisplay + generalTaxAmountDisplay + vatAmountDisplay;
+
+
   let displayAmountPaid = initialData?.amountPaid || 0;
-  
-  
+
+
   let displayRemainingBalance = initialData?.remainingBalance !== undefined ? initialData.remainingBalance : totalAmountDisplay;
 
   if (watchedPaymentProcessingStatus === 'Fully Paid') {
-    
-    displayRemainingBalance = 0; 
+
+    displayRemainingBalance = 0;
   } else if (watchedPaymentProcessingStatus === 'Partially Paid' && watchedPartialAmountPaid && watchedPartialAmountPaid > 0) {
-    
+
     const currentPaid = initialData?.amountPaid || 0;
     const potentialNewPaid = currentPaid + watchedPartialAmountPaid;
     displayRemainingBalance = Math.max(0, totalAmountDisplay - potentialNewPaid);
@@ -272,6 +347,17 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
         customer.id.toLowerCase().includes(currentCustomerSearchInput.toLowerCase().trim())
     );
   }, [customers, currentCustomerSearchInput]);
+
+  const getFilteredProducts = (index: number) => {
+    const searchVal = currentProductSearchInput[index]?.toLowerCase().trim() || '';
+    if (!searchVal) return products;
+    return products.filter(
+        (product) =>
+        product.name.toLowerCase().includes(searchVal) ||
+        (product.sku && product.sku.toLowerCase().includes(searchVal)) ||
+        product.id.toLowerCase().includes(searchVal)
+    );
+  };
 
 
   return (
@@ -301,10 +387,10 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                   open={isCustomerPopoverOpen}
                   onOpenChange={(open) => {
                     setIsCustomerPopoverOpen(open);
-                    if (!open) { 
+                    if (!open) {
                       const selectedCustomerId = form.getValues("customerId");
                       const customer = customers.find(c => c.id === selectedCustomerId);
-                       if (customer) { 
+                       if (customer) {
                          setCurrentCustomerSearchInput(customer.name);
                        }
                     }
@@ -340,12 +426,12 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         <CommandGroup>
                           {filteredCustomers.map((customer) => (
                             <CommandItem
-                              value={customer.name} 
+                              value={customer.name}
                               key={customer.id}
                               onSelect={() => {
                                 form.setValue("customerId", customer.id, { shouldValidate: true });
                                 setIsCustomerPopoverOpen(false);
-                                setCurrentCustomerSearchInput(customer.name); 
+                                setCurrentCustomerSearchInput(customer.name);
                               }}
                             >
                               <Check
@@ -429,7 +515,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           />
            <FormField
             control={form.control}
-            name="status" 
+            name="status"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Invoice Status</FormLabel>
@@ -458,15 +544,56 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           <FormLabel>Invoice Items</FormLabel>
           {fields.map((itemField, index) => (
             <div key={itemField.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
+               {/* Product Selection Field for Item */}
               <FormField
                 control={form.control}
-                name={`items.${index}.description`}
+                name={`items.${index}.productId`} // Using productId to store linked product
                 render={({ field }) => (
-                  <FormItem className="flex-grow w-full md:w-auto">
-                    <FormLabel className="sr-only">Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Item Description" {...field} className="min-h-[40px] text-sm" />
-                    </FormControl>
+                  <FormItem className="flex-grow-[2] w-full md:w-auto"> {/* Takes more space */}
+                    <FormLabel className="sr-only">Product</FormLabel>
+                     <Popover
+                        open={isProductPopoverOpen[index] || false}
+                        onOpenChange={(open) => setIsProductPopoverOpen(prev => ({ ...prev, [index]: open }))}
+                      >
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                            >
+                              {field.value
+                                ? products.find(p => p.id === field.value)?.name ?? "Select product"
+                                : "Select product"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search product..."
+                              value={currentProductSearchInput[index] || ''}
+                              onValueChange={(search) => setCurrentProductSearchInput(prev => ({ ...prev, [index]: search }))}
+                            />
+                            <CommandList>
+                              <CommandEmpty>No product found.</CommandEmpty>
+                              <CommandGroup>
+                                {getFilteredProducts(index).map((product) => (
+                                  <CommandItem
+                                    value={product.name}
+                                    key={product.id}
+                                    onSelect={() => handleProductSelect(index, product)}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", product.id === field.value ? "opacity-100" : "opacity-0")} />
+                                    {product.name} (SKU: {product.sku})
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -478,7 +605,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                   <FormItem className="w-full md:w-24">
                     <FormLabel className="sr-only">Quantity</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="Quantity" {...field} step="0.01" className="text-sm"/>
+                      <Input type="number" placeholder="Qty" {...field} step="0.01" className="text-sm"/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -490,7 +617,14 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                 render={({ field }) => (
                   <FormItem className="w-full md:w-32">
                     <FormLabel className="sr-only">Unit Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || 'PCS'}>
+                    <Select
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            handleUnitTypeChange(index, value as 'PCS' | 'Cartons');
+                        }}
+                        value={field.value}
+                        defaultValue={field.value || 'PCS'}
+                    >
                       <FormControl>
                         <SelectTrigger className="text-sm">
                           <SelectValue placeholder="Unit" />
@@ -514,9 +648,10 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                     <FormControl>
                         <div className="relative">
                         <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-6 text-sm"/>
+                        <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-6 text-sm" readOnly={!!form.getValues(`items.${index}.productId`)} />
                         </div>
                     </FormControl>
+                     <FormDescription className="text-xs">Incl. Excise</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -531,7 +666,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
               </Button>
             </div>
           ))}
-          <Button type="button" variant="outline" onClick={() => append({ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
+          <Button type="button" variant="outline" onClick={() => append({ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, productId: undefined, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Item
           </Button>
         </div>
@@ -573,7 +708,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                     <div className="relative">
                       <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input type="number" placeholder="Enter amount" {...field} step="0.01" className="pl-7"
-                             value={field.value === undefined ? '' : String(field.value)} 
+                             value={field.value === undefined ? '' : String(field.value)}
                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                       />
                     </div>
@@ -678,15 +813,15 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
-            <span>Subtotal:</span>
+            <span>Subtotal (incl. item excise):</span>
             <span>${subtotalDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
-            <span>Tax ({ (taxRate * 100).toFixed(0) }%):</span>
-            <span>${taxAmountDisplay.toFixed(2)}</span>
+            <span>General Tax ({ (taxRate * 100).toFixed(0) }% on Subtotal):</span>
+            <span>${generalTaxAmountDisplay.toFixed(2)}</span>
           </div>
            <div className="flex justify-between">
-            <span>VAT ({ (vatRate * 100).toFixed(0) }%):</span>
+            <span>VAT ({ (vatRate * 100).toFixed(0) }% on Subtotal + Gen. Tax):</span>
             <span>${vatAmountDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-semibold">
@@ -755,4 +890,3 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     </Form>
   );
 }
-
