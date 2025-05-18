@@ -103,21 +103,24 @@ export default function ProductsPage() {
 
   const handleSubmit = (data: ProductFormValues) => {
     let actualBaseUnitPrice = data.salePrice;
-    if (data.packagingUnit && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
+    // If packaging unit is defined and items per unit is a positive number,
+    // the entered salePrice is for the package. Convert it to base unit price.
+    if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       actualBaseUnitPrice = data.salePrice / data.itemsPerPackagingUnit;
     }
+    // else, the salePrice is already for the base unit
 
     const productDataForStorage: Omit<Product, 'id' | 'sku'> & { sku: string } = {
       name: data.name,
       sku: data.sku,
       category: data.category,
       unitType: data.unitType,
-      packagingUnit: data.packagingUnit || undefined,
-      itemsPerPackagingUnit: data.itemsPerPackagingUnit || undefined,
+      packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
+      itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: actualBaseUnitPrice, 
+      salePrice: actualBaseUnitPrice,
     };
 
     if (editingProduct) {
@@ -209,10 +212,8 @@ export default function ProductsPage() {
         />
       </div>
 
-      {/* Table Section Container - This div grows and has min-h-0 */}
       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
         {isLoading ? (
-           // Scrollable Viewport for Skeleton
           <div className="h-full overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -250,7 +251,6 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          // Scrollable Viewport for Actual Table
           <div className="h-full overflow-auto"> 
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -317,7 +317,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8"> {/* Container for empty state */}
+          <div className="h-full flex items-center justify-center p-8">
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -445,4 +445,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
