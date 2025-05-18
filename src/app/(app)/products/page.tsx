@@ -49,7 +49,7 @@ export default function ProductsPage() {
     products,
     addProduct,
     updateProduct,
-    deleteProduct,
+    deleteProduct, // Ensured deleteProduct is destructured
     isLoading,
     companyProfile,
   } = useData();
@@ -451,3 +451,4 @@ export default function ProductsPage() {
     
 
     
+
