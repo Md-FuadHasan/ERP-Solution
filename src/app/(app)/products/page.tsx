@@ -128,9 +128,9 @@ export default function ProductsPage() {
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
-      costPrice: data.costPrice, // Cost price is still stored if it was part of the form
-      salePrice: storedBaseSalePrice, // Always store base unit price (pre-excise, pre-VAT)
-      exciseTax: storedBaseUnitExciseTax, // Always store base unit excise tax
+      costPrice: data.costPrice,
+      salePrice: storedBaseSalePrice,
+      exciseTax: storedBaseUnitExciseTax,
     };
 
     if (editingProduct) {
@@ -208,19 +208,21 @@ export default function ProductsPage() {
     }
     return { exciseAmount: totalExciseAmount, unit };
   };
-
+  
   const getDisplayVatInfo = (product: Product, profile: CompanyProfile): { vatAmount: number; unit: string } => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
     let baseForVatCalculation: number;
     let unit: string;
+    
+    const baseUnitExcise = product.exciseTax || 0;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       const packageBasePrice = product.salePrice * product.itemsPerPackagingUnit;
-      const packageExciseTax = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
+      const packageExciseTax = baseUnitExcise * product.itemsPerPackagingUnit;
       baseForVatCalculation = packageBasePrice + packageExciseTax;
       unit = product.packagingUnit;
     } else {
-      baseForVatCalculation = product.salePrice + (product.exciseTax || 0);
+      baseForVatCalculation = product.salePrice + baseUnitExcise;
       unit = product.unitType;
     }
     
@@ -254,7 +256,6 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Orange Section: Page Header and Search */}
       <div>
         <PageHeader
           title="Products"
@@ -275,13 +276,12 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Purple Section: Table Area */}
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
@@ -503,7 +503,7 @@ export default function ProductsPage() {
                     </div>
                     <Separator className="my-1" />
                      <div>
-                        <strong>VAT ({companyProfile.vatRate || 0}% on Base Price + Excise Tax):</strong>
+                        <strong>VAT ({companyProfile.vatRate || 0}% on Base Price + Excise):</strong>
                         &nbsp;${getDisplayVatInfo(productToView, companyProfile).vatAmount.toFixed(2)} / {getDisplayVatInfo(productToView, companyProfile).unit}
                     </div>
                     <Separator className="my-1" />
@@ -548,3 +548,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+
