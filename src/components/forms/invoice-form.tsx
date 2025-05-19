@@ -27,7 +27,7 @@ const invoiceItemSchema = z.object({
   productId: z.string().optional(), // To link to Product
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
-  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."), // Price with product excise, before invoice tax/VAT
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."), // Price INCLUDES product excise, but BEFORE invoice-level tax/VAT
   unitType: z.enum(['Cartons', 'PCS']).default('PCS'),
 });
 
@@ -115,7 +115,7 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
         ...item,
         id: item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         unitType: item.unitType || 'PCS',
-        productId: (item as any).productId || undefined, // Keep productId if it exists
+        productId: (item as any).productId || undefined, 
       })),
       status: invoice.status,
       paymentProcessingStatus: 'Unpaid',
@@ -137,7 +137,7 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       description: '',
       quantity: 1,
-      unitPrice: 0,
+      unitPrice: 0, // This will be (base price + excise tax)
       unitType: 'PCS',
       productId: undefined
     }],
@@ -154,7 +154,7 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
 
 
 export function InvoiceForm({ initialData, customers, companyProfile, invoices, prefillData, onSubmit, onCancel, isSubmitting: parentIsSubmitting }: InvoiceFormProps) {
-  const { products } = useData(); // Get products from DataContext
+  const { products } = useData(); 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: getDefaultFormValues(initialData, prefillData?.customerId, customers),
@@ -250,26 +250,28 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
   const handleProductSelect = (index: number, product: Product) => {
     const currentItem = form.getValues(`items.${index}`);
-    const unitType = currentItem.unitType || 'PCS'; // Default to PCS if not set
+    const unitType = currentItem.unitType || 'PCS'; 
 
     let unitPriceWithExcise: number;
+    const baseUnitPrice = product.salePrice; // This is per base unit, pre-excise
+    const baseUnitExciseTax = product.exciseTax || 0; // Per base unit
 
     if (unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       // Price for the whole carton, including total excise for the carton
-      const baseCartonPrice = product.salePrice * product.itemsPerPackagingUnit;
-      const totalExciseForCarton = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
-      unitPriceWithExcise = baseCartonPrice + totalExciseForCarton;
+      const totalBasePriceForCarton = baseUnitPrice * product.itemsPerPackagingUnit;
+      const totalExciseForCarton = baseUnitExciseTax * product.itemsPerPackagingUnit;
+      unitPriceWithExcise = totalBasePriceForCarton + totalExciseForCarton;
     } else {
       // Price per base unit (PCS), including excise for one base unit
-      unitPriceWithExcise = product.salePrice + (product.exciseTax || 0);
+      unitPriceWithExcise = baseUnitPrice + baseUnitExciseTax;
     }
 
     update(index, {
       ...currentItem,
       productId: product.id,
       description: product.name,
-      unitPrice: unitPriceWithExcise,
-      unitType: unitType, // ensure unitType is preserved or updated
+      unitPrice: unitPriceWithExcise, // This unitPrice now includes excise tax
+      unitType: unitType,
     });
     setCurrentProductSearchInput(prev => ({ ...prev, [index]: product.name }));
     setIsProductPopoverOpen(prev => ({ ...prev, [index]: false }));
@@ -278,7 +280,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const handleUnitTypeChange = (index: number, newUnitType: 'PCS' | 'Cartons') => {
     const currentItem = form.getValues(`items.${index}`);
     const productId = currentItem.productId;
-    if (!productId) { // If no product linked, just update the unit type
+    if (!productId) { 
         update(index, {...currentItem, unitType: newUnitType});
         return;
     }
@@ -287,36 +289,37 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     if (!product) return;
 
     let unitPriceWithExcise: number;
+    const baseUnitPrice = product.salePrice; // This is per base unit, pre-excise
+    const baseUnitExciseTax = product.exciseTax || 0; // Per base unit
 
     if (newUnitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      const baseCartonPrice = product.salePrice * product.itemsPerPackagingUnit;
-      const totalExciseForCarton = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
-      unitPriceWithExcise = baseCartonPrice + totalExciseForCarton;
-    } else { // PCS or product doesn't have packaging info
-      unitPriceWithExcise = product.salePrice + (product.exciseTax || 0);
+      const totalBasePriceForCarton = baseUnitPrice * product.itemsPerPackagingUnit;
+      const totalExciseForCarton = baseUnitExciseTax * product.itemsPerPackagingUnit;
+      unitPriceWithExcise = totalBasePriceForCarton + totalExciseForCarton;
+    } else { 
+      unitPriceWithExcise = baseUnitPrice + baseUnitExciseTax;
     }
 
     update(index, {
       ...currentItem,
-      unitPrice: unitPriceWithExcise,
+      unitPrice: unitPriceWithExcise, // This unitPrice now includes excise tax
       unitType: newUnitType,
     });
   };
 
 
   const itemsToCalc = watchedItems || [];
+  // Subtotal is sum of (quantity * (base product price + product excise tax))
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
 
-  const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate)/100 : 0.10; // General Tax
-  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.05; // VAT
+  // General Tax is now 0, as VAT is the primary tax applied after excise.
+  const generalTaxAmountDisplay = 0; 
+  
+  // VAT is applied on the subtotal (which already includes product-specific excise taxes)
+  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.15; // Default to 15% VAT if not set
+  const vatAmountDisplay = subtotalDisplay * vatRate;
 
-  // General tax is applied on subtotal (which already includes product-specific excise taxes)
-  const generalTaxAmountDisplay = subtotalDisplay * taxRate;
-  // VAT is applied on (subtotal + general tax)
-  const amountForVatCalculation = subtotalDisplay + generalTaxAmountDisplay;
-  const vatAmountDisplay = amountForVatCalculation * vatRate;
-
-  const totalAmountDisplay = subtotalDisplay + generalTaxAmountDisplay + vatAmountDisplay;
+  const totalAmountDisplay = subtotalDisplay + vatAmountDisplay; // No generalTaxAmountDisplay
 
 
   let displayAmountPaid = initialData?.amountPaid || 0;
@@ -544,12 +547,11 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
           <FormLabel>Invoice Items</FormLabel>
           {fields.map((itemField, index) => (
             <div key={itemField.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
-               {/* Product Selection Field for Item */}
               <FormField
                 control={form.control}
-                name={`items.${index}.productId`} // Using productId to store linked product
+                name={`items.${index}.productId`} 
                 render={({ field }) => (
-                  <FormItem className="flex-grow-[2] w-full md:w-auto"> {/* Takes more space */}
+                  <FormItem className="flex-grow-[2] w-full md:w-auto"> 
                     <FormLabel className="sr-only">Product</FormLabel>
                      <Popover
                         open={isProductPopoverOpen[index] || false}
@@ -651,7 +653,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
                         <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-6 text-sm" readOnly={!!form.getValues(`items.${index}.productId`)} />
                         </div>
                     </FormControl>
-                     <FormDescription className="text-xs">Incl. Excise</FormDescription>
+                     <FormDescription className="text-xs">Incl. Item Excise</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -813,15 +815,17 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
-            <span>Subtotal (incl. item excise):</span>
+            <span>Subtotal (incl. Item Excise):</span>
             <span>${subtotalDisplay.toFixed(2)}</span>
           </div>
+          {/* General Tax is removed as per new logic:
           <div className="flex justify-between">
             <span>General Tax ({ (taxRate * 100).toFixed(0) }% on Subtotal):</span>
             <span>${generalTaxAmountDisplay.toFixed(2)}</span>
           </div>
+          */}
            <div className="flex justify-between">
-            <span>VAT ({ (vatRate * 100).toFixed(0) }% on Subtotal + Gen. Tax):</span>
+            <span>VAT ({ (vatRate * 100).toFixed(0) }% on Subtotal):</span>
             <span>${vatAmountDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-semibold">

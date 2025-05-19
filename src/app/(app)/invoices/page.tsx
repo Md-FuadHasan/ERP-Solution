@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -146,7 +145,6 @@ export default function InvoicesPage() {
       
       const currentAction = searchParams.get('action');
       const currentId = searchParams.get('id');
-      const intentKeyForClose = `action=${currentAction}&id=${currentId}`;
       
       if ((currentAction === 'edit' || currentAction === 'new') && urlParamsProcessedIntentKey && (urlParamsProcessedIntentKey.startsWith(currentAction) || (currentAction === 'edit' && urlParamsProcessedIntentKey.includes(currentId || '')) )) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -155,7 +153,7 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // The useEffect will handle resetting urlParamsProcessedIntentKey when it sees the cleared URL
+        setUrlParamsProcessedIntentKey(null); 
       }
     }
   }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
@@ -170,6 +168,7 @@ export default function InvoicesPage() {
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+            setUrlParamsProcessedIntentKey(null);
         }
     }
   }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
@@ -250,13 +249,15 @@ export default function InvoicesPage() {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
 
+    // Calculate totals based on line items where unitPrice already includes item-specific excise tax
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-    const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0.10;
-    const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.05;
-    const calculatedTaxAmount = calculatedSubtotal * taxRate;
-    const amountForVatCalculation = calculatedSubtotal + calculatedTaxAmount;
-    const calculatedVatAmount = amountForVatCalculation * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + calculatedVatAmount;
+    
+    // General tax is now 0, VAT is the primary tax applied to subtotal (which includes excise)
+    const calculatedGeneralTaxAmount = 0; 
+    const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.15; // Default to 15%
+    const calculatedVatAmount = calculatedSubtotal * vatRate;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
+
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -319,7 +320,6 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    // Determine final status based on payment and due date
     if (data.status === 'Cancelled') {
       finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
@@ -341,10 +341,10 @@ export default function InvoicesPage() {
       customerName: customer?.name || 'N/A',
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
-      items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })),
-      subtotal: calculatedSubtotal,
-      taxAmount: calculatedTaxAmount,
-      vatAmount: calculatedVatAmount,
+      items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })), // item.unitPrice already includes excise
+      subtotal: calculatedSubtotal, // Subtotal includes item excise taxes
+      taxAmount: calculatedGeneralTaxAmount, // General tax, now 0
+      vatAmount: calculatedVatAmount, // VAT on subtotal
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus, 
@@ -368,8 +368,8 @@ export default function InvoicesPage() {
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
-  const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
   const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
+  // taxRatePercent for general tax is removed as it's no longer applied in totals
 
   return (
     <div className="flex flex-col h-full">
@@ -389,8 +389,8 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
-        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+        <div className="h-full overflow-y-auto"> 
           {isDataContextLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -593,8 +593,8 @@ export default function InvoicesPage() {
                             <TableRow>
                               <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
                               <TableHead className="text-center w-24">Qty</TableHead>
-                              <TableHead className="text-right w-32">Unit Price</TableHead>
-                              <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount</TableHead>
+                              <TableHead className="text-right w-32">Unit Price (incl. Excise)</TableHead>
+                              <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount (incl. Excise)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -624,13 +624,15 @@ export default function InvoicesPage() {
                       </div>
                       <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subtotal:</span>
+                          <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
                           <span className="font-medium text-foreground">${invoiceToViewInModal.subtotal.toFixed(2)}</span>
                         </div>
+                        {/* General Tax is removed based on new logic
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span>
+                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
                           <span className="font-medium text-foreground">${invoiceToViewInModal.taxAmount.toFixed(2)}</span>
                         </div>
+                        */}
                         {invoiceToViewInModal.vatAmount > 0 && (
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>

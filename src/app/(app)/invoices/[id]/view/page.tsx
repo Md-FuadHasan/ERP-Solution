@@ -40,11 +40,10 @@ export default function InvoiceViewPage() {
         setCustomer(foundCustomer);
         setQrCodeValue(`Invoice ID: ${foundInvoice.id}\nTotal Amount: $${foundInvoice.totalAmount.toFixed(2)}\nDue Date: ${format(new Date(foundInvoice.dueDate), 'MMM d, yyyy')}`);
       } else {
-        setCustomer(null); // Invoice not found, so customer is also not applicable
+        setCustomer(null); 
       }
       setPageLoading(false);
     } else if (!isDataContextLoading && !invoiceId) {
-        // No invoiceId provided or invalid
         setInvoice(null);
         setCustomer(null);
         setPageLoading(false);
@@ -53,7 +52,6 @@ export default function InvoiceViewPage() {
 
   const handlePrint = () => {
     toast({ title: "Print Action", description: "Print functionality would be implemented here." });
-    // window.print(); // Basic browser print
   };
 
   const handleDownloadPDF = () => {
@@ -66,68 +64,70 @@ export default function InvoiceViewPage() {
     }
   };
   
-  const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
+  // General tax (companyProfile.taxRate) is now assumed to be 0 or not used in the final invoice calculation
+  // if VAT is the primary tax applied after excise.
   const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
 
 
   if (pageLoading || isDataContextLoading) {
     return (
       <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg animate-pulse">
-        <Skeleton className="h-6 w-24 mb-8" /> {/* Back button placeholder */}
+        <Skeleton className="h-6 w-24 mb-8" /> 
         
         <header className="mb-8">
           <div className="flex justify-between items-center mb-2">
-            <Skeleton className="h-10 w-40" /> {/* INVOICE title skeleton */}
-            <Skeleton className="h-8 w-24" /> {/* Badge skeleton */}
+            <Skeleton className="h-10 w-40" /> 
+            <Skeleton className="h-8 w-24" /> 
           </div>
-          <Skeleton className="h-4 w-32" /> {/* Invoice # skeleton */}
+          <Skeleton className="h-4 w-32" /> 
         </header>
         
         <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
           <div>
-            <Skeleton className="h-4 w-16 mb-2" /> {/* From label skeleton */}
-            <Skeleton className="h-6 w-48 mb-1" /> {/* Company name skeleton */}
-            <Skeleton className="h-4 w-full mb-0.5" /> {/* Address line 1 skeleton */}
-            <Skeleton className="h-4 w-3/4 mb-0.5" /> {/* Address line 2 skeleton */}
-            <Skeleton className="h-4 w-5/6" /> {/* Contact skeleton */}
+            <Skeleton className="h-4 w-16 mb-2" /> 
+            <Skeleton className="h-6 w-48 mb-1" /> 
+            <Skeleton className="h-4 w-full mb-0.5" /> 
+            <Skeleton className="h-4 w-3/4 mb-0.5" /> 
+            <Skeleton className="h-4 w-5/6" /> 
           </div>
           <div className="md:text-left">
-            <Skeleton className="h-4 w-16 mb-2" /> {/* Bill To label skeleton */}
-            <Skeleton className="h-6 w-40 mb-1" /> {/* Customer name skeleton */}
-            <Skeleton className="h-4 w-full mb-0.5" /> {/* Address line 1 skeleton */}
-            <Skeleton className="h-4 w-3/4 mb-0.5" /> {/* Address line 2 skeleton */}
-            <Skeleton className="h-4 w-5/6" /> {/* Contact skeleton */}
+            <Skeleton className="h-4 w-16 mb-2" /> 
+            <Skeleton className="h-6 w-40 mb-1" /> 
+            <Skeleton className="h-4 w-full mb-0.5" /> 
+            <Skeleton className="h-4 w-3/4 mb-0.5" /> 
+            <Skeleton className="h-4 w-5/6" /> 
           </div>
         </section>
         
         <Separator className="my-8" />
 
         <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
-           <div className="grid grid-cols-3 gap-x-4 text-sm"> {/* Updated skeleton grid */}
+           <div className="grid grid-cols-3 gap-x-4 text-sm"> 
             {[...Array(3)].map((_, i) => (
               <div key={i} className="space-y-1">
-                <Skeleton className="h-3 w-20" /> {/* Label skeleton */}
-                <Skeleton className="h-5 w-full max-w-[100px] sm:max-w-[120px]" /> {/* Value skeleton */}
+                <Skeleton className="h-3 w-20" /> 
+                <Skeleton className="h-5 w-full max-w-[100px] sm:max-w-[120px]" /> 
               </div>
             ))}
           </div>
         </section>
         
         <section className="mb-8">
-          <Skeleton className="h-6 w-36 mb-4" /> {/* Order Summary title skeleton */}
+          <Skeleton className="h-6 w-36 mb-4" /> 
           <div className="overflow-x-auto rounded-lg border">
-            <Skeleton className="h-48 w-full" /> {/* Table Skeleton */}
+            <Skeleton className="h-48 w-full" /> 
           </div>
         </section>
 
         <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
             <div className="w-full md:w-auto flex flex-col items-center md:items-start">
-                <Skeleton className="h-5 w-32 mb-2" /> {/* QR Code title skeleton */}
-                <Skeleton className="h-32 w-32" /> {/* QR Code Skeleton */}
+                <Skeleton className="h-5 w-32 mb-2" /> 
+                <Skeleton className="h-32 w-32" /> 
             </div>
             <div className="w-full md:max-w-sm space-y-2.5 border p-4 sm:p-6 rounded-lg bg-muted/40">
                 <Skeleton className="h-5 w-24 ml-auto" />
-                <Skeleton className="h-5 w-20 ml-auto" />
+                {/* Removed skeleton for general tax if it's no longer displayed */}
+                <Skeleton className="h-5 w-20 ml-auto" /> 
                 <Skeleton className="h-1 w-full my-3 !bg-border" />
                 <Skeleton className="h-6 w-28 ml-auto" />
                 <Skeleton className="h-5 w-24 ml-auto mt-2" />
@@ -203,7 +203,7 @@ export default function InvoiceViewPage() {
       <Separator className="my-8" />
 
       <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
-        <div className="grid grid-cols-3 gap-x-4 text-sm"> {/* Changed to grid-cols-3 and adjusted gap */}
+        <div className="grid grid-cols-3 gap-x-4 text-sm"> 
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
             <p className="font-medium text-base text-foreground">{format(new Date(invoice.issueDate), 'MMMM d, yyyy')}</p>
@@ -227,8 +227,8 @@ export default function InvoiceViewPage() {
               <TableRow>
                 <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
                 <TableHead className="text-center w-24">Qty</TableHead>
-                <TableHead className="text-right w-32">Unit Price</TableHead>
-                <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount</TableHead>
+                <TableHead className="text-right w-32">Unit Price (incl. Excise)</TableHead>
+                <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount (incl. Excise)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,13 +258,15 @@ export default function InvoiceViewPage() {
         </div>
         <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal:</span>
+            <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
             <span className="font-medium text-foreground">${invoice.subtotal.toFixed(2)}</span>
           </div>
+          {/* General Tax (invoice.taxAmount) is usually 0 now. We only show VAT.
           <div className="flex justify-between">
             <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
             <span className="font-medium text-foreground">${invoice.taxAmount.toFixed(2)}</span>
           </div>
+          */}
           {invoice.vatAmount > 0 && (
              <div className="flex justify-between">
                 <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
