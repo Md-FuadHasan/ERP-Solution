@@ -104,8 +104,8 @@ export default function ProductsPage() {
     let storedBaseSalePrice: number;
     let storedBaseExciseTax: number | undefined = undefined;
 
-    const formSalePrice = data.salePrice; 
-    const formExciseTax = data.exciseTax; 
+    const formSalePrice = data.salePrice;
+    const formExciseTax = data.exciseTax;
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
@@ -118,7 +118,7 @@ export default function ProductsPage() {
         storedBaseExciseTax = formExciseTax;
       }
     }
-    
+
     const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = {
       name: data.name,
       sku: data.sku || '',
@@ -129,7 +129,7 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseSalePrice, 
+      salePrice: storedBaseSalePrice,
       exciseTax: storedBaseExciseTax,
     };
 
@@ -180,9 +180,9 @@ export default function ProductsPage() {
       default: return 'secondary';
     }
   };
-  
+
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
-    let price = product.salePrice; 
+    let price = product.salePrice;
     let unit = product.unitType;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       price = product.salePrice * product.itemsPerPackagingUnit;
@@ -193,7 +193,7 @@ export default function ProductsPage() {
     }
     return { price, unit };
   };
-
+  
   const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
     const baseUnitExcise = product.exciseTax || 0;
     let totalExciseAmount = baseUnitExcise;
@@ -208,15 +208,15 @@ export default function ProductsPage() {
     }
     return { exciseAmount: totalExciseAmount, unit };
   };
-  
+
   const getDisplayVatInfo = (product: Product, profile: CompanyProfile): { vatAmount: number; unit: string } => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
     
     let baseForVatCalculation: number;
     let unit: string;
     
-    const baseUnitSalePrice = product.salePrice; 
-    const baseUnitExcise = product.exciseTax || 0; 
+    const baseUnitSalePrice = product.salePrice;
+    const baseUnitExcise = product.exciseTax || 0;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       const packageBasePrice = baseUnitSalePrice * product.itemsPerPackagingUnit;
@@ -238,7 +238,7 @@ export default function ProductsPage() {
 
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0); 
+    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0);
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
@@ -254,7 +254,6 @@ export default function ProductsPage() {
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -549,3 +548,6 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+
+    
