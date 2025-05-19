@@ -143,22 +143,117 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteCustomer = useCallback((customerId: string) => {
     setCustomers((prev) => prev.filter((c) => c.id !== customerId));
-    setInvoices((prevInvoices) => prevInvoices.filter(inv => inv.customerId !== customerId));
+    // Optionally, also delete associated invoices or handle them differently
+    // For now, just deleting customer, invoices remain (orphaned or could be filtered out in UI)
   }, []);
 
   const addInvoice = useCallback((invoice: Invoice) => {
     setInvoices((prev) => [invoice, ...prev]);
+
+    // Deduct stock if invoice is not cancelled
+    if (invoice.status !== 'Cancelled') {
+      setProducts((currentProducts) => {
+        const updatedProducts = currentProducts.map(p => ({ ...p })); // Create a mutable copy
+
+        invoice.items.forEach(item => {
+          if (!item.productId) return; 
+
+          const productIndex = updatedProducts.findIndex(p => p.id === item.productId);
+          if (productIndex !== -1) {
+            const product = updatedProducts[productIndex];
+            let quantityToDeduct = item.quantity;
+
+            if (item.unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+              quantityToDeduct = item.quantity * product.itemsPerPackagingUnit;
+            }
+            
+            updatedProducts[productIndex] = {
+              ...product,
+              stockLevel: Math.max(0, product.stockLevel - quantityToDeduct),
+            };
+          }
+        });
+        return updatedProducts;
+      });
+    }
   }, []);
 
   const updateInvoice = useCallback((updatedInvoice: Invoice) => {
+    const originalInvoice = invoices.find(inv => inv.id === updatedInvoice.id);
+
+    setProducts((currentProducts) => {
+      let tempProducts = currentProducts.map(p => ({ ...p }));
+
+      // 1. Return stock from the original invoice items (if it existed and wasn't cancelled)
+      if (originalInvoice && originalInvoice.status !== 'Cancelled') {
+        originalInvoice.items.forEach(item => {
+          if (!item.productId) return;
+          const productIndex = tempProducts.findIndex(p => p.id === item.productId);
+          if (productIndex !== -1) {
+            const product = tempProducts[productIndex];
+            let quantityToAddBack = item.quantity;
+            if (item.unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+              quantityToAddBack = item.quantity * product.itemsPerPackagingUnit;
+            }
+            tempProducts[productIndex] = {
+              ...product,
+              stockLevel: product.stockLevel + quantityToAddBack,
+            };
+          }
+        });
+      }
+
+      // 2. Deduct stock for the new/updated invoice items (if not cancelled)
+      if (updatedInvoice.status !== 'Cancelled') {
+        updatedInvoice.items.forEach(item => {
+          if (!item.productId) return;
+          const productIndex = tempProducts.findIndex(p => p.id === item.productId);
+          if (productIndex !== -1) {
+            const product = tempProducts[productIndex];
+            let quantityToDeduct = item.quantity;
+            if (item.unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+              quantityToDeduct = item.quantity * product.itemsPerPackagingUnit;
+            }
+            tempProducts[productIndex] = {
+              ...product,
+              stockLevel: Math.max(0, product.stockLevel - quantityToDeduct),
+            };
+          }
+        });
+      }
+      return tempProducts;
+    });
+
     setInvoices((prev) =>
       prev.map((i) => (i.id === updatedInvoice.id ? updatedInvoice : i))
     );
-  }, []);
+  }, [invoices]); // Important: add invoices to dependency array
 
   const deleteInvoice = useCallback((invoiceId: string) => {
+    const invoiceToDelete = invoices.find(inv => inv.id === invoiceId);
+    if (invoiceToDelete && invoiceToDelete.status !== 'Cancelled') {
+      setProducts((currentProducts) => {
+        const updatedProducts = currentProducts.map(p => ({ ...p }));
+        invoiceToDelete.items.forEach(item => {
+          if (!item.productId) return;
+          const productIndex = updatedProducts.findIndex(p => p.id === item.productId);
+          if (productIndex !== -1) {
+            const product = updatedProducts[productIndex];
+            let quantityToAddBack = item.quantity;
+            if (item.unitType === 'Cartons' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+              quantityToAddBack = item.quantity * product.itemsPerPackagingUnit;
+            }
+            updatedProducts[productIndex] = {
+              ...product,
+              stockLevel: product.stockLevel + quantityToAddBack,
+            };
+          }
+        });
+        return updatedProducts;
+      });
+    }
     setInvoices((prev) => prev.filter((i) => i.id !== invoiceId));
-  }, []);
+  }, [invoices]); // Important: add invoices to dependency array
 
   const updateCompanyProfile = useCallback((profileUpdate: Partial<CompanyProfile>) => {
     setCompanyProfile((prev) => ({ ...prev, ...profileUpdate }));
@@ -232,7 +327,3 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
-
-    
-
-    
