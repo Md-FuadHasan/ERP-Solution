@@ -101,29 +101,30 @@ export default function ProductsPage() {
   };
 
   const handleSubmit = (data: ProductFormValues) => {
+    // Ensure baseSalePrice and baseExciseTax are correctly calculated and stored
     let storedBaseSalePrice: number;
-    let storedBaseUnitExciseTax: number | undefined = undefined;
+    let storedBaseExciseTax: number | undefined = undefined;
 
-    const formSalePrice = data.salePrice; // This price is pre-excise, pre-VAT
-    const formExciseTax = data.exciseTax; // This is the excise amount entered by user
+    const formSalePrice = data.salePrice; // This is price as entered (either per base unit or per package)
+    const formExciseTax = data.exciseTax; // This is excise tax as entered (either per base unit or per package)
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       // User entered price and excise tax for the whole package
       storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
       if (formExciseTax !== undefined && formExciseTax !== null) {
-        storedBaseUnitExciseTax = formExciseTax / data.itemsPerPackagingUnit;
+        storedBaseExciseTax = formExciseTax / data.itemsPerPackagingUnit;
       }
     } else {
       // User entered price and excise tax for the base unit
       storedBaseSalePrice = formSalePrice;
       if (formExciseTax !== undefined && formExciseTax !== null) {
-        storedBaseUnitExciseTax = formExciseTax;
+        storedBaseExciseTax = formExciseTax;
       }
     }
     
     const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = {
       name: data.name,
-      sku: data.sku,
+      sku: data.sku || '',
       category: data.category,
       unitType: data.unitType,
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
@@ -132,7 +133,7 @@ export default function ProductsPage() {
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
       salePrice: storedBaseSalePrice, // Always store base unit sale price (pre-excise, pre-VAT)
-      exciseTax: storedBaseUnitExciseTax, // Always store base unit excise tax
+      exciseTax: storedBaseExciseTax, // Always store base unit excise tax
     };
 
     if (editingProduct) {
@@ -182,7 +183,7 @@ export default function ProductsPage() {
       default: return 'secondary';
     }
   };
-
+  
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
     let price = product.salePrice; // This is base unit price, pre-excise, pre-VAT
     let unit = product.unitType;
@@ -216,17 +217,15 @@ export default function ProductsPage() {
     let baseForVatCalculation: number;
     let unit: string;
     
-    const baseUnitSalePrice = product.salePrice; // Already base unit price
-    const baseUnitExcise = product.exciseTax || 0; // Already base unit excise
+    const baseUnitSalePrice = product.salePrice; 
+    const baseUnitExcise = product.exciseTax || 0; 
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      // Calculate for the whole package
       const packageBasePrice = baseUnitSalePrice * product.itemsPerPackagingUnit;
       const packageExciseTax = baseUnitExcise * product.itemsPerPackagingUnit;
       baseForVatCalculation = packageBasePrice + packageExciseTax;
       unit = product.packagingUnit;
     } else {
-      // Calculate for the base unit
       baseForVatCalculation = baseUnitSalePrice + baseUnitExcise;
       unit = product.unitType;
     }
@@ -241,7 +240,7 @@ export default function ProductsPage() {
 
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0); // product.salePrice is base unit price, product.exciseTax is base unit excise
+    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0); 
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
@@ -261,6 +260,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Orange Section: Page Header and Search */}
       <div>
         <PageHeader
           title="Products"
@@ -281,13 +281,13 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Table Section Wrapper */}
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+      {/* Purple Section: Table Area */}
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
         {isLoading ? (
-           <div className="h-full overflow-y-auto">
+          <div className="h-full overflow-y-auto"> {/* Scrollable container for skeleton */}
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
+                <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
@@ -297,8 +297,7 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead className="text-center align-bottom min-w-[160px]" colSpan={2}>
-                     <div>Sale Price</div>
-                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
+                     <div>Sale Price <span className="text-xs font-normal opacity-75">(Inc VAT & Excise)</span></div>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
@@ -333,7 +332,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="h-full overflow-y-auto"> 
+          <div className="h-full overflow-y-auto"> {/* Scrollable container for actual table */}
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
@@ -414,7 +413,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center p-8">
+          <div className="h-full flex items-center justify-center p-8"> {/* Centering placeholder */}
             <DataPlaceholder
               title="No Products Found"
               message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -556,3 +555,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
