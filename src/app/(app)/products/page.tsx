@@ -103,7 +103,7 @@ export default function ProductsPage() {
     let storedBaseSalePrice: number;
     let storedBaseExciseTax: number | undefined = undefined;
 
-    const formSalePrice = data.salePrice; // This is pre-excise, pre-VAT
+    const formSalePrice = data.salePrice; 
     const formExciseTaxValue = data.exciseTax;
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
@@ -117,7 +117,7 @@ export default function ProductsPage() {
         storedBaseExciseTax = formExciseTaxValue;
       }
     }
-
+    
     const productDataForStorage: Omit<Product, 'id' | 'createdAt' | 'category'> & { category: ProductCategory } = {
       name: data.name,
       sku: data.sku || '',
@@ -128,8 +128,8 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseSalePrice, // Always store base unit sale price (pre-excise, pre-VAT)
-      exciseTax: storedBaseExciseTax, // Always store base unit excise tax
+      salePrice: storedBaseSalePrice, 
+      exciseTax: storedBaseExciseTax,
     };
 
     if (editingProduct) {
@@ -190,9 +190,9 @@ export default function ProductsPage() {
     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') return 'Ctn';
     return unit;
   };
-
+  
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
-    let price = product.salePrice;
+    let price = product.salePrice; // This is base unit price, pre-excise, pre-VAT
     let unit = product.unitType;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       price = product.salePrice * product.itemsPerPackagingUnit;
@@ -220,16 +220,16 @@ export default function ProductsPage() {
     let baseForVatCalculation: number;
     let unit: string;
     
-    const baseUnitSalePrice = product.salePrice; // pre-excise, pre-VAT
+    const baseUnitSalePrice = product.salePrice; 
     const baseUnitExcise = product.exciseTax || 0;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       const packageBasePrice = baseUnitSalePrice * product.itemsPerPackagingUnit;
       const packageExciseTax = baseUnitExcise * product.itemsPerPackagingUnit;
-      baseForVatCalculation = packageBasePrice + packageExciseTax;
+      baseForVatCalculation = packageBasePrice + packageExciseTax; // VAT on Base + Excise
       unit = product.packagingUnit;
     } else {
-      baseForVatCalculation = baseUnitSalePrice + baseUnitExcise;
+      baseForVatCalculation = baseUnitSalePrice + baseUnitExcise; // VAT on Base + Excise
       unit = product.unitType;
     }
     
@@ -238,14 +238,14 @@ export default function ProductsPage() {
     return { vatAmount, unit };
   };
 
-  const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
+  const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile): number => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
     const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0);
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
 
-  const calculateFinalCtnPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
+  const calculateFinalCtnPriceWithVatAndExcise = (product: Product, profile: CompanyProfile): number | null => {
     if (!product.packagingUnit || !product.itemsPerPackagingUnit || product.itemsPerPackagingUnit <= 0) {
       return null;
     }
@@ -289,19 +289,19 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="min-w-[150px]">Name</TableHead>
                   <TableHead rowSpan={2} className="min-w-[70px]">SKU</TableHead>
                   <TableHead rowSpan={2} className="min-w-[100px]">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Stock</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[80px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[160px]">
+                  <TableHead rowSpan={2} className="min-w-[70px] text-right">Stock</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[80px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
                      <div>Sale Price</div>
                      <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[120px]">Actions</TableHead>
+                  <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
+                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,25 +321,25 @@ export default function ProductsPage() {
         ) : filteredProducts.length > 0 ? (
           <div className="h-full overflow-y-auto">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
                   <TableHead rowSpan={2} className="min-w-[80px]">Product ID</TableHead>
                   <TableHead rowSpan={2} className="min-w-[150px]">Name</TableHead>
                   <TableHead rowSpan={2} className="min-w-[70px]">SKU</TableHead>
                   <TableHead rowSpan={2} className="min-w-[100px]">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Stock</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[80px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[160px]">
+                  <TableHead rowSpan={2} className="min-w-[70px] text-right">Stock</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[80px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
                      <div>Sale Price</div>
                      <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[120px]">Actions</TableHead>
+                  <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
+                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,16 +374,16 @@ export default function ProductsPage() {
                       <TableCell className="text-right">${finalPcsPrice.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary" title="View Product">
+                          <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary p-1.5" title="View Product">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary" title="Edit Product">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="hover:text-primary p-1.5" title="Edit Product">
                             <Edit className="h-4 w-4" />
                           </Button>
                            <Button
                             variant="ghost"
                             size="icon"
-                            className="hover:text-destructive"
+                            className="hover:text-destructive p-1.5"
                             title="Delete Product"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -460,7 +460,7 @@ export default function ProductsPage() {
                   {productToView.packagingUnit && (<>
                       <div className="col-span-2"><Separator className="my-1" /></div>
                       <div><strong>Packaging Unit:</strong></div><div><Badge variant="outline">{getDisplayUnit(productToView, 'package')}</Badge></div>
-                      <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit} {productToView.unitType}</div>
+                      <div><strong>Items per Package:</strong></div><div>{productToView.itemsPerPackagingUnit} {getDisplayUnit(productToView, 'base')}</div>
                   </>)}
               </CardContent></Card>
               <Card><CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
@@ -468,12 +468,11 @@ export default function ProductsPage() {
                   <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
                     {productToView.stockLevel} {getDisplayUnit(productToView, productToView.packagingUnit ? 'package' : 'base')}
                   </div>
-                  <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {productToView.unitType}</div>
+                  <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {getDisplayUnit(productToView, 'base')}</div>
               </CardContent></Card>
                <Card><CardContent className="pt-6 grid grid-cols-1 gap-y-2">
                   <div><strong>Base Price:</strong> ${getDisplayBasePriceInfo(productToView).price.toFixed(2)} / {getDisplayBasePriceInfo(productToView).unit} <span className="text-muted-foreground text-xs italic">(pre-VAT, pre-excise)</span></div>
-                  <Separator className="my-1" />
-                  <div><strong>Excise Tax:</strong> ${getDisplayExciseTaxInfo(productToView).exciseAmount.toFixed(2)} / {getDisplayExciseTaxInfo(productToView).unit}</div>
+                   <div><strong>Excise Tax:</strong> ${getDisplayExciseTaxInfo(productToView).exciseAmount.toFixed(2)} / {getDisplayExciseTaxInfo(productToView).unit}</div>
                   <Separator className="my-1" />
                   <div><strong>VAT ({companyProfile.vatRate || 0}% on Base + Excise):</strong> ${getDisplayVatInfo(productToView, companyProfile).vatAmount.toFixed(2)} / {getDisplayVatInfo(productToView, companyProfile).unit}</div>
                   <Separator className="my-1" />
