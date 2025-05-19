@@ -92,14 +92,13 @@ export default function InvoicesPage() {
     const customerNameParam = searchParams.get('customerName');
 
     let currentUrlIntentKey: string | null = null;
-    if (action === 'new') { // No need to check customerIdParam here, prefillData handles it
+    if (action === 'new') {
       currentUrlIntentKey = `action=new&customerId=${customerIdParam || ''}&customerName=${customerNameParam || ''}`;
     } else if (action === 'edit' && invoiceIdParam) {
       currentUrlIntentKey = `action=edit&id=${invoiceIdParam}`;
     } else if (action === 'view' && invoiceIdParam) {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
-
 
     if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
       if (action === 'new') {
@@ -125,10 +124,8 @@ export default function InvoicesPage() {
            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
          }
       }
-    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
-        if (!isFormModalOpen && !isViewModalOpen) {
-             setUrlParamsProcessedIntentKey(null);
-        }
+    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey && !isFormModalOpen && !isViewModalOpen) {
+      setUrlParamsProcessedIntentKey(null);
     }
   }, [
     searchParams,
@@ -147,9 +144,11 @@ export default function InvoicesPage() {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
       
-      // Only clear URL if it was the source of the modal opening
       const currentAction = searchParams.get('action');
-      if ((currentAction === 'edit' || currentAction === 'new') && urlParamsProcessedIntentKey) {
+      const currentId = searchParams.get('id');
+      const intentKeyForClose = `action=${currentAction}&id=${currentId}`;
+      
+      if ((currentAction === 'edit' || currentAction === 'new') && urlParamsProcessedIntentKey && (urlParamsProcessedIntentKey.startsWith(currentAction) || (currentAction === 'edit' && urlParamsProcessedIntentKey.includes(currentId || '')) )) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
@@ -171,7 +170,6 @@ export default function InvoicesPage() {
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-             // The useEffect will handle resetting urlParamsProcessedIntentKey
         }
     }
   }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
@@ -236,7 +234,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -256,7 +254,8 @@ export default function InvoicesPage() {
     const taxRate = companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0.10;
     const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.05;
     const calculatedTaxAmount = calculatedSubtotal * taxRate;
-    const calculatedVatAmount = calculatedSubtotal * vatRate;
+    const amountForVatCalculation = calculatedSubtotal + calculatedTaxAmount;
+    const calculatedVatAmount = amountForVatCalculation * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + calculatedVatAmount;
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
@@ -320,6 +319,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
+    // Determine final status based on payment and due date
     if (data.status === 'Cancelled') {
       finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
@@ -331,7 +331,7 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else { 
-      finalStatus = 'Paid'; // Default to Paid if balance is zero and not explicitly cancelled.
+      finalStatus = 'Paid'; 
     }
 
 
@@ -371,20 +371,27 @@ export default function InvoicesPage() {
   const taxRatePercent = companyProfile.taxRate ? parseFloat(String(companyProfile.taxRate)) : 0;
   const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
 
-  if (isDataContextLoading) {
-    return (
-      <div className="flex flex-col h-full">
+  return (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0">
         <PageHeader
           title="Invoices"
           description="Manage and track all your invoices."
-          actions={<Button onClick={handleAddNewInvoice} className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice</Button>}
+          actions={
+            <Button onClick={handleAddNewInvoice} className="w-full sm:w-auto" disabled={isDataContextLoading}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
+            </Button>
+          }
         />
         <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
-          <Skeleton className="h-10 w-full md:w-80" />
-          <Skeleton className="h-10 w-full md:w-[200px]" />
+          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
+          <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-          <div className="h-full overflow-y-auto">
+      </div>
+
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
+        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+          {isDataContextLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -417,31 +424,7 @@ export default function InvoicesPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <PageHeader
-        title="Invoices"
-        description="Manage and track all your invoices."
-        actions={
-          <Button onClick={handleAddNewInvoice} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Invoice
-          </Button>
-        }
-      />
-      <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
-        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
-        <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
-      </div>
-
-       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-        {filteredInvoices.length > 0 ? (
-          <div className="h-full overflow-y-auto"> 
+          ) : filteredInvoices.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -475,48 +458,30 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the invoice "{invoice.id}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteInvoice(invoice)} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center p-8"> 
-            <DataPlaceholder
-              title="No Invoices Found"
-              message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
-              icon={PlusCircle}
-              action={!searchTerm && statusFilter === 'all' ? (
-                <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
-                </Button>
-              ) : undefined}
-            />
-          </div>
-        )}
+          ) : (
+             <div className="h-full flex items-center justify-center">
+              <DataPlaceholder
+                title="No Invoices Found"
+                message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
+                icon={PlusCircle}
+                action={!searchTerm && statusFilter === 'all' ? (
+                  <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Edit/Create Form Modal */}
@@ -782,4 +747,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-

@@ -128,8 +128,8 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseSalePrice,
-      exciseTax: storedBaseExciseTax,
+      salePrice: storedBaseSalePrice, // This is base unit price, pre-excise, pre-VAT
+      exciseTax: storedBaseExciseTax, // This is base unit excise tax
     };
 
     if (editingProduct) {
@@ -214,7 +214,7 @@ export default function ProductsPage() {
     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') unit = 'Ctn';
     return { exciseAmount: totalExciseAmount, unit };
   };
-
+  
   const getDisplayVatInfo = (product: Product, profile: CompanyProfile): { vatAmount: number; unit: string } => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
     let baseForVatCalculation: number;
@@ -261,7 +261,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0">
+      <div className="shrink-0"> {/* Orange Section Wrapper */}
         <PageHeader
           title="Products"
           description="Manage your product catalog."
@@ -281,9 +281,10 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Purple Section Wrapper (Table Area) */}
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
-        {isLoading ? (
-          <div className="h-full overflow-y-auto">
+        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+          {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -296,7 +297,7 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
                   <TableHead rowSpan={2} className="min-w-[90px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
-                     <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
+                    <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
                   </TableHead>
                   <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -323,9 +324,7 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        ) : filteredProducts.length > 0 ? (
-          <div className="h-full overflow-y-auto">
+          ) : filteredProducts.length > 0 ? (
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -337,7 +336,7 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
                   <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
                   <TableHead rowSpan={2} className="min-w-[90px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
+                   <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
                      <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
                   </TableHead>
                   <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
@@ -349,12 +348,12 @@ export default function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
+                  const stockDisplayUnit = getDisplayUnit(product, product.packagingUnit ? 'package' : 'base');
                   const basePriceInfo = getDisplayBasePriceInfo(product);
                   const exciseTaxInfo = getDisplayExciseTaxInfo(product);
                   const vatInfo = getDisplayVatInfo(product, companyProfile);
                   const finalPcsPrice = calculateFinalPcsPriceWithVatAndExcise(product, companyProfile);
                   const finalCtnPrice = calculateFinalCtnPriceWithVatAndExcise(product, companyProfile);
-                  const stockDisplayUnit = getDisplayUnit(product, product.packagingUnit ? 'package' : 'base');
 
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
@@ -404,20 +403,20 @@ export default function ProductsPage() {
                 })}
               </TableBody>
             </Table>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            <DataPlaceholder
-              title="No Products Found"
-              message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-              action={!searchTerm ? (
-                <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                </Button>
-              ) : undefined}
-            />
-          </div>
-        )}
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <DataPlaceholder
+                title="No Products Found"
+                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
+                action={!searchTerm ? (
+                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {

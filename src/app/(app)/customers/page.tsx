@@ -35,7 +35,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -114,7 +113,7 @@ export default function CustomersPage() {
     setIsFormModalOpen(true);
   };
 
-  const handleDeleteCustomer = (customer: Customer) => {
+  const handleDeleteCustomerConfirm = (customer: Customer) => {
     setCustomerToDelete(customer);
   };
 
@@ -193,39 +192,47 @@ export default function CustomersPage() {
     setEditingCustomer(null);
   };
 
-  if (isLoading) {
-     return (
-      <div className="flex flex-col h-full">
+  return (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0">
         <PageHeader
           title="Customers"
           description="Manage your customer profiles and contact information."
           actions={
-            <Button onClick={handleAddCustomer} disabled className="w-full sm:w-auto">
+            <Button onClick={handleAddCustomer} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
             </Button>
           }
         />
         <div className="mb-6">
-          <Skeleton className="h-10 w-full md:w-80" />
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search by name, ID, CR, VAT..."
+            className="w-full md:w-80"
+          />
         </div>
-        <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-          <div className="h-full overflow-y-auto"> 
+      </div>
+
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card overflow-hidden">
+        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+          {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[180px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[120px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[140px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[80px]"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="min-w-[130px] text-right"><Skeleton className="h-5 w-full" /></TableHead>
-                  <TableHead className="text-right min-w-[150px]"><Skeleton className="h-8 w-28 ml-auto" /></TableHead>
+                  <TableHead className="min-w-[100px]">Cust. ID</TableHead>
+                  <TableHead className="min-w-[180px]">Name</TableHead>
+                  <TableHead className="min-w-[120px]">CR No.</TableHead>
+                  <TableHead className="min-w-[120px]">VAT No.</TableHead>
+                  <TableHead className="min-w-[140px]">Phone</TableHead>
+                  <TableHead className="min-w-[80px]">Type</TableHead>
+                  <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
+                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
-                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
@@ -233,40 +240,12 @@ export default function CustomersPage() {
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <PageHeader
-        title="Customers"
-        description="Manage your customer profiles and contact information."
-        actions={
-          <Button onClick={handleAddCustomer} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
-          </Button>
-        }
-      />
-      <div className="mb-6">
-        <SearchInput
-          value={searchTerm}
-          onChange={setSearchTerm}
-          placeholder="Search by name, ID, CR, VAT..."
-          className="w-full md:w-80"
-        />
-      </div>
-
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
-        {filteredCustomers.length > 0 ? (
-          <div className="h-full overflow-y-auto"> 
+          ) : filteredCustomers.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -284,17 +263,17 @@ export default function CustomersPage() {
                 {filteredCustomers.map((customer, index) => {
                   const outstandingBalance = getOutstandingBalanceByCustomerId(customer.id);
                   return (
-                    <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium text-xs">{customer.id}</TableCell>
+                    <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                      <TableCell className="font-medium">{customer.id}</TableCell>
                       <TableCell
-                        className="cursor-pointer hover:text-primary hover:underline text-xs"
+                        className="cursor-pointer hover:text-primary hover:underline"
                         onClick={() => handleViewCustomerDetails(customer)}
                       >
                         {customer.name}
                       </TableCell>
-                      <TableCell className="text-xs">{customer.registrationNumber || '-'}</TableCell>
-                      <TableCell className="text-xs">{customer.vatNumber || '-'}</TableCell>
-                      <TableCell className="text-xs">{customer.phone}</TableCell>
+                      <TableCell>{customer.registrationNumber || '-'}</TableCell>
+                      <TableCell>{customer.vatNumber || '-'}</TableCell>
+                      <TableCell>{customer.phone}</TableCell>
                       <TableCell>
                         <Badge
                           variant={customer.customerType === 'Credit' ? 'creditCustomer' : 'cashCustomer'}
@@ -304,7 +283,7 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className={cn(
-                        "text-right font-semibold text-xs",
+                        "text-right font-semibold",
                         outstandingBalance > 0 ? "text-destructive" : "text-foreground"
                       )}>
                         ${outstandingBalance.toFixed(2)}
@@ -317,27 +296,9 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the customer "{customer.name}" and all associated data (including invoices).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteCustomer(customer)} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerConfirm(customer);}}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -345,20 +306,20 @@ export default function CustomersPage() {
                 })}
               </TableBody>
             </Table>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center p-8">
-            <DataPlaceholder
-              title="No Customers Found"
-              message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
-              action={!searchTerm ? (
-                <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-                </Button>
-              ) : undefined}
-            />
-          </div>
-        )}
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <DataPlaceholder
+                title="No Customers Found"
+                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
+                action={!searchTerm ? (
+                  <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+                  </Button>
+                ) : undefined}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
@@ -483,7 +444,7 @@ export default function CustomersPage() {
                         </TableHeader>
                         <TableBody>
                           {customerInvoices.map((invoice, index) => (
-                            <TableRow key={invoice.id} className={index % 2 === 0 ? 'bg-card' : 'bg-muted/50'}>
+                            <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                               <TableCell className="font-medium">{invoice.id}</TableCell>
                               <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
                               <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
@@ -541,4 +502,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-

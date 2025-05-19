@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, children, ...props }, ref) => {
-    return <div className="relative w-full rounded-lg overflow-hidden"><table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props}>{children}</table></div>;
+    // This wrapper div handles rounded corners, full width, height context, and vertical scrolling.
+    return <div className="relative w-full rounded-lg overflow-hidden overflow-y-auto h-full"><table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props}>{children}</table></div>;
   }
 );
 Table.displayName = "Table";
