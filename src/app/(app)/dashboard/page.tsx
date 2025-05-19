@@ -182,13 +182,13 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-            <Card>
+            <Card className="mb-6">
               <CardHeader>
                 <CardTitle><Skeleton className="h-6 w-1/2" /></CardTitle>
                 <CardDescription><Skeleton className="h-4 w-3/4" /></CardDescription>
               </CardHeader>
-              <CardContent className="overflow-x-auto p-0 sm:p-2">
-                <div className="max-h-72"> {/* Ensure this div doesn't cause overflow itself */}
+              <CardContent className="p-0 sm:p-2">
+                <div className="max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-primary/50 text-primary-foreground">
                       <TableRow>
@@ -217,8 +217,8 @@ export default function DashboardPage() {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2">
                 <CardHeader><CardTitle><Skeleton className="h-6 w-1/2" /></CardTitle></CardHeader>
-                <CardContent className="overflow-x-auto p-0 sm:p-2">
-                   <div className="max-h-72"> {/* Ensure this div doesn't cause overflow itself */}
+                <CardContent className="p-0 sm:p-2">
+                   <div className="max-h-72 overflow-y-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-primary/50 text-primary-foreground">
                         <TableRow>
@@ -419,10 +419,10 @@ export default function DashboardPage() {
                 <CardTitle>Top Outstanding Invoices</CardTitle>
                 <CardDescription>Top 5 invoices with remaining balances, most recent due dates first.</CardDescription>
               </CardHeader>
-              <CardContent className="p-0 sm:p-2"> {/* Removed overflow-x-auto here */}
-                {outstandingInvoicesData.length > 0 ? (
-                  <div className="max-h-72 overflow-y-auto"> {/* This div handles vertical scroll */}
-                    <Table> {/* Table itself will handle horizontal scroll if needed via its internal wrapper */}
+              <CardContent className="p-0 sm:p-2">
+                <div className="max-h-72 overflow-y-auto">
+                  {outstandingInvoicesData.length > 0 ? (
+                    <Table>
                       <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                         <TableRow>
                           <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
@@ -448,14 +448,14 @@ export default function DashboardPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Zap className="mx-auto h-12 w-12 mb-2 text-green-500 dark:text-green-400" />
-                    <p className="font-semibold">All Clear!</p>
-                    <p>No outstanding invoices at the moment.</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Zap className="mx-auto h-12 w-12 mb-2 text-green-500 dark:text-green-400" />
+                      <p className="font-semibold">All Clear!</p>
+                      <p>No outstanding invoices at the moment.</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -467,10 +467,10 @@ export default function DashboardPage() {
                     View all
                   </Link>
                 </CardHeader>
-                <CardContent className="p-0 sm:p-2"> {/* Removed overflow-x-auto here */}
-                  {recentInvoices.length > 0 ? (
-                    <div className="max-h-72 overflow-y-auto"> {/* This div handles vertical scroll */}
-                       <Table> {/* Table itself will handle horizontal scroll if needed via its internal wrapper */}
+                <CardContent className="p-0 sm:p-2">
+                  <div className="max-h-72 overflow-y-auto">
+                    {recentInvoices.length > 0 ? (
+                       <Table>
                         <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                           <TableRow>
                             <TableHead className="py-2 px-2 sm:px-4">Invoice ID</TableHead>
@@ -493,11 +493,11 @@ export default function DashboardPage() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <p className="p-4 text-center text-muted-foreground">No recent invoices.</p>
-                  )}
+                       </Table>
+                    ) : (
+                      <p className="p-4 text-center text-muted-foreground">No recent invoices.</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -564,3 +564,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
