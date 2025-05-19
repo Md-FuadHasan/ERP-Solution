@@ -201,7 +201,7 @@ export default function ProductsPage() {
     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') unit = 'Ctn';
     return { price, unit };
   };
-
+  
   const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
     const baseUnitExcise = product.exciseTax || 0;
     let totalExciseAmount = baseUnitExcise;
@@ -261,7 +261,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0"> {/* Orange Section Wrapper */}
+      <div className="shrink-0">
         <PageHeader
           title="Products"
           description="Manage your product catalog."
@@ -281,45 +281,44 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Purple Section Wrapper (Table Area) */}
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
-        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+        <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead rowSpan={2} className="min-w-[80px] text-left">Product ID</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[150px] text-left">Name</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-left">SKU</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-left">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-left">Stock</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
-                    <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
+                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2">Product ID</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2">Name</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2">SKU</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2">Category</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2">Stock</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">VAT (15%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2">
+                     <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
+                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
-                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="text-left"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-left"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-left"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-left"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell className="text-left px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-left px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-left px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-left px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-left px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -327,56 +326,65 @@ export default function ProductsPage() {
           ) : filteredProducts.length > 0 ? (
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead rowSpan={2} className="min-w-[80px] text-left">Product ID</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[150px] text-left">Name</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-left">SKU</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-left">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[70px] text-left">Stock</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                   <TableHead colSpan={2} className="text-center align-bottom min-w-[180px]">
+                 <TableRow>
+                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2">Product ID</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2">Name</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2">SKU</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2">Category</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2">Stock</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2">VAT (15%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2">
                      <div>Sale Price <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div></div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-center min-w-[100px]">Actions</TableHead>
+                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
-                  <TableHead className="min-w-[90px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const stockDisplayUnit = getDisplayUnit(product, product.packagingUnit ? 'package' : 'base');
                   const basePriceInfo = getDisplayBasePriceInfo(product);
                   const exciseTaxInfo = getDisplayExciseTaxInfo(product);
                   const vatInfo = getDisplayVatInfo(product, companyProfile);
                   const finalPcsPrice = calculateFinalPcsPriceWithVatAndExcise(product, companyProfile);
                   const finalCtnPrice = calculateFinalCtnPriceWithVatAndExcise(product, companyProfile);
 
+                  const isPackageDisplay = product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0;
+                  const currentStockLevel = product.stockLevel;
+                  // Determine if the stock level should be displayed with decimals (e.g., for Kgs/Liters)
+                  const stockRequiresDecimals = product.unitType === 'Kgs' || product.unitType === 'Liters';
+                  const stockValueToDisplay = isPackageDisplay
+                      ? (currentStockLevel / product.itemsPerPackagingUnit!).toFixed(stockRequiresDecimals && (currentStockLevel / product.itemsPerPackagingUnit!) % 1 !== 0 ? 2 : 0)
+                      : currentStockLevel.toFixed(stockRequiresDecimals && currentStockLevel % 1 !== 0 ? 2 : 0);
+                  const stockUnitToDisplay = getDisplayUnit(product, isPackageDisplay ? 'package' : 'base');
+
+
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium text-left">{product.id}</TableCell>
-                      <TableCell className="text-left">{product.name}</TableCell>
-                      <TableCell className="text-left">{product.sku}</TableCell>
-                      <TableCell className="text-left">
+                      <TableCell className="font-medium text-left px-2">{product.id}</TableCell>
+                      <TableCell className="text-left px-2">{product.name}</TableCell>
+                      <TableCell className="text-left px-2">{product.sku}</TableCell>
+                      <TableCell className="text-left px-2">
                         <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                           {product.category}
                         </Badge>
                       </TableCell>
-                      <TableCell className={cn(
-                        "text-left font-medium",
+                       <TableCell className={cn(
+                        "text-left font-medium px-2",
                         product.stockLevel <= product.reorderPoint ? "text-destructive" : ""
                       )}>
-                        {product.stockLevel} {stockDisplayUnit}
+                        {stockValueToDisplay} {stockUnitToDisplay}
                       </TableCell>
-                      <TableCell className="text-right">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
-                      <TableCell className="text-right">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
-                      <TableCell className="text-right">${vatInfo.vatAmount.toFixed(2)} / {vatInfo.unit}</TableCell>
-                      <TableCell className="text-right">{finalCtnPrice !== null ? `$${finalCtnPrice.toFixed(2)}` : '-'}</TableCell>
-                      <TableCell className="text-right">${finalPcsPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right px-2">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2">${vatInfo.vatAmount.toFixed(2)} / {vatInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2">{finalCtnPrice !== null ? `$${finalCtnPrice.toFixed(2)}` : '-'}</TableCell>
+                      <TableCell className="text-right px-2">${finalPcsPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right px-2">
                         <div className="flex justify-end items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleViewProduct(product)} className="hover:text-primary p-1.5" title="View Product">
                             <Eye className="h-4 w-4" />
@@ -470,7 +478,15 @@ export default function ProductsPage() {
               <Card><CardContent className="pt-6 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div><strong>Stock Level:</strong></div>
                   <div className={cn(productToView.stockLevel <= productToView.reorderPoint ? "text-destructive font-semibold" : "")}>
-                    {productToView.stockLevel} {getDisplayUnit(productToView, productToView.packagingUnit ? 'package' : 'base')}
+                    { (() => {
+                        const isPkg = productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0;
+                        const stockVal = isPkg ? (productToView.stockLevel / productToView.itemsPerPackagingUnit!) : productToView.stockLevel;
+                        const requiresDec = productToView.unitType === 'Kgs' || productToView.unitType === 'Liters';
+                        return stockVal.toFixed(requiresDec && stockVal % 1 !== 0 ? 2 : 0);
+                      })()
+                    }
+                    {' '}
+                    { getDisplayUnit(productToView, (productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0) ? 'package' : 'base') }
                   </div>
                   <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {getDisplayUnit(productToView, 'base')}</div>
               </CardContent></Card>
