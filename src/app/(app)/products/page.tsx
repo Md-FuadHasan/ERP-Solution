@@ -104,8 +104,8 @@ export default function ProductsPage() {
     let storedBaseSalePrice: number;
     let storedBaseUnitExciseTax: number | undefined = undefined;
 
-    const formSalePrice = data.salePrice; // This is what user entered, could be for package or PCS
-    const formExciseTax = data.exciseTax; // This is what user entered, could be for package or PCS
+    const formSalePrice = data.salePrice;
+    const formExciseTax = data.exciseTax;
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
       storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
@@ -128,7 +128,7 @@ export default function ProductsPage() {
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
-      costPrice: data.costPrice,
+      costPrice: data.costPrice, // Cost price is still stored if it was part of the form
       salePrice: storedBaseSalePrice, // Always store base unit price (pre-excise, pre-VAT)
       exciseTax: storedBaseUnitExciseTax, // Always store base unit excise tax
     };
@@ -180,10 +180,9 @@ export default function ProductsPage() {
       default: return 'secondary';
     }
   };
-  
-  // Helper function to get base price for display (PCS or CTN)
+
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
-    let price = product.salePrice; // This is base unit price (pre-excise, pre-VAT)
+    let price = product.salePrice;
     let unit = product.unitType;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       price = product.salePrice * product.itemsPerPackagingUnit;
@@ -195,7 +194,6 @@ export default function ProductsPage() {
     return { price, unit };
   };
 
-  // Helper function to get excise tax for display (PCS or CTN)
   const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
     const baseUnitExcise = product.exciseTax || 0;
     let totalExciseAmount = baseUnitExcise;
@@ -211,23 +209,22 @@ export default function ProductsPage() {
     return { exciseAmount: totalExciseAmount, unit };
   };
 
-  // Helper function to get VAT amount based on (Base Price + Excise Tax) for display (PCS or CTN)
   const getDisplayVatInfo = (product: Product, profile: CompanyProfile): { vatAmount: number; unit: string } => {
-    const vatRate = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    let baseForVat: number;
+    const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
+    let baseForVatCalculation: number;
     let unit: string;
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       const packageBasePrice = product.salePrice * product.itemsPerPackagingUnit;
       const packageExciseTax = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
-      baseForVat = packageBasePrice + packageExciseTax;
+      baseForVatCalculation = packageBasePrice + packageExciseTax;
       unit = product.packagingUnit;
     } else {
-      baseForVat = product.salePrice + (product.exciseTax || 0);
+      baseForVatCalculation = product.salePrice + (product.exciseTax || 0);
       unit = product.unitType;
     }
     
-    const vatAmount = baseForVat * (vatRate / 100);
+    const vatAmount = baseForVatCalculation * (vatRatePercent / 100);
     
     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') {
         unit = 'Ctn';
@@ -235,15 +232,13 @@ export default function ProductsPage() {
     return { vatAmount, unit };
   };
 
-  // Calculates final PCS price including base price, excise tax, and VAT on that sum
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0); // price per base unit + excise per base unit
+    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0);
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
 
-  // Calculates final CTN price including total base price, total excise tax, and VAT on that sum
   const calculateFinalCtnPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     if (!product.packagingUnit || !product.itemsPerPackagingUnit || product.itemsPerPackagingUnit <= 0) {
       return null;
@@ -259,30 +254,34 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader
-        title="Products"
-        description="Manage your product catalog."
-        actions={
-          <Button onClick={handleAddProduct} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-          </Button>
-        }
-      />
-      <div className="mb-6">
-        <SearchInput
-          value={searchTerm}
-          onChange={setSearchTerm}
-          placeholder="Search by name, SKU, ID, category..."
-          className="w-full md:w-80"
+      {/* Orange Section: Page Header and Search */}
+      <div>
+        <PageHeader
+          title="Products"
+          description="Manage your product catalog."
+          actions={
+            <Button onClick={handleAddProduct} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+            </Button>
+          }
         />
+        <div className="mb-6">
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search by name, SKU, ID, category..."
+            className="w-full md:w-80"
+          />
+        </div>
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+      {/* Purple Section: Table Area */}
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
+                <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
@@ -291,9 +290,9 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead className="text-center align-bottom" colSpan={2}>
-                    <div>Sale Price</div>
-                    <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
+                  <TableHead className="text-center align-bottom min-w-[160px]" colSpan={2}>
+                     <div>Sale Price</div>
+                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
@@ -328,8 +327,8 @@ export default function ProductsPage() {
             </Table>
           ) : filteredProducts.length > 0 ? (
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
+               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
@@ -338,9 +337,9 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>VAT ({companyProfile.vatRate || 0}%)</TableHead>
-                  <TableHead className="text-center align-bottom" colSpan={2}>
-                    <div>Sale Price</div>
-                    <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
+                  <TableHead className="text-center align-bottom min-w-[160px]" colSpan={2}>
+                     <div>Sale Price</div>
+                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
                   <TableHead className="text-right min-w-[150px]" rowSpan={2}>Actions</TableHead>
                 </TableRow>
@@ -406,7 +405,7 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex-grow flex items-center justify-center p-8">
+            <div className="h-full flex items-center justify-center p-8">
               <DataPlaceholder
                 title="No Products Found"
                 message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
@@ -421,6 +420,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Add/Edit Product Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
         setIsFormModalOpen(isOpen);
         if (!isOpen) setEditingProduct(null);
@@ -442,6 +442,7 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* View Product Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="w-[90vw] max-w-lg">
           <DialogHeader>
@@ -526,6 +527,7 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Product Confirmation Modal */}
       <AlertDialog open={!!productToDelete} onOpenChange={(isOpen) => !isOpen && setProductToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
