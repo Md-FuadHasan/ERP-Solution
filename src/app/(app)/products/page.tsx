@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
@@ -104,19 +104,17 @@ export default function ProductsPage() {
     let storedBaseExciseTax: number | undefined = undefined;
 
     const formSalePrice = data.salePrice; // This is pre-excise, pre-VAT
-    const formExciseTax = data.exciseTax;
+    const formExciseTaxValue = data.exciseTax;
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
-      // User entered price and excise tax for the whole package
       storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
-      if (formExciseTax !== undefined && formExciseTax !== null) {
-        storedBaseExciseTax = formExciseTax / data.itemsPerPackagingUnit;
+      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
+        storedBaseExciseTax = formExciseTaxValue / data.itemsPerPackagingUnit;
       }
     } else {
-      // User entered price and excise tax for the base unit
       storedBaseSalePrice = formSalePrice;
-      if (formExciseTax !== undefined && formExciseTax !== null) {
-        storedBaseExciseTax = formExciseTax;
+      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
+        storedBaseExciseTax = formExciseTaxValue;
       }
     }
 
@@ -194,7 +192,7 @@ export default function ProductsPage() {
   };
 
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
-    let price = product.salePrice; // This is pre-tax, pre-excise per base unit
+    let price = product.salePrice;
     let unit = product.unitType;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       price = product.salePrice * product.itemsPerPackagingUnit;
@@ -203,7 +201,7 @@ export default function ProductsPage() {
     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') unit = 'Ctn';
     return { price, unit };
   };
-
+  
   const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
     const baseUnitExcise = product.exciseTax || 0;
     let totalExciseAmount = baseUnitExcise;
@@ -242,8 +240,6 @@ export default function ProductsPage() {
 
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    // product.salePrice is base unit price (pre-excise, pre-VAT)
-    // product.exciseTax is base unit excise tax
     const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0);
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
@@ -260,7 +256,6 @@ export default function ProductsPage() {
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -290,33 +285,34 @@ export default function ProductsPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead rowSpan={2} className="min-w-[80px]">ID</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[80px]">Product ID</TableHead>
                   <TableHead rowSpan={2} className="min-w-[150px]">Name</TableHead>
                   <TableHead rowSpan={2} className="min-w-[70px]">SKU</TableHead>
                   <TableHead rowSpan={2} className="min-w-[100px]">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Stock</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Stock</TableHead>
                   <TableHead rowSpan={2} className="min-w-[90px] text-right">Base Price</TableHead>
                   <TableHead rowSpan={2} className="min-w-[80px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[80px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[70px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead colSpan={2} className="text-center align-bottom min-w-[160px]">
                      <div>Sale Price</div>
-                     <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
+                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[120px]">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal">CTN Price</TableHead>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    {[...Array(11)].map((_cell, cellIndex) => (
-                       <TableCell key={cellIndex} className={cn(cellIndex >=4 && cellIndex <=9 ? 'text-right' : '')}>
+                    {[...Array(9)].map((_cell, cellIndex) => ( 
+                       <TableCell key={cellIndex} className={cn(cellIndex >=4 && cellIndex <=7 ? 'text-right' : '')}>
                          <Skeleton className="h-5 w-3/4" />
                        </TableCell>
                     ))}
+                     <TableCell><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -325,25 +321,25 @@ export default function ProductsPage() {
         ) : filteredProducts.length > 0 ? (
           <div className="h-full overflow-y-auto">
             <Table>
-               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead rowSpan={2} className="min-w-[80px]">ID</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[180px]">Name</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[80px]">SKU</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[110px]">Category</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Stock</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[100px] text-right">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="min-w-[90px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[80px]">Product ID</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[150px]">Name</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[70px]">SKU</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[100px]">Category</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Stock</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[90px] text-right">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[80px] text-right">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="min-w-[70px] text-right">VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead colSpan={2} className="text-center align-bottom min-w-[160px]">
                      <div>Sale Price</div>
-                     <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
+                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[120px]">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal">CTN Price</TableHead>
-                  <TableHead className="min-w-[80px] text-right text-xs font-normal">PCS Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">CTN Price</TableHead>
+                  <TableHead className="min-w-[80px] text-right text-xs font-normal opacity-75">PCS Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -474,7 +470,7 @@ export default function ProductsPage() {
                   </div>
                   <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {productToView.unitType}</div>
               </CardContent></Card>
-              <Card><CardContent className="pt-6 grid grid-cols-1 gap-y-2">
+               <Card><CardContent className="pt-6 grid grid-cols-1 gap-y-2">
                   <div><strong>Base Price:</strong> ${getDisplayBasePriceInfo(productToView).price.toFixed(2)} / {getDisplayBasePriceInfo(productToView).unit} <span className="text-muted-foreground text-xs italic">(pre-VAT, pre-excise)</span></div>
                   <Separator className="my-1" />
                   <div><strong>Excise Tax:</strong> ${getDisplayExciseTaxInfo(productToView).exciseAmount.toFixed(2)} / {getDisplayExciseTaxInfo(productToView).unit}</div>
