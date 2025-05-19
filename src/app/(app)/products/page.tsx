@@ -104,21 +104,23 @@ export default function ProductsPage() {
     let storedBaseSalePrice: number;
     let storedBaseUnitExciseTax: number | undefined = undefined;
 
-    const formSalePrice = data.salePrice;
-    const formExciseTax = data.exciseTax;
+    const formSalePrice = data.salePrice; // This price is pre-excise, pre-VAT
+    const formExciseTax = data.exciseTax; // This is the excise amount entered by user
 
     if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
+      // User entered price and excise tax for the whole package
       storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
       if (formExciseTax !== undefined && formExciseTax !== null) {
         storedBaseUnitExciseTax = formExciseTax / data.itemsPerPackagingUnit;
       }
     } else {
+      // User entered price and excise tax for the base unit
       storedBaseSalePrice = formSalePrice;
       if (formExciseTax !== undefined && formExciseTax !== null) {
         storedBaseUnitExciseTax = formExciseTax;
       }
     }
-
+    
     const productDataForStorage: Omit<Product, 'id' | 'createdAt'> = {
       name: data.name,
       sku: data.sku,
@@ -129,8 +131,8 @@ export default function ProductsPage() {
       stockLevel: data.stockLevel,
       reorderPoint: data.reorderPoint,
       costPrice: data.costPrice,
-      salePrice: storedBaseSalePrice,
-      exciseTax: storedBaseUnitExciseTax,
+      salePrice: storedBaseSalePrice, // Always store base unit sale price (pre-excise, pre-VAT)
+      exciseTax: storedBaseUnitExciseTax, // Always store base unit excise tax
     };
 
     if (editingProduct) {
@@ -170,7 +172,7 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
 
-  const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
+ const getCategoryBadgeVariant = (category: ProductCategory): VariantProps<typeof badgeVariants>['variant'] => {
     switch (category) {
       case 'Frozen': return 'categoryFrozen';
       case 'Dairy': return 'categoryDairy';
@@ -182,7 +184,7 @@ export default function ProductsPage() {
   };
 
   const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
-    let price = product.salePrice;
+    let price = product.salePrice; // This is base unit price, pre-excise, pre-VAT
     let unit = product.unitType;
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
       price = product.salePrice * product.itemsPerPackagingUnit;
@@ -203,7 +205,7 @@ export default function ProductsPage() {
       totalExciseAmount = baseUnitExcise * product.itemsPerPackagingUnit;
       unit = product.packagingUnit;
     }
-    if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') {
+     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') {
         unit = 'Ctn';
     }
     return { exciseAmount: totalExciseAmount, unit };
@@ -214,21 +216,24 @@ export default function ProductsPage() {
     let baseForVatCalculation: number;
     let unit: string;
     
-    const baseUnitExcise = product.exciseTax || 0;
+    const baseUnitSalePrice = product.salePrice; // Already base unit price
+    const baseUnitExcise = product.exciseTax || 0; // Already base unit excise
 
     if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-      const packageBasePrice = product.salePrice * product.itemsPerPackagingUnit;
+      // Calculate for the whole package
+      const packageBasePrice = baseUnitSalePrice * product.itemsPerPackagingUnit;
       const packageExciseTax = baseUnitExcise * product.itemsPerPackagingUnit;
       baseForVatCalculation = packageBasePrice + packageExciseTax;
       unit = product.packagingUnit;
     } else {
-      baseForVatCalculation = product.salePrice + baseUnitExcise;
+      // Calculate for the base unit
+      baseForVatCalculation = baseUnitSalePrice + baseUnitExcise;
       unit = product.unitType;
     }
     
     const vatAmount = baseForVatCalculation * (vatRatePercent / 100);
     
-    if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') {
+     if (unit.toLowerCase() === 'carton' || unit.toLowerCase() === 'cartons') {
         unit = 'Ctn';
     }
     return { vatAmount, unit };
@@ -236,7 +241,7 @@ export default function ProductsPage() {
 
   const calculateFinalPcsPriceWithVatAndExcise = (product: Product, profile: CompanyProfile) => {
     const vatRatePercent = typeof profile.vatRate === 'string' ? parseFloat(profile.vatRate) : (profile.vatRate || 0);
-    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0);
+    const subtotalBeforeVAT = product.salePrice + (product.exciseTax || 0); // product.salePrice is base unit price, product.exciseTax is base unit excise
     const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
     return subtotalBeforeVAT + vatAmount;
   };
@@ -276,9 +281,10 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
-        <div className="h-full overflow-y-auto">
-          {isLoading ? (
+      {/* Table Section Wrapper */}
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+        {isLoading ? (
+           <div className="h-full overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
@@ -287,7 +293,7 @@ export default function ProductsPage() {
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
+                  <TableHead className="min-w-[120px] text-right" rowSpan={2}>Base Price</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead className="text-center align-bottom min-w-[160px]" colSpan={2}>
@@ -325,16 +331,18 @@ export default function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
-          ) : filteredProducts.length > 0 ? (
+          </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="h-full overflow-y-auto"> 
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead className="min-w-[100px]" rowSpan={2}>Product ID</TableHead>
                   <TableHead className="min-w-[180px]" rowSpan={2}>Name</TableHead>
                   <TableHead className="min-w-[80px]" rowSpan={2}>SKU</TableHead>
                   <TableHead className="min-w-[120px]" rowSpan={2}>Category</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Stock</TableHead>
-                  <TableHead className="min-w-[100px] text-right" rowSpan={2}>Base Price</TableHead>
+                  <TableHead className="min-w-[120px] text-right" rowSpan={2}>Base Price</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>Excise Tax</TableHead>
                   <TableHead className="min-w-[100px] text-right" rowSpan={2}>VAT ({companyProfile.vatRate || 0}%)</TableHead>
                   <TableHead className="text-center align-bottom min-w-[160px]" colSpan={2}>
@@ -351,8 +359,8 @@ export default function ProductsPage() {
               <TableBody>
                 {filteredProducts.map((product, index) => {
                   const basePriceInfo = getDisplayBasePriceInfo(product);
-                  const exciseTaxInfo = getDisplayExciseTaxInfo(product);
                   const vatInfo = getDisplayVatInfo(product, companyProfile);
+                  const exciseTaxInfo = getDisplayExciseTaxInfo(product);
                   const finalPcsPrice = calculateFinalPcsPriceWithVatAndExcise(product, companyProfile);
                   const finalCtnPrice = calculateFinalCtnPriceWithVatAndExcise(product, companyProfile);
 
@@ -404,20 +412,20 @@ export default function ProductsPage() {
                 })}
               </TableBody>
             </Table>
-          ) : (
-            <div className="h-full flex items-center justify-center p-8">
-              <DataPlaceholder
-                title="No Products Found"
-                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
-                action={!searchTerm ? (
-                  <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                  </Button>
-                ) : undefined}
-              />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center p-8">
+            <DataPlaceholder
+              title="No Products Found"
+              message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first product."}
+              action={!searchTerm ? (
+                <Button onClick={handleAddProduct} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                </Button>
+              ) : undefined}
+            />
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Product Modal */}
@@ -548,4 +556,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
