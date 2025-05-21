@@ -1,9 +1,9 @@
 
 'use client';
-import { useMemo, useState } from 'react'; // Added useState
+import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle } from 'lucide-react'; // Added PlusCircle
+import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/DataContext';
@@ -11,36 +11,53 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'; // Added Dialog imports
-import { ProductForm, type ProductFormValues } from '@/components/forms/product-form'; // Added ProductForm imports
-import type { Product } from '@/types'; // Added Product import
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
+import type { Product } from '@/types';
+import { addDays, isBefore, parseISO, startOfDay } from 'date-fns'; // Added date-fns imports
 
 export default function InventoryPage() {
-  const { products, isLoading, addProduct, companyProfile } = useData(); // Added addProduct
+  const { products, isLoading, addProduct, companyProfile } = useData();
   const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null); // Though only adding from here
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const kpiData = useMemo(() => {
     if (isLoading || !products || products.length === 0) {
       return {
         totalInventoryValue: 0,
         lowStockItemsCount: 0,
-        nearingExpiryCount: 0, 
+        nearingExpiryCount: 0,
       };
     }
 
     const totalInventoryValue = products.reduce((sum, product) => {
-      return sum + (product.stockLevel * product.costPrice); 
+      const stock = typeof product.stockLevel === 'number' ? product.stockLevel : 0;
+      const cost = typeof product.costPrice === 'number' ? product.costPrice : 0;
+      return sum + (stock * cost);
     }, 0);
 
     const lowStockItemsCount = products.filter(product => product.stockLevel <= product.reorderPoint).length;
 
+    const today = startOfDay(new Date());
+    const expiryThresholdDate = addDays(today, 30); // Items expiring within the next 30 days
+
+    const nearingExpiryCount = products.filter(product => {
+      if (!product.expiryDate) return false;
+      try {
+        const expiry = startOfDay(parseISO(product.expiryDate));
+        return isBefore(expiry, expiryThresholdDate) && !isBefore(expiry, today); // Nearing expiry but not yet expired
+      } catch (e) {
+        console.warn(`Invalid expiry date format for product ${product.id}: ${product.expiryDate}`);
+        return false;
+      }
+    }).length;
+
     return {
       totalInventoryValue,
       lowStockItemsCount,
-      nearingExpiryCount: 5, 
+      nearingExpiryCount,
     };
   }, [products, isLoading]);
 
@@ -79,26 +96,6 @@ export default function InventoryPage() {
       }
     }
     
-    let storedBaseSalePrice: number;
-    let storedBaseExciseTax: number | undefined = undefined;
-
-    const formSalePrice = data.salePrice; // Price as entered (could be for base unit or package)
-    const formExciseTaxValue = data.exciseTax; // Excise as entered (could be for base unit or package)
-
-    if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
-      // User entered price for the package, convert to base unit price
-      storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
-      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
-        storedBaseExciseTax = formExciseTaxValue / data.itemsPerPackagingUnit;
-      }
-    } else {
-      // User entered price for the base unit
-      storedBaseSalePrice = formSalePrice;
-      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
-        storedBaseExciseTax = formExciseTaxValue;
-      }
-    }
-
     const newProduct: Product = {
       id: finalProductId,
       name: data.name,
@@ -108,11 +105,15 @@ export default function InventoryPage() {
       piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
-      stockLevel: data.stockLevel,
-      reorderPoint: data.reorderPoint,
-      costPrice: 0, // Default costPrice to 0 for new products from this simplified form
-      salePrice: storedBaseSalePrice,
-      exciseTax: storedBaseExciseTax,
+      stockLevel: data.stockLevel || 0, // Default stockLevel for new products
+      reorderPoint: data.reorderPoint || 0,
+      basePrice: data.basePrice || 0,
+      costPrice: data.costPrice || 0,
+      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
+      batchNo: data.batchNo || undefined,
+      productionDate: data.productionDate ? data.productionDate.toISOString() : undefined,
+      expiryDate: data.expiryDate ? data.expiryDate.toISOString() : undefined,
+      discountRate: data.discountRate === undefined || data.discountRate === null ? 0 : data.discountRate,
       createdAt: new Date().toISOString(),
     };
 
@@ -177,7 +178,7 @@ export default function InventoryPage() {
             <Button onClick={handleAdjustStock} className="w-full sm:w-auto">
               <Edit className="mr-2 h-4 w-4" /> Adjust Stock
             </Button>
-            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto"> {/* Changed from Link */}
+            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
             </Button>
           </div>
@@ -226,7 +227,7 @@ export default function InventoryPage() {
               {kpiData.nearingExpiryCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              Batches expiring soon (mock data).
+              Products expiring within 30 days.
             </p>
           </CardContent>
         </Card>
@@ -299,7 +300,7 @@ export default function InventoryPage() {
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
             <ProductForm
-              initialData={null} // Always null as we are only adding from here
+              initialData={null}
               onSubmit={handleSubmitNewProduct}
               onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
             />
