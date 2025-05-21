@@ -40,7 +40,7 @@ export default function AiSuggestionsPage() {
               <p className="text-muted-foreground max-w-md">
                 This section will offer AI-driven suggestions for sales strategies, inventory optimization, customer engagement, financial forecasting, and more.
               </p>
-            </Card> {/* Corrected closing tag for the Card component */}
+            </Card>
           </div>
         </CardContent>
       </Card>
