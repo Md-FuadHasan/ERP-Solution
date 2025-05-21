@@ -1,3 +1,4 @@
+
 // src/app/(app)/products/page.tsx
 'use client';
 import * as React from 'react';
@@ -31,7 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import type { VariantProps } from 'class-variance-authority';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle from here
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -41,21 +42,22 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle as AlertDialogTitleComponent,
+  AlertDialogTitle as AlertDialogTitleComponent, // Renamed to avoid conflict
 } from "@/components/ui/alert-dialog";
 
 
-// Helper functions moved outside the component
+// Helper functions (moved outside component for clarity if they don't rely on component state/props directly)
 const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
   let unit: string | undefined;
   if (type === 'package' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     unit = product.packagingUnit;
   } else {
-    unit = product.unitType;
+    unit = product.unitType; // This is the base unit for stock
   }
   const unitLower = unit?.toLowerCase();
   if (unitLower === 'carton' || unitLower === 'cartons') return 'Ctn';
   if (unitLower === 'pcs') return 'PCS';
+  // Add more abbreviations as needed
   return unit || 'N/A';
 };
 
@@ -71,18 +73,21 @@ const getCategoryBadgeVariant = (category?: ProductCategory): VariantProps<typeo
   }
 };
 
+// Price of one Product.unitType (Base Unit for Stock)
 const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
   const price = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const displayUnit = getDisplayUnit(product, 'base');
   return { price, unit: displayUnit };
 };
 
+// Excise tax for one Product.unitType (Base Unit for Stock)
 const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
   const exciseAmount = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   const displayUnit = getDisplayUnit(product, 'base');
   return { exciseAmount, unit: displayUnit };
 };
 
+// VAT calculated on (Base Price per unitType + Excise Tax per unitType)
 const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | null | undefined): { vatAmount: number; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
@@ -95,47 +100,52 @@ const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | nu
   return { vatAmount, unit: displayUnit };
 };
 
+// Final selling price for one conceptual "PCS", including its share of base price, excise, and VAT.
 const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): number => {
-  const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
-  const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
+  const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0; // Price for one Product.unitType
+  const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0; // Excise for one Product.unitType
+  
+  // piecesInBaseUnit is how many conceptual PCS are in one Product.unitType
   const piecesInBase = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
 
   const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInBase;
   const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInBase;
 
-  const subtotalBeforeVAT = basePricePerConceptualPiece + exciseTaxPerConceptualPiece;
+  const subtotalBeforeVATPerPiece = basePricePerConceptualPiece + exciseTaxPerConceptualPiece;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
-  const vatAmountOnPcs = subtotalBeforeVAT * (vatRatePercent / 100);
-  return subtotalBeforeVAT + vatAmountOnPcs;
+  const vatAmountOnPcs = subtotalBeforeVATPerPiece * (vatRatePercent / 100);
+  
+  return subtotalBeforeVATPerPiece + vatAmountOnPcs;
 };
 
+// Final selling price for either the Product.unitType (if it's a package) or the optional Product.packagingUnit (larger package)
 const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number | null; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
 
   let itemsInTargetUnit = 1;
-  let displayUnit = getDisplayUnit(product, 'base');
+  let targetUnitDisplay = getDisplayUnit(product, 'base');
   let isPriceForPackageContext = false;
 
-  // Case 1: A larger packagingUnit is defined (e.g., Pallet of Cartons)
+  // Case 1: Optional LARGER packagingUnit is defined (e.g., Pallet of Cartons)
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-    itemsInTargetUnit = product.itemsPerPackagingUnit;
-    displayUnit = getDisplayUnit(product, 'package');
+    itemsInTargetUnit = product.itemsPerPackagingUnit; // e.g., 20 Cartons
+    targetUnitDisplay = getDisplayUnit(product, 'package'); // e.g., "Pallet"
     isPriceForPackageContext = true;
   } 
-  // Case 2: The base unitType itself is a package (e.g., Carton) and not PCS
+  // Case 2: The base unitType itself is a package (e.g., Carton) AND it's not just 'PCS'
   else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 0) > 0) {
     itemsInTargetUnit = 1; // We are calculating for one base unit, which is a package
-    displayUnit = getDisplayUnit(product, 'base');
+    targetUnitDisplay = getDisplayUnit(product, 'base'); // e.g., "Ctn" if unitType is 'Cartons'
     isPriceForPackageContext = true;
-  } 
+  }
   // Case 3: Base unit is PCS and no larger packaging unit is defined
   else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    return { price: null, unit: '-' }; // No separate "package" price to show if base is PCS
+    return { price: null, unit: '-' }; // No separate "package" price if base is PCS and no larger package
   }
   
-  if (!isPriceForPackageContext) return { price: null, unit: '-' };
+  if (!isPriceForPackageContext) return { price: null, unit: targetUnitDisplay };
 
   const totalBasePriceForTargetUnit = basePricePerBaseUnit * itemsInTargetUnit;
   const totalExciseTaxForTargetUnit = exciseTaxPerBaseUnit * itemsInTargetUnit;
@@ -144,7 +154,7 @@ const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile
   const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
   const finalPrice = subtotalBeforeVAT + vatAmount;
 
-  return { price: finalPrice, unit: displayUnit };
+  return { price: finalPrice, unit: targetUnitDisplay };
 };
 
 
@@ -205,17 +215,21 @@ export default function ProductsPage() {
   }, [productToDelete, deleteProduct, toast]);
 
   const handleSubmit = useCallback((data: ProductFormValues) => {
+    // Data from form: data.basePrice and data.exciseTax are for Product.unitType
+    // No conversion needed for these from form to storage as they already refer to the base unit.
+    
     const productDataForStorage = {
       name: data.name,
       sku: data.sku || '',
       category: data.category,
-      unitType: data.unitType,
-      piecesInBaseUnit: data.piecesInBaseUnit || undefined,
-      packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
-      itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
+      unitType: data.unitType, // Base unit for stock
+      piecesInBaseUnit: data.piecesInBaseUnit || undefined, // Pieces (e.g. PCS) in one Base Unit
+      packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined, // Optional LARGER package
+      itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined, // Number of Base Units in Larger Package
       reorderPoint: data.reorderPoint,
-      basePrice: data.basePrice, // Storing basePrice directly as it's for the base unit
-      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax, // Storing exciseTax directly
+      basePrice: data.basePrice, // This is price per Product.unitType
+      costPrice: data.costPrice, // Cost price per Product.unitType
+      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax, // Excise tax per Product.unitType
     };
 
     if (editingProduct) {
@@ -224,7 +238,6 @@ export default function ProductsPage() {
         ...editingProduct,
         ...productDataForStorage,
         stockLevel: newStockLevel,
-        costPrice: editingProduct.costPrice // Preserve existing costPrice
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -249,7 +262,7 @@ export default function ProductsPage() {
         ...productDataForStorage,
         id: finalProductId,
         stockLevel: data.stockLevel || 0,
-        costPrice: 0, // Default costPrice for new products
+        // costPrice is already in productDataForStorage, defaulting from form
         createdAt: new Date().toISOString(),
       };
       addProduct(newProduct);
@@ -288,10 +301,10 @@ export default function ProductsPage() {
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                   <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">Product ID</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm">SKU</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm text-[11px]">SKU</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
                   <TableHead colSpan={2} className="text-center align-middle px-2 text-sm">Inventory Levels</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
@@ -304,9 +317,9 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Stock</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">Pkg.</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
                 </TableRow>
               </TableHeader>
@@ -352,30 +365,15 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Stock</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">Pkg.</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const currentStockLevel = product.stockLevel;
-                  // Logic for stock display
-                  const isPackageDisplayRelevantForStock =
-                    product.packagingUnit &&
-                    product.itemsPerPackagingUnit &&
-                    product.itemsPerPackagingUnit > 0 &&
-                    product.unitType.toLowerCase() !== product.packagingUnit.toLowerCase();
-                  
-                  const stockValueToDisplay = isPackageDisplayRelevantForStock
-                    ? (currentStockLevel / product.itemsPerPackagingUnit!).toFixed( (currentStockLevel / product.itemsPerPackagingUnit!) % 1 !== 0 ? 2 : 0)
-                    : currentStockLevel.toFixed( (product.unitType === 'Kgs' || product.unitType === 'Liters') && currentStockLevel % 1 !== 0 ? 2 : 0);
-                  
-                  const stockUnitToDisplay = isPackageDisplayRelevantForStock
-                    ? getDisplayUnit(product, 'package')
-                    : getDisplayUnit(product, 'base');
-
+                  const stockUnitDisplay = getDisplayUnit(product, 'base');
                   const totalPieces = product.stockLevel * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
 
                   const basePriceInfo = getDisplayBasePriceInfo(product);
@@ -398,7 +396,7 @@ export default function ProductsPage() {
                         "text-left font-medium px-2",
                         product.stockLevel <= product.reorderPoint ? "text-destructive" : ""
                       )}>
-                        {stockValueToDisplay} {stockUnitToDisplay}
+                        {product.stockLevel.toFixed((product.unitType === 'Kgs' || product.unitType === 'Liters') && product.stockLevel % 1 !== 0 ? 2 : 0)} {stockUnitDisplay}
                       </TableCell>
                       <TableCell className="text-left px-2">
                         {totalPieces > 0 ? `${totalPieces.toFixed(0)} PCS` : '-'}
@@ -477,10 +475,10 @@ export default function ProductsPage() {
           <DialogHeader>
             <DialogTitle>Product Details: {productToView?.name}</DialogTitle>
             <DialogDescription>
-              Viewing details for product {productToView?.id} (SKU: {productToView?.sku}).
+              Viewing details for product {productToView?.id} (SKU: {productToView?.sku || 'N/A'}).
             </DialogDescription>
           </DialogHeader>
-          {productToView && companyProfile && (
+          {productToView && ( // Removed companyProfile from this check as it's globally available
             <div className="space-y-3 py-4 text-sm">
               <Card><CardContent className="pt-4 space-y-1">
                 <div className="grid grid-cols-2 gap-x-2">
@@ -526,6 +524,8 @@ export default function ProductsPage() {
                   <div>{(productToView.stockLevel * (productToView.piecesInBaseUnit || (productToView.unitType.toLowerCase() === 'pcs' ? 1:0) ) ).toFixed(0)} PCS</div>
 
                   <div><strong>Reorder Point:</strong></div><div>{productToView.reorderPoint} {getDisplayUnit(productToView, 'base')}</div>
+                  <div><strong>Cost Price:</strong></div><div>${(productToView.costPrice || 0).toFixed(2)} / {getDisplayUnit(productToView, 'base')}</div>
+
               </CardContent></Card>
               
                <Card><CardContent className="pt-4 grid grid-cols-1 gap-y-1">
@@ -580,4 +580,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
 

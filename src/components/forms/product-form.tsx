@@ -9,11 +9,10 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product, ProductCategory, ProductUnitType } from '@/types';
+import { PRODUCT_CATEGORIES, PRODUCT_UNIT_TYPES } from '@/types';
 import { DollarSign } from 'lucide-react';
 import * as React from 'react';
 
-const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Dairy', 'Beverages', 'Raw Materials', 'Packaging'];
-const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML', 'Pack'];
 const PACKAGING_UNIT_SUGGESTIONS: string[] = ['Carton', 'Box', 'Pack', 'Tray', 'Pallet', 'Master Case'];
 
 const productFormSchema = z.object({
@@ -22,13 +21,14 @@ const productFormSchema = z.object({
   sku: z.string().min(1, "SKU is required.").max(50),
   category: z.enum(PRODUCT_CATEGORIES, { required_error: "Category is required."}),
   unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Base Unit Type is required."}),
-  piecesInBaseUnit: z.coerce.number().min(1, "Must be at least 1 if specified.").optional().nullable(),
+  piecesInBaseUnit: z.coerce.number().min(1, "Must be at least 1 if base unit is a package or PCS.").optional().nullable(),
   packagingUnit: z.string().max(50).optional().nullable(),
   itemsPerPackagingUnit: z.coerce.number().positive("Must be a positive number if specifying a larger package.").optional().nullable(),
   stockLevel: z.coerce.number().min(0, "Stock level cannot be negative.").default(0),
   addStockQuantity: z.coerce.number().min(0, "Cannot add negative stock.").optional().nullable(),
   reorderPoint: z.coerce.number().min(0, "Reorder point cannot be negative.").default(0),
   basePrice: z.coerce.number().min(0, "Base price cannot be negative.").default(0),
+  costPrice: z.coerce.number().min(0, "Cost price cannot be negative.").default(0),
   exciseTax: z.coerce.number().min(0, "Excise tax cannot be negative.").optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.itemsPerPackagingUnit && (!data.packagingUnit || data.packagingUnit.trim() === '')) {
@@ -50,13 +50,6 @@ const productFormSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Specify how many individual pieces (e.g., PCS) are in this base unit package.",
-      path: ["piecesInBaseUnit"],
-    });
-  }
-  if (!isBaseUnitAPackageLike && data.unitType !== 'PCS' && data.piecesInBaseUnit && data.piecesInBaseUnit > 1) {
-     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Pieces per Base Unit should typically be 1 if the Base Unit itself is not a standard package type (e.g., 'Kgs', 'Liters', 'Units'). If it's 'PCS', it must be 1.",
       path: ["piecesInBaseUnit"],
     });
   }
@@ -83,25 +76,24 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
     resolver: zodResolver(productFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      basePrice: initialData.basePrice, // Directly use stored basePrice
-      exciseTax: initialData.exciseTax === undefined || initialData.exciseTax === null ? undefined : initialData.exciseTax, // Directly use stored exciseTax
-      packagingUnit: initialData.packagingUnit || '',
-      itemsPerPackagingUnit: initialData.itemsPerPackagingUnit || undefined,
-      piecesInBaseUnit: initialData.piecesInBaseUnit || undefined,
-      addStockQuantity: undefined,
+      addStockQuantity: undefined, // Always reset addStockQuantity
+      basePrice: initialData.basePrice, // Base price is per unitType
+      exciseTax: initialData.exciseTax === undefined || initialData.exciseTax === null ? undefined : initialData.exciseTax, // Excise tax is per unitType
+      costPrice: initialData.costPrice,
     } : {
       id: '',
       name: '',
       sku: '',
       category: undefined,
       unitType: PRODUCT_UNIT_TYPES[0],
-      piecesInBaseUnit: 1, // Default to 1, especially if PCS is first unit type
+      piecesInBaseUnit: 1,
       packagingUnit: '',
       itemsPerPackagingUnit: undefined,
       stockLevel: 0,
       addStockQuantity: undefined,
       reorderPoint: 0,
       basePrice: 0,
+      costPrice: 0,
       exciseTax: undefined,
     },
   });
@@ -113,14 +105,22 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
   }, [watchedUnitType]);
 
   React.useEffect(() => {
-    if (watchedUnitType === 'PCS' && form.getValues("piecesInBaseUnit") !== 1) {
-      form.setValue("piecesInBaseUnit", 1, { shouldValidate: true });
-    } else if (!isBaseUnitAPackageLike && watchedUnitType !== 'PCS' && form.getValues("piecesInBaseUnit") === undefined) {
-      // For units like Kgs, Liters, Units, if piecesInBaseUnit is not set, default it to 1.
-      // Only do this if it's undefined to avoid overriding intentional edits for other package-like base units.
-      // form.setValue("piecesInBaseUnit", 1, { shouldValidate: true });
+    if (watchedUnitType === 'PCS') {
+      if (form.getValues("piecesInBaseUnit") !== 1) {
+        form.setValue("piecesInBaseUnit", 1, { shouldValidate: true });
+      }
+    } else if (isBaseUnitAPackageLike) {
+      // If it's a package-like unit, and piecesInBaseUnit is not set or 0, prompt or default
+      // For now, we rely on Zod validation to catch this if it's required.
+      // User might intentionally set it later.
+    } else { // For units like Kgs, Liters, Units, clear or set piecesInBaseUnit to 1
+        if(form.getValues("piecesInBaseUnit") !== 1 && form.getValues("piecesInBaseUnit") !== undefined && form.getValues("piecesInBaseUnit") !== null){
+             // If user previously set a value and now changes to non-package, they might need to adjust.
+             // For simplicity, we might not auto-clear or auto-set here, letting validation guide.
+        }
     }
   }, [watchedUnitType, isBaseUnitAPackageLike, form]);
+
 
   const handleSubmitForm = (values: ProductFormValues) => {
     onSubmit(values);
@@ -216,7 +216,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>The primary unit inventory is counted in AND how its sale price is defined (e.g., PCS, Cartons). Stock levels refer to this unit.</FormDescription>
+                <FormDescription>The primary unit inventory is counted in AND its base price is defined for (e.g., PCS, Cartons). Stock levels refer to this unit.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -228,7 +228,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="piecesInBaseUnit"
             render={({ field }) => (
             <FormItem>
-                <FormLabel>Pieces per Base Unit (e.g., PCS in this Carton/Pack)</FormLabel>
+                <FormLabel>Individual Pieces in this Base Unit (e.g., PCS)</FormLabel>
                 <FormControl>
                 <Input
                     type="number"
@@ -238,7 +238,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                 />
                 </FormControl>
-                <FormDescription>If 'Base Unit Type' is a package (like Carton), enter how many individual sellable pieces (e.g., PCS) it contains. Enter 1 if the Base Unit is already a piece (e.g. if Base Unit Type is 'PCS').</FormDescription>
+                <FormDescription>If 'Base Unit Type' is a package (like Carton, Pack), enter how many individual sellable pieces (e.g., PCS) it contains. Enter 1 if Base Unit is already a piece (e.g. if Base Unit Type is 'PCS').</FormDescription>
                 <FormMessage />
             </FormItem>
             )}
@@ -259,7 +259,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                       <option key={suggestion} value={suggestion} />
                   ))}
                 </datalist>
-                <FormDescription>e.g., Pallet, Master Case. Leave blank if not applicable.</FormDescription>
+                <FormDescription>e.g., Pallet, Master Case. Defines a larger package made of multiple 'Base Units'.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -280,7 +280,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                     disabled={!form.getValues("packagingUnit") || form.getValues("packagingUnit")!.trim() === ''}
                   />
                 </FormControl>
-                <FormDescription>Number of 'Base Units' (defined above) in one 'Larger Sales Package'.</FormDescription>
+                <FormDescription>Number of 'Base Units' (defined above) in one 'Larger Package'.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -301,8 +301,11 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                     {...field} 
                     readOnly={!!initialData} 
                     disabled={!!initialData}
+                    value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                   />
                 </FormControl>
+                <FormDescription>Current inventory quantity in terms of the selected 'Base Unit Type'.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -337,27 +340,33 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
               <FormItem>
                 <FormLabel>Reorder Point (in {watchedUnitType || 'Base Units'})</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="e.g. 50" {...field} />
+                  <Input type="number" placeholder="e.g. 50" {...field} 
+                  value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                  onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <FormField
             control={form.control}
             name="basePrice"
             render={({ field }) => (
               <FormItem>
-                 <FormLabel>Base Price (per {watchedUnitType || 'Base Unit'}, before taxes)</FormLabel>
+                 <FormLabel>Base Price (per {watchedUnitType || 'Base Unit Type'}, before taxes)</FormLabel>
                 <FormControl>
                    <div className="relative">
                     <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="number" placeholder="e.g. 5.99" {...field} step="0.01" className="pl-8" />
+                    <Input type="number" placeholder="e.g. 5.99" {...field} step="0.01" className="pl-8" 
+                    value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    />
                   </div>
                 </FormControl>
                 <FormDescription>
-                  Enter the fundamental price for one '{watchedUnitType || 'Base Unit'}' *before* any taxes (VAT, Excise).
+                  Fundamental price for one '{watchedUnitType || 'Base Unit'}' *before* any taxes (VAT, Excise).
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -368,7 +377,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             name="exciseTax"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Excise Tax (per {watchedUnitType || 'Base Unit'}) (Optional)</FormLabel>
+                <FormLabel>Excise Tax (per {watchedUnitType || 'Base Unit Type'}) (Optional)</FormLabel>
                 <FormControl>
                    <div className="relative">
                     <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -384,7 +393,29 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                   </div>
                 </FormControl>
                 <FormDescription>
-                  Enter the excise tax amount for one '{watchedUnitType || 'Base Unit'}'.
+                  Excise tax amount for one '{watchedUnitType || 'Base Unit Type'}'.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="costPrice"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cost Price (per {watchedUnitType || 'Base Unit Type'})</FormLabel>
+                <FormControl>
+                   <div className="relative">
+                    <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input type="number" placeholder="e.g. 3.00" {...field} step="0.01" className="pl-8" 
+                     value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    />
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  Your cost for one '{watchedUnitType || 'Base Unit Type'}'. Used for inventory valuation.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -396,7 +427,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || (!form.formState.isDirty && !form.getValues("addStockQuantity") && !!initialData) || !form.formState.isValid}>
+          <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
             {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Product')}
           </Button>
         </div>
