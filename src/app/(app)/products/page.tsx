@@ -1,4 +1,4 @@
-
+// src/app/(app)/products/page.tsx
 'use client';
 import * as React from 'react';
 import { useState, useMemo, useCallback } from 'react';
@@ -31,7 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import type { VariantProps } from 'class-variance-authority';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Added Card imports
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -44,8 +44,7 @@ import {
   AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 
-
-// Helper functions moved outside the component
+// Helper functions (moved outside component for clarity and potential reuse if ever needed)
 const getDisplayUnit = (product: Product, type: 'base' | 'package' | 'pieces'): string => {
   if (type === 'pieces') return 'PCS';
   let unit: string | undefined;
@@ -74,20 +73,20 @@ const getCategoryBadgeVariant = (category?: ProductCategory): VariantProps<typeo
 
 const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
   const price = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
-  let displayUnit = getDisplayUnit(product, 'base');
+  const displayUnit = getDisplayUnit(product, 'base');
   return { price, unit: displayUnit };
 };
 
 const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
   const exciseAmount = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  let displayUnit = getDisplayUnit(product, 'base');
+  const displayUnit = getDisplayUnit(product, 'base');
   return { exciseAmount, unit: displayUnit };
 };
 
 const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | null | undefined): { vatAmount: number; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  const vatRate = (companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0) / 100;
+  const vatRate = (companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0) / 100;
   
   const subtotalForVatPerBaseUnit = basePricePerBaseUnit + exciseTaxPerBaseUnit;
   const vatAmount = subtotalForVatPerBaseUnit * vatRate;
@@ -105,7 +104,7 @@ const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile
   const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInBase;
 
   const subtotalBeforeVAT = basePricePerConceptualPiece + exciseTaxPerConceptualPiece;
-  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
+  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
   const vatAmountOnPcs = subtotalBeforeVAT * (vatRatePercent / 100);
   return subtotalBeforeVAT + vatAmountOnPcs;
 };
@@ -113,24 +112,21 @@ const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile
 const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number | null; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
+  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
 
   let itemsInTargetUnit = 1;
   let displayUnit = getDisplayUnit(product, 'base');
   let isPriceForPackageContext = false;
 
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-    // Pricing the optional larger packaging unit
     itemsInTargetUnit = product.itemsPerPackagingUnit;
     displayUnit = getDisplayUnit(product, 'package');
     isPriceForPackageContext = true;
   } else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 0) > 0) {
-    // Base unit itself is a package (like 'Cartons'), and we are pricing this base unit package
-    itemsInTargetUnit = 1; // We are pricing one base unit
+    itemsInTargetUnit = 1; 
     displayUnit = getDisplayUnit(product, 'base');
     isPriceForPackageContext = true;
   } else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    // Base unit is PCS and no larger package defined, so no "package" price relevant here
     return { price: null, unit: '-' };
   }
   
@@ -213,8 +209,8 @@ export default function ProductsPage() {
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       reorderPoint: data.reorderPoint,
-      basePrice: data.basePrice, // This is now the base price per Base Unit Type
-      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax, // This is now excise tax per Base Unit Type
+      basePrice: data.basePrice,
+      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax,
     };
 
     if (editingProduct) {
@@ -223,7 +219,6 @@ export default function ProductsPage() {
         ...editingProduct,
         ...productDataForStorage,
         stockLevel: newStockLevel,
-        costPrice: editingProduct.costPrice, // Preserve existing costPrice
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -248,7 +243,7 @@ export default function ProductsPage() {
         ...productDataForStorage,
         id: finalProductId,
         stockLevel: data.stockLevel || 0,
-        costPrice: 0, // Default costPrice for new products
+        costPrice: 0, // costPrice is set here
         createdAt: new Date().toISOString(),
       };
       addProduct(newProduct);
@@ -287,16 +282,16 @@ export default function ProductsPage() {
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
+                <TableRow>
                   <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">Product ID</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm">SKU</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
                   <TableHead colSpan={2} className="text-center align-bottom min-w-[170px] px-2 text-sm">Stock Levels</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT (15%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[160px] px-2 text-sm">
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2 text-sm">
                     <div>Sale Price</div>
                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
@@ -304,30 +299,18 @@ export default function ProductsPage() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[80px]">CTN</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[80px]">PCS</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    {[...Array(11)].map((_, j) => <TableCell key={j} className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>)}
                     <TableCell className="text-center px-2">
                         <div className="flex justify-center items-center gap-1">
-                            <Skeleton className="h-7 w-7" />
-                            <Skeleton className="h-7 w-7" />
-                            <Skeleton className="h-7 w-7" />
+                            <Skeleton className="h-7 w-7" /> <Skeleton className="h-7 w-7" /> <Skeleton className="h-7 w-7" />
                         </div>
                     </TableCell>
                   </TableRow>
@@ -336,17 +319,17 @@ export default function ProductsPage() {
             </Table>
           ) : filteredProducts.length > 0 ? (
             <Table>
-               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
                   <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">Product ID</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm">SKU</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
                   <TableHead colSpan={2} className="text-center align-bottom min-w-[170px] px-2 text-sm">Stock Levels</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Base Price</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT (15%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[160px] px-2 text-sm">
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2 text-sm">
                     <div>Sale Price</div>
                     <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                   </TableHead>
@@ -354,9 +337,9 @@ export default function ProductsPage() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[80px]">CTN</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[80px]">PCS</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -377,7 +360,7 @@ export default function ProductsPage() {
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                       <TableCell className="text-left px-2 font-medium">{product.id}</TableCell>
                       <TableCell className="text-left px-2">{product.name}</TableCell>
-                      <TableCell className="text-left px-2">{product.sku}</TableCell>
+                      <TableCell className="text-left px-2 text-[11px]">{product.sku}</TableCell>
                       <TableCell className="text-left px-2">
                         <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                           {product.category}
@@ -387,9 +370,9 @@ export default function ProductsPage() {
                         "text-left font-medium px-2",
                         product.stockLevel <= product.reorderPoint ? "text-destructive" : ""
                       )}>
-                        {stockValueToDisplay} {stockUnitDisplay}
+                        {stockValueToDisplay} {stockUnitToDisplay}
                       </TableCell>
-                       <TableCell className="text-left px-2">
+                      <TableCell className="text-left px-2">
                         {totalPieces > 0 ? `${totalPieces.toFixed(0)} PCS` : '-'}
                       </TableCell>
                       <TableCell className="text-right px-2">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
