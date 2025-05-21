@@ -1,34 +1,38 @@
 
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react'; // Added useState
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter } from 'lucide-react';
+import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle } from 'lucide-react'; // Added PlusCircle
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'; // Added Dialog imports
+import { ProductForm, type ProductFormValues } from '@/components/forms/product-form'; // Added ProductForm imports
+import type { Product } from '@/types'; // Added Product import
 
 export default function InventoryPage() {
-  const { products, isLoading } = useData();
+  const { products, isLoading, addProduct, companyProfile } = useData(); // Added addProduct
   const { toast } = useToast();
+
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null); // Though only adding from here
 
   const kpiData = useMemo(() => {
     if (isLoading || !products || products.length === 0) {
       return {
         totalInventoryValue: 0,
         lowStockItemsCount: 0,
-        nearingExpiryCount: 0, // Static for now
+        nearingExpiryCount: 0, 
       };
     }
 
     const totalInventoryValue = products.reduce((sum, product) => {
-      return sum + (product.stockLevel * product.costPrice); // Make sure costPrice is per base unit
+      return sum + (product.stockLevel * product.costPrice); 
     }, 0);
 
     const lowStockItemsCount = products.filter(product => product.stockLevel <= product.reorderPoint).length;
@@ -36,7 +40,7 @@ export default function InventoryPage() {
     return {
       totalInventoryValue,
       lowStockItemsCount,
-      nearingExpiryCount: 5, // Static placeholder for nearing expiry
+      nearingExpiryCount: 5, 
     };
   }, [products, isLoading]);
 
@@ -52,6 +56,73 @@ export default function InventoryPage() {
     });
   };
 
+  const handleAddNewProduct = () => {
+    setEditingProduct(null);
+    setIsFormModalOpen(true);
+  };
+
+  const handleSubmitNewProduct = (data: ProductFormValues) => {
+    let finalProductId = data.id;
+    if (finalProductId && finalProductId.trim() !== '') {
+      if (products.find(p => p.id === finalProductId)) {
+        toast({
+          title: "Error: Product ID exists",
+          description: `Product ID ${finalProductId} is already in use. Please choose a different ID or leave blank.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+      while (products.find(p => p.id === finalProductId)) {
+        finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+      }
+    }
+    
+    let storedBaseSalePrice: number;
+    let storedBaseExciseTax: number | undefined = undefined;
+
+    const formSalePrice = data.salePrice; // Price as entered (could be for base unit or package)
+    const formExciseTaxValue = data.exciseTax; // Excise as entered (could be for base unit or package)
+
+    if (data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit && data.itemsPerPackagingUnit > 0) {
+      // User entered price for the package, convert to base unit price
+      storedBaseSalePrice = formSalePrice / data.itemsPerPackagingUnit;
+      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
+        storedBaseExciseTax = formExciseTaxValue / data.itemsPerPackagingUnit;
+      }
+    } else {
+      // User entered price for the base unit
+      storedBaseSalePrice = formSalePrice;
+      if (formExciseTaxValue !== undefined && formExciseTaxValue !== null) {
+        storedBaseExciseTax = formExciseTaxValue;
+      }
+    }
+
+    const newProduct: Product = {
+      id: finalProductId,
+      name: data.name,
+      sku: data.sku || '',
+      category: data.category,
+      unitType: data.unitType,
+      piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
+      packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
+      itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
+      stockLevel: data.stockLevel,
+      reorderPoint: data.reorderPoint,
+      costPrice: 0, // Default costPrice to 0 for new products from this simplified form
+      salePrice: storedBaseSalePrice,
+      exciseTax: storedBaseExciseTax,
+      createdAt: new Date().toISOString(),
+    };
+
+    addProduct(newProduct);
+    toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
+    setIsFormModalOpen(false);
+    setEditingProduct(null);
+  };
+
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -63,10 +134,8 @@ export default function InventoryPage() {
               <Button className="w-full sm:w-auto" disabled>
                 <Edit className="mr-2 h-4 w-4" /> Adjust Stock
               </Button>
-              <Button asChild className="w-full sm:w-auto" disabled>
-                <Link href="/products">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-                </Link>
+              <Button className="w-full sm:w-auto" disabled>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
               </Button>
             </div>
           }
@@ -108,10 +177,8 @@ export default function InventoryPage() {
             <Button onClick={handleAdjustStock} className="w-full sm:w-auto">
               <Edit className="mr-2 h-4 w-4" /> Adjust Stock
             </Button>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href="/products">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-              </Link>
+            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto"> {/* Changed from Link */}
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
             </Button>
           </div>
         }
@@ -217,8 +284,28 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* Add Product Modal */}
+      <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
+        setIsFormModalOpen(isOpen);
+        if (!isOpen) setEditingProduct(null);
+      }}>
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>Add New Product</DialogTitle>
+            <DialogDescription>
+              Enter the details for the new product.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow overflow-y-auto p-6">
+            <ProductForm
+              initialData={null} // Always null as we are only adding from here
+              onSubmit={handleSubmitNewProduct}
+              onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-    
