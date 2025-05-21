@@ -100,29 +100,32 @@ export default function InvoicesPage() {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
 
-    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey && !isFormModalOpen && !isViewModalOpen) {
       if (action === 'new') {
-        if (!isFormModalOpen && !editingInvoice) {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
           setIsFormModalOpen(true);
           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        }
       } else if (action === 'edit') {
-        if (!isFormModalOpen && (!editingInvoice || editingInvoice.id !== invoiceIdParam)) {
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
           setEditingInvoice(invoiceToEdit || null);
           setCurrentPrefillValues(null);
           setIsFormModalOpen(true);
           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        }
       } else if (action === 'view') {
-         if (!isViewModalOpen && (!invoiceToViewInModal || invoiceToViewInModal.id !== invoiceIdParam)) {
            const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
-           setInvoiceToViewInModal(invoiceToView || null);
-           setIsViewModalOpen(true);
-           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-         }
+           if (invoiceToView) {
+             setInvoiceToViewInModal(invoiceToView);
+             setIsViewModalOpen(true);
+             setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+           } else {
+             // If invoice not found for view, clear params to avoid loop
+              const newSearchParams = new URLSearchParams(searchParams.toString());
+              newSearchParams.delete('action');
+              newSearchParams.delete('id');
+              router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+              setUrlParamsProcessedIntentKey(null);
+           }
       }
     } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey && !isFormModalOpen && !isViewModalOpen) {
       setUrlParamsProcessedIntentKey(null);
@@ -134,7 +137,9 @@ export default function InvoicesPage() {
     urlParamsProcessedIntentKey,
     invoices,
     editingInvoice,
-    invoiceToViewInModal
+    invoiceToViewInModal,
+    router,
+    pathname
   ]);
 
 
@@ -143,36 +148,37 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
+      setUrlParamsProcessedIntentKey(null); // Reset processed key on close
       
       const currentAction = searchParams.get('action');
       const currentId = searchParams.get('id');
       
-      if (urlParamsProcessedIntentKey && ( (currentAction === 'new' && urlParamsProcessedIntentKey.startsWith('action=new')) || (currentAction === 'edit' && urlParamsProcessedIntentKey.startsWith('action=edit') && urlParamsProcessedIntentKey.includes(currentId || '')) )) {
+      if ( (currentAction === 'new' || currentAction === 'edit')) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        setUrlParamsProcessedIntentKey(null); 
       }
     }
-  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
         setInvoiceToViewInModal(null);
+        setUrlParamsProcessedIntentKey(null); // Reset processed key on close
+
         const currentAction = searchParams.get('action');
-        if (currentAction === 'view' && urlParamsProcessedIntentKey) {
+        if (currentAction === 'view') {
             const newSearchParams = new URLSearchParams(searchParams.toString());
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-            setUrlParamsProcessedIntentKey(null);
         }
     }
-  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname]);
 
 
   const handleAddNewInvoice = useCallback(() => {
@@ -228,7 +234,8 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (invoiceToViewInModal) {
-      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${invoiceToViewInModal.totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
+      const totalAmount = typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0;
+      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
     } else {
       setQrCodeValueForModal('');
     }
@@ -250,14 +257,12 @@ export default function InvoicesPage() {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
 
-    // Invoice items unitPrice already includes (base price + excise tax)
-    const calculatedSubtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    // General tax (companyProfile.taxRate) is assumed to be 0 as VAT is the primary consumption tax.
-    const calculatedGeneralTaxAmount = 0; 
-    const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.15; // Default to 15%
+    const calculatedGeneralTaxAmount = 0; // Assuming general tax is not used
+    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
     const calculatedVatAmount = calculatedSubtotal * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount; // Subtotal (Base+Excise) + VAT
+    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
 
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
@@ -285,7 +290,7 @@ export default function InvoicesPage() {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
       if (paymentAmount >= 0) { 
         newPaymentHistory.push({
-          id: `PAY-${Date.now()}`,
+          id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
           paymentDate: new Date().toISOString(),
           amount: paymentAmount,
           status: 'Full Payment',
@@ -303,7 +308,7 @@ export default function InvoicesPage() {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
         newPaymentHistory.push({
-          id: `PAY-${Date.now()}`,
+          id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
           paymentDate: new Date().toISOString(),
           amount: actualPartialPayment,
           status: 'Partial Payment',
@@ -342,10 +347,10 @@ export default function InvoicesPage() {
       customerName: customer?.name || 'N/A',
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
-      items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })), // item.unitPrice already includes (base + excise)
-      subtotal: calculatedSubtotal, // Subtotal includes item (base + excise taxes)
-      taxAmount: calculatedGeneralTaxAmount, // General tax, now 0
-      vatAmount: calculatedVatAmount, // VAT on (Base+Excise) subtotal
+      items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0) })), 
+      subtotal: calculatedSubtotal, 
+      taxAmount: calculatedGeneralTaxAmount, 
+      vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus, 
@@ -364,12 +369,12 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
-    handleFormModalOpenChange(false);
+    handleFormModalOpenChange(false); // This will also clear URL params due to its internal logic
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
-  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
+  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -512,7 +517,7 @@ export default function InvoicesPage() {
 
       {/* View Invoice Details Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="p-6 space-y-6 animate-pulse">
               <Skeleton className="h-8 w-1/2 mb-2" />
@@ -531,13 +536,13 @@ export default function InvoicesPage() {
           )}
           {(!isDataContextLoading && invoiceToViewInModal) && (
             <>
-              <DialogHeader className="p-6 pb-4 border-b">
+              <DialogHeader className="p-6 pb-4 border-b print:hidden">
                 <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
                 <DialogDescription>
                   Viewing details for invoice #{invoiceToViewInModal.id}.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex-grow overflow-y-auto p-6 space-y-6">
+              <div className="flex-grow overflow-y-auto p-6 space-y-6 print:overflow-visible print:h-auto print:p-0">
                 {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
                 {customerForModal && companyProfile && (
                   <>
@@ -580,7 +585,7 @@ export default function InvoicesPage() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider">Invoice Total</p>
-                          <p className="font-bold text-base text-primary">${invoiceToViewInModal.totalAmount.toFixed(2)}</p>
+                          <p className="font-bold text-base text-primary">${(typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0).toFixed(2)}</p>
                         </div>
                       </div>
                     </section>
@@ -602,8 +607,8 @@ export default function InvoicesPage() {
                               <TableRow key={item.id || index} className="even:bg-muted/20">
                                 <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
                                 <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
-                                <TableCell className="text-right text-muted-foreground py-3">${item.unitPrice.toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${item.total.toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-muted-foreground py-3">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -625,27 +630,27 @@ export default function InvoicesPage() {
                       <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
-                          <span className="font-medium text-foreground">${invoiceToViewInModal.subtotal.toFixed(2)}</span>
+                          <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.subtotal === 'number' ? invoiceToViewInModal.subtotal : 0).toFixed(2)}</span>
                         </div>
                         {invoiceToViewInModal.vatAmount > 0 && (
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
-                              <span className="font-medium text-foreground">${invoiceToViewInModal.vatAmount.toFixed(2)}</span>
+                              <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.vatAmount === 'number' ? invoiceToViewInModal.vatAmount : 0).toFixed(2)}</span>
                           </div>
                         )}
                         <Separator className="my-3 !bg-border" />
                         <div className="flex justify-between text-base font-semibold">
                           <span className="text-foreground">Total Amount:</span>
-                          <span className="text-foreground">${invoiceToViewInModal.totalAmount.toFixed(2)}</span>
+                          <span className="text-foreground">${(typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between mt-2 text-green-600 dark:text-green-400">
                           <span className="font-medium">Amount Paid:</span>
-                          <span className="font-semibold">${invoiceToViewInModal.amountPaid.toFixed(2)}</span>
+                          <span className="font-semibold">${(typeof invoiceToViewInModal.amountPaid === 'number' ? invoiceToViewInModal.amountPaid : 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-lg font-bold">
                           <span className="text-foreground">Balance Due:</span>
-                          <span className={`${invoiceToViewInModal.remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
-                            ${invoiceToViewInModal.remainingBalance.toFixed(2)}
+                          <span className={`${(typeof invoiceToViewInModal.remainingBalance === 'number' ? invoiceToViewInModal.remainingBalance : 0) > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
+                            ${(typeof invoiceToViewInModal.remainingBalance === 'number' ? invoiceToViewInModal.remainingBalance : 0).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -665,7 +670,7 @@ export default function InvoicesPage() {
                                               {format(new Date(record.paymentDate), "MMM d, yyyy 'at' hh:mm a")}
                                           </p>
                                       </div>
-                                      <p className="font-semibold text-primary">${record.amount.toFixed(2)}</p>
+                                      <p className="font-semibold text-primary">${(typeof record.amount === 'number' ? record.amount : 0).toFixed(2)}</p>
                                   </div>
                                   {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
                                       <p className="text-xs text-muted-foreground mt-1">Voucher: {record.cashVoucherNumber}</p>
@@ -682,11 +687,15 @@ export default function InvoicesPage() {
                           </div>
                       </section>
                     )}
+                    <div className="mt-12 text-center text-xs text-muted-foreground print:block hidden">
+                        <p>Thank you for your business!</p>
+                        {companyProfile && <p>{companyProfile.name} | {companyProfile.email} | {companyProfile.phone}</p>}
+                    </div>
                   </>
                 )}
               </div>
-              <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
-                <Button variant="outline" onClick={() => { toast({ title: "Print Action", description: "Print functionality would be implemented here." }) }} className="w-full sm:w-auto">
+              <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 print:hidden">
+                <Button variant="outline" onClick={() => window.print()} className="w-full sm:w-auto">
                   <Printer className="mr-2 h-4 w-4" /> Print Invoice
                 </Button>
                 <Button variant="outline" onClick={() => { toast({ title: "Download PDF Action", description: "PDF download functionality would be implemented here." }) }} className="w-full sm:w-auto">
@@ -743,5 +752,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
-    
