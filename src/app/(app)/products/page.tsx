@@ -44,9 +44,9 @@ import {
   AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 
-// Helper functions (moved outside component for clarity and potential reuse if ever needed)
-const getDisplayUnit = (product: Product, type: 'base' | 'package' | 'pieces'): string => {
-  if (type === 'pieces') return 'PCS';
+
+// Helper functions moved outside the component
+const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
   let unit: string | undefined;
   if (type === 'package' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     unit = product.packagingUnit;
@@ -118,16 +118,21 @@ const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile
   let displayUnit = getDisplayUnit(product, 'base');
   let isPriceForPackageContext = false;
 
+  // Case 1: A larger packagingUnit is defined (e.g., Pallet of Cartons)
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     itemsInTargetUnit = product.itemsPerPackagingUnit;
     displayUnit = getDisplayUnit(product, 'package');
     isPriceForPackageContext = true;
-  } else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 0) > 0) {
-    itemsInTargetUnit = 1; 
+  } 
+  // Case 2: The base unitType itself is a package (e.g., Carton) and not PCS
+  else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 0) > 0) {
+    itemsInTargetUnit = 1; // We are calculating for one base unit, which is a package
     displayUnit = getDisplayUnit(product, 'base');
     isPriceForPackageContext = true;
-  } else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    return { price: null, unit: '-' };
+  } 
+  // Case 3: Base unit is PCS and no larger packaging unit is defined
+  else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
+    return { price: null, unit: '-' }; // No separate "package" price to show if base is PCS
   }
   
   if (!isPriceForPackageContext) return { price: null, unit: '-' };
@@ -209,8 +214,8 @@ export default function ProductsPage() {
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       reorderPoint: data.reorderPoint,
-      basePrice: data.basePrice,
-      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax,
+      basePrice: data.basePrice, // Storing basePrice directly as it's for the base unit
+      exciseTax: data.exciseTax === undefined || data.exciseTax === null ? 0 : data.exciseTax, // Storing exciseTax directly
     };
 
     if (editingProduct) {
@@ -219,6 +224,7 @@ export default function ProductsPage() {
         ...editingProduct,
         ...productDataForStorage,
         stockLevel: newStockLevel,
+        costPrice: editingProduct.costPrice // Preserve existing costPrice
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -243,7 +249,7 @@ export default function ProductsPage() {
         ...productDataForStorage,
         id: finalProductId,
         stockLevel: data.stockLevel || 0,
-        costPrice: 0, // costPrice is set here
+        costPrice: 0, // Default costPrice for new products
         createdAt: new Date().toISOString(),
       };
       addProduct(newProduct);
@@ -287,7 +293,7 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm">SKU</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[170px] px-2 text-sm">Stock Levels</TableHead>
+                  <TableHead colSpan={2} className="text-center align-middle px-2 text-sm">Inventory Levels</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
@@ -298,7 +304,7 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Stock</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
@@ -307,7 +313,17 @@ export default function ProductsPage() {
               <TableBody>
                 {[...Array(10)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    {[...Array(11)].map((_, j) => <TableCell key={j} className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>)}
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-left"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="text-center px-2">
                         <div className="flex justify-center items-center gap-1">
                             <Skeleton className="h-7 w-7" /> <Skeleton className="h-7 w-7" /> <Skeleton className="h-7 w-7" />
@@ -323,9 +339,9 @@ export default function ProductsPage() {
                  <TableRow>
                   <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">Product ID</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm">SKU</TableHead>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-sm text-[11px]">SKU</TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[170px] px-2 text-sm">Stock Levels</TableHead>
+                  <TableHead colSpan={2} className="text-center align-middle px-2 text-sm">Inventory Levels</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
@@ -336,7 +352,7 @@ export default function ProductsPage() {
                   <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">Stock</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Stock</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[100px]">Total PCS (Calc.)</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
@@ -345,9 +361,21 @@ export default function ProductsPage() {
               <TableBody>
                 {filteredProducts.map((product, index) => {
                   const currentStockLevel = product.stockLevel;
-                  const stockUnitDisplay = getDisplayUnit(product, 'base');
-                  const stockValueToDisplay = currentStockLevel.toFixed((product.unitType === 'Kgs' || product.unitType === 'Liters') && currentStockLevel % 1 !== 0 ? 2 : 0);
+                  // Logic for stock display
+                  const isPackageDisplayRelevantForStock =
+                    product.packagingUnit &&
+                    product.itemsPerPackagingUnit &&
+                    product.itemsPerPackagingUnit > 0 &&
+                    product.unitType.toLowerCase() !== product.packagingUnit.toLowerCase();
                   
+                  const stockValueToDisplay = isPackageDisplayRelevantForStock
+                    ? (currentStockLevel / product.itemsPerPackagingUnit!).toFixed( (currentStockLevel / product.itemsPerPackagingUnit!) % 1 !== 0 ? 2 : 0)
+                    : currentStockLevel.toFixed( (product.unitType === 'Kgs' || product.unitType === 'Liters') && currentStockLevel % 1 !== 0 ? 2 : 0);
+                  
+                  const stockUnitToDisplay = isPackageDisplayRelevantForStock
+                    ? getDisplayUnit(product, 'package')
+                    : getDisplayUnit(product, 'base');
+
                   const totalPieces = product.stockLevel * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
 
                   const basePriceInfo = getDisplayBasePriceInfo(product);
@@ -452,7 +480,7 @@ export default function ProductsPage() {
               Viewing details for product {productToView?.id} (SKU: {productToView?.sku}).
             </DialogDescription>
           </DialogHeader>
-          {productToView && (
+          {productToView && companyProfile && (
             <div className="space-y-3 py-4 text-sm">
               <Card><CardContent className="pt-4 space-y-1">
                 <div className="grid grid-cols-2 gap-x-2">
@@ -469,7 +497,7 @@ export default function ProductsPage() {
                   <div><strong>Primary Stocking Unit (Base Unit):</strong></div>
                   <div><Badge variant="outline">{getDisplayUnit(productToView, 'base')}</Badge></div>
 
-                  {productToView.piecesInBaseUnit && productToView.piecesInBaseUnit > 0 && productToView.unitType.toLowerCase() !== 'pcs' ? (
+                  {productToView.piecesInBaseUnit && productToView.piecesInBaseUnit > 0 ? (
                     <>
                       <div><strong>Individual Pieces in Base Unit:</strong></div>
                       <div>{productToView.piecesInBaseUnit} PCS</div>
