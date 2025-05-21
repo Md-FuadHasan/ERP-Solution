@@ -22,13 +22,13 @@ export interface Customer {
 
 export interface InvoiceItem {
   id:string;
-  productId?: string; // ID of the product from the product catalog
+  productId?: string;
   description: string;
   quantity: number;
   // unitPrice on invoice item = (product base price + product excise tax) for the chosen selling unit. Excludes invoice-level VAT.
   unitPrice: number;
   total: number; // quantity * unitPrice
-  unitType: 'Cartons' | 'PCS'; // The unit type for this specific line item
+  unitType: 'Cartons' | 'PCS';
 }
 
 export type PaymentProcessingStatus = 'Unpaid' | 'Partially Paid' | 'Fully Paid';
@@ -59,10 +59,11 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  // Subtotal = Sum of all (item.quantity * item.unitPrice), where item.unitPrice includes product base price & product excise tax.
+  // Subtotal = Sum of all (item.quantity * (product base price + product excise tax)).
   subtotal: number;
   taxAmount: number; // General tax - typically 0 if VAT is the main consumption tax.
-  vatAmount: number; // VAT on subtotal (which already includes item-specific excise).
+  // vatAmount = VAT on subtotal (which already includes item-specific excise).
+  vatAmount: number;
   totalAmount: number; // subtotal + taxAmount + vatAmount.
   status: InvoiceStatus;
   paymentProcessingStatus: PaymentProcessingStatus;
@@ -81,9 +82,9 @@ export interface CompanyProfile {
   address: string;
   phone: string;
   email: string;
-  taxRate: number | string; // General Tax Rate Percentage (likely 0 if VAT is primary)
-  vatRate: number | string; // VAT Rate Percentage
-  excessTaxRate?: number | string; // Potentially unused if excise is per product
+  taxRate: number | string;
+  vatRate: number | string;
+  excessTaxRate?: number | string;
 }
 
 export interface Manager {
@@ -127,6 +128,10 @@ export interface Product {
   costPrice: number;             // Cost per 'unitType'
   basePrice: number;             // Base selling price for one 'unitType' (BEFORE any taxes)
   exciseTax?: number;            // Excise tax amount PER 'unitType'
+  batchNo?: string;
+  productionDate?: string; // ISO string
+  expiryDate?: string;     // ISO string
+  discountRate?: number;   // Percentage e.g., 10 for 10%
   createdAt?: string;
 }
 
@@ -135,14 +140,14 @@ export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   address: '123 App Dev Lane, Suite 404, Logic City, OS 12345',
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
-  taxRate: 0, // General Tax set to 0, VAT is primary after product excise
-  vatRate: 15, // VAT: 15%
+  taxRate: 0,
+  vatRate: 15,
   excessTaxRate: 0
 };
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'PROD001', name: 'Ice Cream Cone (Vanilla) - 120ml', sku: 'ICCV12030', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 40 * 24, reorderPoint: 10 * 24, costPrice: 0.30, basePrice: 0.80, exciseTax: 0.05 },
-  { id: 'PROD002', name: 'LABAN - 900 ML', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 100 * 12, reorderPoint: 20 * 12, costPrice: 0.60, basePrice: 1.00, exciseTax: 0.10 },
+  { id: 'PROD001', name: 'Ice Cream Cone (Vanilla) - 120ml', sku: 'ICCV12030', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 40 * 24, reorderPoint: 10 * 24, costPrice: 0.30, basePrice: 0.80, exciseTax: 0.05, batchNo: 'B001', productionDate: '2023-01-01', expiryDate: '2024-01-01', discountRate: 0 },
+  { id: 'PROD002', name: 'LABAN - 900 ML', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 100 * 12, reorderPoint: 20 * 12, costPrice: 0.60, basePrice: 1.00, exciseTax: 0.10, discountRate: 5 },
   { id: 'PROD003', name: 'Cooking Cream 1080ml', sku: '330012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150 * 12, reorderPoint: 30 * 12, costPrice: 0.80, basePrice: 1.20, exciseTax: 0 },
   { id: 'PROD004', name: 'Al Rabie Juice 125ml - Orange', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200 * 18, reorderPoint: 50 * 18, costPrice: 0.35, basePrice: 0.60, exciseTax: 0.02 },
   { id: 'PROD005', name: 'Ice Cream Tub 1.8L - Vanilla', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80 * 6, reorderPoint: 20 * 6, costPrice: 1.50, basePrice: 2.50, exciseTax: 0.50 },
@@ -165,8 +170,8 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2024001', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-07-01', dueDate: '2024-07-31',
     items: [{ id: 'item1',productId: 'PROD001', description: 'Ice Cream Cone (Vanilla) - 120ml', quantity: 10, unitPrice: 0.80 + 0.05, total: (0.80 + 0.05) * 10, unitType: 'PCS' }],
-    subtotal: (0.80 + 0.05) * 10, // (basePrice + exciseTax) * quantity
-    taxAmount: 0, // General tax assumed 0
+    subtotal: (0.80 + 0.05) * 10,
+    taxAmount: 0,
     vatAmount: ((0.80 + 0.05) * 10) * (MOCK_COMPANY_PROFILE.vatRate as number / 100),
     totalAmount: ((0.80 + 0.05) * 10) * (1 + (MOCK_COMPANY_PROFILE.vatRate as number / 100)),
     status: 'Paid',
@@ -180,8 +185,6 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2024002', customerId: 'CUST002', customerName: 'Beta Innovations',
     issueDate: '2024-07-05', dueDate: '2024-08-04',
-    // PROD002: basePrice 1.00, exciseTax 0.10. UnitType PCS. itemsPerPackagingUnit: 12.
-    // Selling 1 Carton. Invoice Item Unit Price for Carton = (1.00 + 0.10) * 12 = 1.10 * 12 = 13.20
     items: [{ id: 'item1', productId: 'PROD002', description: 'LABAN - 900 ML (Carton)', quantity: 1, unitPrice: (1.00 + 0.10) * 12, total: (1.00 + 0.10) * 12 * 1, unitType: 'Cartons' }],
     subtotal: (1.00 + 0.10) * 12 * 1,
     taxAmount: 0,
@@ -198,7 +201,6 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2024003', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-06-10', dueDate: '2024-07-10',
-    // PROD003: basePrice 1.20, exciseTax 0
     items: [{ id: 'item1', productId: 'PROD003', description: 'Cooking Cream 1080ml', quantity: 5, unitPrice: 1.20 + 0, total: (1.20 + 0) * 5, unitType: 'PCS' }],
     subtotal: (1.20 + 0) * 5,
     taxAmount: 0,
@@ -211,13 +213,13 @@ export const MOCK_INVOICES: Invoice[] = [
    {
     id: 'INV-2024004', customerId: 'CUST003', customerName: 'Gamma Services',
     issueDate: '2024-07-15', dueDate: '2024-08-15',
-    items: [{ id: 'item1', description: 'SEO Optimization (Service)', quantity: 1, unitPrice: 500, total: 500, unitType: 'PCS' }], // Assuming basePrice 500, no excise
-    subtotal: 500,
+    items: [{ id: 'item1', productId: 'PROD004', description: 'Al Rabie Juice 125ml - Orange', quantity: 1, unitPrice: (0.60 + 0.02), total: (0.60 + 0.02) * 1, unitType: 'PCS' }],
+    subtotal: (0.60 + 0.02) * 1,
     taxAmount: 0,
-    vatAmount: 500 * (MOCK_COMPANY_PROFILE.vatRate as number / 100),
-    totalAmount: 500 * (1 + (MOCK_COMPANY_PROFILE.vatRate as number / 100)),
+    vatAmount: ((0.60 + 0.02) * 1) * (MOCK_COMPANY_PROFILE.vatRate as number / 100),
+    totalAmount: ((0.60 + 0.02) * 1) * (1 + (MOCK_COMPANY_PROFILE.vatRate as number / 100)),
     status: 'Pending',
-    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: 500 * (1 + (MOCK_COMPANY_PROFILE.vatRate as number / 100)),
+    paymentProcessingStatus: 'Unpaid', amountPaid: 0, remainingBalance: ((0.60 + 0.02) * 1) * (1 + (MOCK_COMPANY_PROFILE.vatRate as number / 100)),
     paymentHistory: []
   },
 ];
