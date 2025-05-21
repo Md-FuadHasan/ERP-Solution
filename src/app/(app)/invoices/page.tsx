@@ -39,6 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -146,7 +147,7 @@ export default function InvoicesPage() {
       const currentAction = searchParams.get('action');
       const currentId = searchParams.get('id');
       
-      if ((currentAction === 'edit' || currentAction === 'new') && urlParamsProcessedIntentKey && (urlParamsProcessedIntentKey.startsWith(currentAction) || (currentAction === 'edit' && urlParamsProcessedIntentKey.includes(currentId || '')) )) {
+      if (urlParamsProcessedIntentKey && ( (currentAction === 'new' && urlParamsProcessedIntentKey.startsWith('action=new')) || (currentAction === 'edit' && urlParamsProcessedIntentKey.startsWith('action=edit') && urlParamsProcessedIntentKey.includes(currentId || '')) )) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('customerId');
@@ -233,7 +234,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -249,14 +250,14 @@ export default function InvoicesPage() {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
 
-    // Calculate totals based on line items where unitPrice already includes item-specific excise tax
+    // Invoice items unitPrice already includes (base price + excise tax)
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
     
-    // General tax is now 0, VAT is the primary tax applied to subtotal (which includes excise)
+    // General tax (companyProfile.taxRate) is assumed to be 0 as VAT is the primary consumption tax.
     const calculatedGeneralTaxAmount = 0; 
     const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0.15; // Default to 15%
     const calculatedVatAmount = calculatedSubtotal * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount; // Subtotal (Base+Excise) + VAT
 
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
@@ -341,10 +342,10 @@ export default function InvoicesPage() {
       customerName: customer?.name || 'N/A',
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
-      items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })), // item.unitPrice already includes excise
-      subtotal: calculatedSubtotal, // Subtotal includes item excise taxes
+      items: data.items.map(item => ({ ...item, total: item.quantity * item.unitPrice })), // item.unitPrice already includes (base + excise)
+      subtotal: calculatedSubtotal, // Subtotal includes item (base + excise taxes)
       taxAmount: calculatedGeneralTaxAmount, // General tax, now 0
-      vatAmount: calculatedVatAmount, // VAT on subtotal
+      vatAmount: calculatedVatAmount, // VAT on (Base+Excise) subtotal
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus, 
@@ -368,12 +369,11 @@ export default function InvoicesPage() {
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
-  const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
-  // taxRatePercent for general tax is removed as it's no longer applied in totals
+  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0">
+      <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Invoices"
           description="Manage and track all your invoices."
@@ -383,37 +383,37 @@ export default function InvoicesPage() {
             </Button>
           }
         />
-        <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
+        <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
           <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
           <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
         <div className="h-full overflow-y-auto"> 
           {isDataContextLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                  <TableHead className="min-w-[180px]">Customer</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
-                  <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[150px] text-right">Actions</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">Customer</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Status</TableHead>
+                  <TableHead className="min-w-[150px] text-right px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2">
                       <div className="flex justify-end items-center gap-1">
                         <Skeleton className="h-8 w-8" />
                         <Skeleton className="h-8 w-8" />
@@ -428,29 +428,29 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                  <TableHead className="min-w-[180px]">Customer</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right">Balance</TableHead>
-                  <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[150px] text-right">Actions</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">Customer</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Status</TableHead>
+                  <TableHead className="min-w-[150px] text-right px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices.map((invoice, index) => (
                   <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${invoice.amountPaid.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">${invoice.remainingBalance.toFixed(2)}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium px-2">{invoice.id}</TableCell>
+                    <TableCell className="px-2">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                    <TableCell className="text-right px-2">${invoice.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right px-2">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold px-2">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell className="px-2">
                       <Badge variant={getStatusBadgeVariant(invoice.status)}>
                         {invoice.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right px-2">
                       <div className="flex justify-end items-center gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
                           <Eye className="h-4 w-4" />
@@ -458,7 +458,7 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -498,7 +498,7 @@ export default function InvoicesPage() {
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
-                companyProfile={companyProfile}
+                companyProfile={companyProfile!}
                 invoices={invoices}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
@@ -539,7 +539,7 @@ export default function InvoicesPage() {
               </DialogHeader>
               <div className="flex-grow overflow-y-auto p-6 space-y-6">
                 {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
-                {customerForModal && (
+                {customerForModal && companyProfile && (
                   <>
                     <header className="mb-8">
                       <div className="flex justify-between items-center mb-2">
@@ -627,12 +627,6 @@ export default function InvoicesPage() {
                           <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
                           <span className="font-medium text-foreground">${invoiceToViewInModal.subtotal.toFixed(2)}</span>
                         </div>
-                        {/* General Tax is removed based on new logic
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
-                          <span className="font-medium text-foreground">${invoiceToViewInModal.taxAmount.toFixed(2)}</span>
-                        </div>
-                        */}
                         {invoiceToViewInModal.vatAmount > 0 && (
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
@@ -749,3 +743,5 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
+    

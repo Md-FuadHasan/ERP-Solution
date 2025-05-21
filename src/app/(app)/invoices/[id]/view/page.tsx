@@ -64,9 +64,7 @@ export default function InvoiceViewPage() {
     }
   };
   
-  // General tax (companyProfile.taxRate) is now assumed to be 0 or not used in the final invoice calculation
-  // if VAT is the primary tax applied after excise.
-  const vatRatePercent = companyProfile.vatRate ? parseFloat(String(companyProfile.vatRate)) : 0;
+  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
 
 
   if (pageLoading || isDataContextLoading) {
@@ -126,7 +124,6 @@ export default function InvoiceViewPage() {
             </div>
             <div className="w-full md:max-w-sm space-y-2.5 border p-4 sm:p-6 rounded-lg bg-muted/40">
                 <Skeleton className="h-5 w-24 ml-auto" />
-                {/* Removed skeleton for general tax if it's no longer displayed */}
                 <Skeleton className="h-5 w-20 ml-auto" /> 
                 <Skeleton className="h-1 w-full my-3 !bg-border" />
                 <Skeleton className="h-6 w-28 ml-auto" />
@@ -188,9 +185,9 @@ export default function InvoiceViewPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
         <div>
           <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">From</h3>
-          <p className="font-semibold text-lg text-foreground">{companyProfile.name}</p>
-          <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{companyProfile.address}</p>
-          <p className="text-muted-foreground">{companyProfile.email} | {companyProfile.phone}</p>
+          <p className="font-semibold text-lg text-foreground">{companyProfile?.name || 'Your Company'}</p>
+          <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{companyProfile?.address}</p>
+          <p className="text-muted-foreground">{companyProfile?.email} | {companyProfile?.phone}</p>
         </div>
         <div className="md:text-left"> 
           <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">Bill To</h3>
@@ -261,12 +258,6 @@ export default function InvoiceViewPage() {
             <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
             <span className="font-medium text-foreground">${invoice.subtotal.toFixed(2)}</span>
           </div>
-          {/* General Tax (invoice.taxAmount) is usually 0 now. We only show VAT.
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax ({taxRatePercent.toFixed(0)}%):</span> 
-            <span className="font-medium text-foreground">${invoice.taxAmount.toFixed(2)}</span>
-          </div>
-          */}
           {invoice.vatAmount > 0 && (
              <div className="flex justify-between">
                 <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
@@ -339,9 +330,11 @@ export default function InvoiceViewPage() {
       
       <div className="mt-12 text-center text-xs text-muted-foreground print:block hidden">
         <p>Thank you for your business!</p>
-        <p>{companyProfile.name} | {companyProfile.email} | {companyProfile.phone}</p>
+        {companyProfile && <p>{companyProfile.name} | {companyProfile.email} | {companyProfile.phone}</p>}
       </div>
 
     </div>
   );
 }
+
+    

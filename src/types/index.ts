@@ -25,9 +25,9 @@ export interface InvoiceItem {
   productId?: string; // ID of the product from the product catalog
   description: string;
   quantity: number;
-  unitPrice: number; // This price NOW INCLUDES product-specific excise tax but is BEFORE invoice-level VAT
-  total: number; // quantity * unitPrice (which includes excise)
-  unitType: 'Cartons' | 'PCS';
+  unitPrice: number; // This price NOW INCLUDES product-specific base price AND product-specific excise tax. It is BEFORE invoice-level VAT.
+  total: number; // quantity * unitPrice
+  unitType: 'Cartons' | 'PCS'; // The unit type for this specific line item
 }
 
 export type PaymentProcessingStatus = 'Unpaid' | 'Partially Paid' | 'Fully Paid';
@@ -58,10 +58,10 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  subtotal: number; // Sum of (item.quantity * (item.baseUnitPrice + item.unitExciseTax))
-  taxAmount: number; // General tax (This is 0 if VAT is the primary tax after excise)
-  vatAmount: number; // VAT on (subtotal including excise)
-  totalAmount: number; // subtotal (incl. excise) + taxAmount (if any, likely 0) + vatAmount
+  subtotal: number; // Sum of (item.quantity * item.unitPrice) where item.unitPrice = (item base price + item excise tax)
+  taxAmount: number; // General tax (This is effectively 0 if VAT is the primary consumption tax)
+  vatAmount: number; // VAT on subtotal
+  totalAmount: number; // subtotal + vatAmount (assuming taxAmount is 0)
   status: InvoiceStatus;
   paymentProcessingStatus: PaymentProcessingStatus;
   amountPaid: number;
@@ -79,9 +79,9 @@ export interface CompanyProfile {
   address: string;
   phone: string;
   email: string;
-  taxRate: number | string; // General Tax Rate Percentage (Now 0 as VAT is primary after excise)
+  taxRate: number | string; // General Tax Rate Percentage (likely 0 if VAT is primary)
   vatRate: number | string; // VAT Rate Percentage
-  excessTaxRate?: number | string;
+  excessTaxRate?: number | string; // Potentially unused if excise is per product
 }
 
 export interface Manager {
@@ -107,8 +107,8 @@ export interface ReportSummary {
 export type ProductCategory = 'Frozen' | 'Dairy' | 'Beverages' | 'Raw Materials' | 'Packaging';
 export const PRODUCT_CATEGORIES: ProductCategory[] = ['Frozen', 'Dairy', 'Beverages', 'Raw Materials', 'Packaging'];
 
-export type ProductUnitType = 'PCS' | 'Cartons' | 'Liters' | 'Kgs' | 'Units' | 'ML';
-export const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML'];
+export type ProductUnitType = 'PCS' | 'Cartons' | 'Liters' | 'Kgs' | 'Units' | 'ML' | 'Pack';
+export const PRODUCT_UNIT_TYPES: ProductUnitType[] = ['PCS', 'Cartons', 'Liters', 'Kgs', 'Units', 'ML', 'Pack'];
 
 
 export interface Product {
@@ -116,28 +116,30 @@ export interface Product {
   name: string;
   sku: string;
   category: ProductCategory;
-  unitType: ProductUnitType;      // Base unit for stockLevel & primary pricing (e.g., PCS, Carton)
-  piecesInBaseUnit?: number;     // If unitType is a package (e.g., Carton), how many individual pieces it contains
+  unitType: ProductUnitType;      // Base unit for stockLevel & primary pricing
+  piecesInBaseUnit?: number;     // If unitType is a package (e.g., Carton), how many individual conceptual pieces (e.g., PCS) it contains
   packagingUnit?: string;        // Optional LARGER sales package (e.g., Pallet, if unitType is Carton)
   itemsPerPackagingUnit?: number;// Number of 'unitType's in one 'packagingUnit'
   stockLevel: number;            // In terms of 'unitType'
   reorderPoint: number;          // In terms of 'unitType'
   costPrice: number;             // Cost per 'unitType'
-  salePrice: number;             // Selling price for one 'unitType' (BEFORE excise tax, BEFORE VAT)
+  basePrice: number;             // Base selling price for one 'unitType' (BEFORE any taxes)
   exciseTax?: number;            // Excise tax amount PER 'unitType'
+  createdAt?: string;
 }
 
+// MOCK_PRODUCTS updated to use basePrice instead of salePrice, and include exciseTax
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'PROD3645224', name: 'Ice Cream Cone (vanilla) -120ml', sku: 'ICCV12030', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 50 * 24, reorderPoint: 10 * 24, costPrice: 0.50, salePrice: 0.80, exciseTax: 0.05 },
-  { id: 'PROD5216208', name: 'LABAN - 900 ML', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 100 * 12, reorderPoint: 20 * 12, costPrice: 0.80, salePrice: 1.00, exciseTax: 0.10 }, // Adjusted cost/sale for PCS
-  { id: 'PROD003', name: 'Cooking Cream 1080ml', sku: '330012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150 * 12, reorderPoint: 30 * 12, costPrice: 1.00, salePrice: 1.20, exciseTax: 0 },
-  { id: 'PROD004', name: 'Al Rabie Juice 125ml - Orange', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200 * 18, reorderPoint: 50 * 18, costPrice: 0.45, salePrice: 0.60, exciseTax: 0.02 },
-  { id: 'PROD005', name: 'Ice Cream Tub 1.8L - Vanilla', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80 * 6, reorderPoint: 20 * 6, costPrice: 2.00, salePrice: 2.50, exciseTax: 0.50 },
-  { id: 'PROD006', name: 'UHT Milk 200ml', sku: '59012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 300 * 18, reorderPoint: 60 * 18, costPrice: 0.60, salePrice: 0.75, exciseTax: 0 },
-  { id: 'PROD007', name: 'Whipping Cream 1080ml', sku: '330011', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120 * 12, reorderPoint: 25 * 12, costPrice: 1.10, salePrice: 1.30, exciseTax: 0 },
-  { id: 'PROD008', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry', sku: '12024-VS', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240 * 24, reorderPoint: 48 * 24, costPrice: 0.70, salePrice: 0.85, exciseTax: 0.03 },
-  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', piecesInBaseUnit: 1, stockLevel: 1000, reorderPoint: 200, costPrice: 0.80, salePrice: 1.00, exciseTax: 0 }, // Assuming 1 Kg is the base unit
-  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', piecesInBaseUnit: 1, stockLevel: 500, reorderPoint: 100, costPrice: 0.20, salePrice: 0.25, exciseTax: 0 },
+  { id: 'PROD3645224', name: 'Ice Cream Cone (vanilla) -120ml', sku: 'ICCV12030', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 50 * 24, reorderPoint: 10 * 24, costPrice: 0.50, basePrice: 0.80, exciseTax: 0.05 },
+  { id: 'PROD5216208', name: 'LABAN - 900 ML', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 100 * 12, reorderPoint: 20 * 12, costPrice: 0.80, basePrice: 1.00, exciseTax: 0.10 },
+  { id: 'PROD003', name: 'Cooking Cream 1080ml', sku: '330012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 150 * 12, reorderPoint: 30 * 12, costPrice: 1.00, basePrice: 1.20, exciseTax: 0 },
+  { id: 'PROD004', name: 'Al Rabie Juice 125ml - Orange', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 200 * 18, reorderPoint: 50 * 18, costPrice: 0.45, basePrice: 0.60, exciseTax: 0.02 },
+  { id: 'PROD005', name: 'Ice Cream Tub 1.8L - Vanilla', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 6, stockLevel: 80 * 6, reorderPoint: 20 * 6, costPrice: 2.00, basePrice: 2.50, exciseTax: 0.50 },
+  { id: 'PROD006', name: 'UHT Milk 200ml', sku: '59012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, stockLevel: 300 * 18, reorderPoint: 60 * 18, costPrice: 0.60, basePrice: 0.75, exciseTax: 0 },
+  { id: 'PROD007', name: 'Whipping Cream 1080ml', sku: '330011', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 12, stockLevel: 120 * 12, reorderPoint: 25 * 12, costPrice: 1.10, basePrice: 1.30, exciseTax: 0 },
+  { id: 'PROD008', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry', sku: '12024-VS', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 24, stockLevel: 240 * 24, reorderPoint: 48 * 24, costPrice: 0.70, basePrice: 0.85, exciseTax: 0.03 },
+  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', piecesInBaseUnit: 1, stockLevel: 1000, reorderPoint: 200, costPrice: 0.80, basePrice: 1.00, exciseTax: 0 },
+  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', piecesInBaseUnit: 1, stockLevel: 500, reorderPoint: 100, costPrice: 0.20, basePrice: 0.25, exciseTax: 0 },
 ];
 
 
@@ -151,7 +153,8 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2024001', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-07-01', dueDate: '2024-07-31',
-    items: [{ id: 'item1',productId: 'PROD3645224', description: 'Ice Cream Cone (vanilla ) -120ml', quantity: 10, unitPrice: 0.85, total: 8.50, unitType: 'PCS' }], // unitPrice includes 0.05 excise
+    // Item: basePrice 0.80, exciseTax 0.05. unitPrice = 0.80 + 0.05 = 0.85
+    items: [{ id: 'item1',productId: 'PROD3645224', description: 'Ice Cream Cone (vanilla ) -120ml', quantity: 10, unitPrice: 0.85, total: 8.50, unitType: 'PCS' }],
     subtotal: 8.50, // (0.80 base + 0.05 excise) * 10
     taxAmount: 0, // General tax assumed 0
     vatAmount: 1.28, // 15% on 8.50
@@ -167,7 +170,9 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2024002', customerId: 'CUST002', customerName: 'Beta Innovations',
     issueDate: '2024-07-05', dueDate: '2024-08-04',
-    items: [{ id: 'item1', productId: 'PROD5216208', description: 'LABAN - 900 ML (Carton)', quantity: 1, unitPrice: 13.20 , total: 13.20, unitType: 'Cartons' }], // (1.00 base + 0.10 excise) * 12 PCS in Carton
+    // Item: PROD5216208: basePrice 1.00, exciseTax 0.10. unitPrice per PCS = 1.10.
+    // Selling 1 Carton (12 PCS). unitPrice for Carton = 1.10 * 12 = 13.20
+    items: [{ id: 'item1', productId: 'PROD5216208', description: 'LABAN - 900 ML (Carton)', quantity: 1, unitPrice: 13.20 , total: 13.20, unitType: 'Cartons' }],
     subtotal: 13.20,
     taxAmount: 0,
     vatAmount: 1.98, // 15% on 13.20
@@ -183,7 +188,8 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2024003', customerId: 'CUST001', customerName: 'Alpha Solutions',
     issueDate: '2024-06-10', dueDate: '2024-07-10',
-    items: [{ id: 'item1', productId: 'PROD003', description: 'Cooking Cream 1080ml', quantity: 5, unitPrice: 1.20, total: 6.00, unitType: 'PCS' }], // 1.20 base + 0 excise
+    // Item: PROD003: basePrice 1.20, exciseTax 0. unitPrice per PCS = 1.20
+    items: [{ id: 'item1', productId: 'PROD003', description: 'Cooking Cream 1080ml', quantity: 5, unitPrice: 1.20, total: 6.00, unitType: 'PCS' }],
     subtotal: 6.00,
     taxAmount: 0,
     vatAmount: 0.90, // 15% on 6.00
@@ -195,7 +201,8 @@ export const MOCK_INVOICES: Invoice[] = [
    {
     id: 'INV-2024004', customerId: 'CUST003', customerName: 'Gamma Services',
     issueDate: '2024-07-15', dueDate: '2024-08-15',
-    items: [{ id: 'item1', description: 'SEO Optimization', quantity: 1, unitPrice: 500, total: 500, unitType: 'PCS' }], // Assuming 0 excise for service
+    // Item: (assuming basePrice 500, exciseTax 0 for this service) unitPrice = 500
+    items: [{ id: 'item1', description: 'SEO Optimization', quantity: 1, unitPrice: 500, total: 500, unitType: 'PCS' }],
     subtotal: 500,
     taxAmount: 0,
     vatAmount: 75,
@@ -211,9 +218,9 @@ export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   address: '123 App Dev Lane, Suite 404, Logic City, OS 12345',
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
-  taxRate: 0, // General Tax set to 0, as VAT is primary
+  taxRate: 0, // General Tax set to 0, as VAT is primary after product excise
   vatRate: 15, // VAT: 15%
-  excessTaxRate: 0
+  excessTaxRate: 0 // Not used if excise is per product
 };
 
 export const MOCK_MANAGERS: Manager[] = [
