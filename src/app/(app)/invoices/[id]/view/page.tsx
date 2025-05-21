@@ -38,7 +38,9 @@ export default function InvoiceViewPage() {
       if (foundInvoice) {
         const foundCustomer = getCustomerById(foundInvoice.customerId);
         setCustomer(foundCustomer);
-        setQrCodeValue(`Invoice ID: ${foundInvoice.id}\nTotal Amount: $${foundInvoice.totalAmount.toFixed(2)}\nDue Date: ${format(new Date(foundInvoice.dueDate), 'MMM d, yyyy')}`);
+        // Ensure amounts are numbers before toFixed
+        const totalAmount = typeof foundInvoice.totalAmount === 'number' ? foundInvoice.totalAmount : 0;
+        setQrCodeValue(`Invoice ID: ${foundInvoice.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(foundInvoice.dueDate), 'MMM d, yyyy')}`);
       } else {
         setCustomer(null); 
       }
@@ -51,7 +53,7 @@ export default function InvoiceViewPage() {
   }, [invoiceId, getInvoiceById, getCustomerById, isDataContextLoading]);
 
   const handlePrint = () => {
-    toast({ title: "Print Action", description: "Print functionality would be implemented here." });
+    window.print();
   };
 
   const handleDownloadPDF = () => {
@@ -64,13 +66,18 @@ export default function InvoiceViewPage() {
     }
   };
   
-  const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
+  const vatRate = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : companyProfile.vatRate) : 0;
+  const subtotal = invoice?.subtotal ? (typeof invoice.subtotal === 'number' ? invoice.subtotal : 0) : 0;
+  const vatAmount = invoice?.vatAmount ? (typeof invoice.vatAmount === 'number' ? invoice.vatAmount : 0) : 0;
+  const totalAmount = invoice?.totalAmount ? (typeof invoice.totalAmount === 'number' ? invoice.totalAmount : 0) : 0;
+  const amountPaid = invoice?.amountPaid ? (typeof invoice.amountPaid === 'number' ? invoice.amountPaid : 0) : 0;
+  const remainingBalance = invoice?.remainingBalance ? (typeof invoice.remainingBalance === 'number' ? invoice.remainingBalance : 0) : 0;
 
 
   if (pageLoading || isDataContextLoading) {
     return (
-      <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg animate-pulse">
-        <Skeleton className="h-6 w-24 mb-8" /> 
+      <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg animate-pulse print:shadow-none print:border-none print:m-0 print:p-4 sm:print:p-6 print:max-w-none">
+        <Skeleton className="h-6 w-24 mb-8 print:hidden" /> 
         
         <header className="mb-8">
           <div className="flex justify-between items-center mb-2">
@@ -80,7 +87,7 @@ export default function InvoiceViewPage() {
           <Skeleton className="h-4 w-32" /> 
         </header>
         
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
           <div>
             <Skeleton className="h-4 w-16 mb-2" /> 
             <Skeleton className="h-6 w-48 mb-1" /> 
@@ -118,7 +125,7 @@ export default function InvoiceViewPage() {
         </section>
 
         <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
-            <div className="w-full md:w-auto flex flex-col items-center md:items-start">
+            <div className="w-full md:w-auto flex flex-col items-center md:items-start print:hidden">
                 <Skeleton className="h-5 w-32 mb-2" /> 
                 <Skeleton className="h-32 w-32" /> 
             </div>
@@ -131,8 +138,8 @@ export default function InvoiceViewPage() {
                 <Skeleton className="h-6 w-32 ml-auto" />
             </div>
         </section>
-        <Separator className="my-8" />
-        <footer className="flex flex-col sm:flex-row justify-end items-center gap-3 sm:gap-4">
+        <Separator className="my-8 print:hidden" />
+        <footer className="flex flex-col sm:flex-row justify-end items-center gap-3 sm:gap-4 print:hidden">
           <Skeleton className="h-10 w-32" />
           <Skeleton className="h-10 w-40" />
           <Skeleton className="h-10 w-32" />
@@ -143,7 +150,7 @@ export default function InvoiceViewPage() {
 
   if (!invoice) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4 print:hidden">
         <h2 className="text-2xl font-semibold mb-2 text-destructive">Invoice Not Found</h2>
         <p className="text-muted-foreground mb-4">The invoice with ID "{invoiceId}" could not be found.</p>
         <Button onClick={() => router.back()} variant="outline">
@@ -155,7 +162,7 @@ export default function InvoiceViewPage() {
   
   if (!customer) {
      return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-4 print:hidden">
         <h2 className="text-2xl font-semibold mb-2 text-destructive">Customer Not Found</h2>
         <p className="text-muted-foreground mb-4">The customer for invoice "{invoiceId}" could not be found.</p>
          <Button onClick={() => router.back()} variant="outline">
@@ -166,7 +173,7 @@ export default function InvoiceViewPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg">
+    <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto bg-card shadow-lg rounded-lg print:max-w-none print:shadow-none print:border-none print:m-0 print:p-4 sm:print:p-6">
       <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-8 group print:hidden">
         <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
         Back
@@ -211,7 +218,7 @@ export default function InvoiceViewPage() {
           </div>
            <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Invoice Total</p>
-            <p className="font-bold text-base text-primary">${invoice.totalAmount.toFixed(2)}</p>
+            <p className="font-bold text-base text-primary">${totalAmount.toFixed(2)}</p>
           </div>
         </div>
       </section>
@@ -233,8 +240,8 @@ export default function InvoiceViewPage() {
                 <TableRow key={item.id || index} className="even:bg-muted/20">
                   <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
                   <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
-                  <TableCell className="text-right text-muted-foreground py-3">${item.unitPrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${item.total.toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground py-3">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -256,27 +263,27 @@ export default function InvoiceViewPage() {
         <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
-            <span className="font-medium text-foreground">${invoice.subtotal.toFixed(2)}</span>
+            <span className="font-medium text-foreground">${subtotal.toFixed(2)}</span>
           </div>
           {invoice.vatAmount > 0 && (
              <div className="flex justify-between">
-                <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
-                <span className="font-medium text-foreground">${invoice.vatAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground">VAT ({vatRate.toFixed(0)}%):</span>
+                <span className="font-medium text-foreground">${vatAmount.toFixed(2)}</span>
             </div>
           )}
           <Separator className="my-3 !bg-border" />
           <div className="flex justify-between text-base font-semibold">
             <span className="text-foreground">Total Amount:</span>
-            <span className="text-foreground">${invoice.totalAmount.toFixed(2)}</span>
+            <span className="text-foreground">${totalAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between mt-2 text-green-600 dark:text-green-400">
             <span className="font-medium">Amount Paid:</span>
-            <span className="font-semibold">${invoice.amountPaid.toFixed(2)}</span>
+            <span className="font-semibold">${amountPaid.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-bold">
             <span className="text-foreground">Balance Due:</span>
-            <span className={`${invoice.remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
-              ${invoice.remainingBalance.toFixed(2)}
+            <span className={`${remainingBalance > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
+              ${remainingBalance.toFixed(2)}
             </span>
           </div>
         </div>
@@ -296,7 +303,7 @@ export default function InvoiceViewPage() {
                                 {format(new Date(record.paymentDate), "MMM d, yyyy 'at' hh:mm a")}
                             </p>
                         </div>
-                        <p className="font-semibold text-primary">${record.amount.toFixed(2)}</p>
+                        <p className="font-semibold text-primary">${(typeof record.amount === 'number' ? record.amount : 0).toFixed(2)}</p>
                     </div>
                     {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
                         <p className="text-xs text-muted-foreground mt-1">Voucher: {record.cashVoucherNumber}</p>
@@ -336,5 +343,3 @@ export default function InvoiceViewPage() {
     </div>
   );
 }
-
-    
