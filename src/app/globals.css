@@ -147,6 +147,19 @@ body {
     print-color-adjust: exact !important;
     margin: 0;
     padding: 0;
+    width: 100%; /* Ensure body uses full width for print */
+    font-size: 10pt; /* Example base font size for print */
   }
-  /* Additional print-specific global styles can go here */
+  .print-hidden-layout { /* Class to hide main layout elements */
+    display: none !important;
+  }
+  .print-root-content { /* Class for the root of the content to be printed */
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important; /* Reset padding for the direct print root */
+    box-shadow: none !important;
+    border: none !important;
+  }
 }

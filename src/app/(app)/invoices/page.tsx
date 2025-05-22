@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -99,27 +99,26 @@ export default function InvoicesPage() {
     } else if (action === 'view' && invoiceIdParam) {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
-
+    
     if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey && !isFormModalOpen && !isViewModalOpen) {
       if (action === 'new') {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
           setIsFormModalOpen(true);
           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-      } else if (action === 'edit') {
+      } else if (action === 'edit' && invoiceIdParam) {
           const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
           setEditingInvoice(invoiceToEdit || null);
           setCurrentPrefillValues(null);
           setIsFormModalOpen(true);
           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-      } else if (action === 'view') {
+      } else if (action === 'view' && invoiceIdParam) {
            const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
            if (invoiceToView) {
              setInvoiceToViewInModal(invoiceToView);
              setIsViewModalOpen(true);
              setUrlParamsProcessedIntentKey(currentUrlIntentKey);
            } else {
-             // If invoice not found for view, clear params to avoid loop
               const newSearchParams = new URLSearchParams(searchParams.toString());
               newSearchParams.delete('action');
               newSearchParams.delete('id');
@@ -136,31 +135,27 @@ export default function InvoicesPage() {
     isViewModalOpen,
     urlParamsProcessedIntentKey,
     invoices,
-    editingInvoice,
-    invoiceToViewInModal,
     router,
     pathname
   ]);
 
 
-  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+ const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      setUrlParamsProcessedIntentKey(null); // Reset processed key on close
-      
+      // Only clear URL params if they were responsible for opening this specific type of modal
       const currentAction = searchParams.get('action');
-      const currentId = searchParams.get('id');
-      
-      if ( (currentAction === 'new' || currentAction === 'edit')) {
+      if (currentAction === 'new' || currentAction === 'edit') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
+        newSearchParams.delete('id');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
-        newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
       }
+      setUrlParamsProcessedIntentKey(null); 
     }
   }, [searchParams, router, pathname]);
   
@@ -168,8 +163,6 @@ export default function InvoicesPage() {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
         setInvoiceToViewInModal(null);
-        setUrlParamsProcessedIntentKey(null); // Reset processed key on close
-
         const currentAction = searchParams.get('action');
         if (currentAction === 'view') {
             const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -177,6 +170,7 @@ export default function InvoicesPage() {
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
         }
+        setUrlParamsProcessedIntentKey(null); 
     }
   }, [searchParams, router, pathname]);
 
@@ -259,10 +253,10 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    const calculatedGeneralTaxAmount = 0; // Assuming general tax is not used
+    const calculatedGeneralTaxAmount = 0; 
     const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
     const calculatedVatAmount = calculatedSubtotal * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
 
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
@@ -369,9 +363,9 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
-    handleFormModalOpenChange(false); // This will also clear URL params due to its internal logic
+    handleFormModalOpenChange(false);
     setIsSaving(false);
-  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
+  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange, pathname, searchParams]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
@@ -395,7 +389,7 @@ export default function InvoicesPage() {
       </div>
 
        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
-        <div className="h-full overflow-y-auto"> 
+        <div className="h-full overflow-y-auto">
           {isDataContextLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -517,7 +511,7 @@ export default function InvoicesPage() {
 
       {/* View Invoice Details Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto">
+        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print-root-content print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="p-6 space-y-6 animate-pulse">
               <Skeleton className="h-8 w-1/2 mb-2" />
@@ -542,14 +536,14 @@ export default function InvoicesPage() {
                   Viewing details for invoice #{invoiceToViewInModal.id}.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex-grow overflow-y-auto p-6 space-y-6 print:overflow-visible print:h-auto print:p-0">
+              <div className="flex-grow overflow-y-auto p-6 space-y-6 print:overflow-visible print:h-auto print:p-4 sm:print:p-6">
                 {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
                 {customerForModal && companyProfile && (
                   <>
                     <header className="mb-8">
                       <div className="flex justify-between items-center mb-2">
-                        <h1 className="text-3xl md:text-4xl font-bold text-foreground">INVOICE</h1>
-                        <Badge variant={getStatusBadgeVariant(invoiceToViewInModal.status)} className="text-base px-4 py-1.5">
+                        <h1 className="text-3xl md:text-4xl font-bold text-foreground">TAX INVOICE</h1>
+                        <Badge variant={getStatusBadgeVariant(invoiceToViewInModal.status)} className="text-base px-4 py-1.5 print:hidden">
                           {invoiceToViewInModal.status}
                         </Badge>
                       </div>
