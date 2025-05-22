@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,43 +99,49 @@ export default function InvoicesPage() {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
     
-    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey && !isFormModalOpen && !isViewModalOpen) {
-      if (action === 'new') {
-          setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
-          setEditingInvoice(null);
-          setIsFormModalOpen(true);
-          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-      } else if (action === 'edit' && invoiceIdParam) {
-          const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-          setEditingInvoice(invoiceToEdit || null);
-          setCurrentPrefillValues(null);
-          setIsFormModalOpen(true);
-          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-      } else if (action === 'view' && invoiceIdParam) {
-           const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
-           if (invoiceToView) {
-             setInvoiceToViewInModal(invoiceToView);
-             setIsViewModalOpen(true);
-             setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-           } else {
-              const newSearchParams = new URLSearchParams(searchParams.toString());
-              newSearchParams.delete('action');
-              newSearchParams.delete('id');
-              router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-              setUrlParamsProcessedIntentKey(null);
-           }
+    if (currentUrlIntentKey) {
+      if (urlParamsProcessedIntentKey !== currentUrlIntentKey && !isFormModalOpen && !isViewModalOpen) {
+        if (action === 'new') {
+            setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
+            setEditingInvoice(null);
+            setIsFormModalOpen(true);
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+        } else if (action === 'edit' && invoiceIdParam) {
+            const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
+            setEditingInvoice(invoiceToEdit || null);
+            setCurrentPrefillValues(null);
+            setIsFormModalOpen(true);
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+        } else if (action === 'view' && invoiceIdParam) {
+             const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
+             if (invoiceToView) {
+               setInvoiceToViewInModal(invoiceToView);
+               setIsViewModalOpen(true);
+               setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+             } else {
+                // If invoice for view not found, clean up URL params, this part of effect will run again
+                const newSearchParams = new URLSearchParams(searchParams.toString());
+                newSearchParams.delete('action'); newSearchParams.delete('id');
+                router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+             }
+        }
       }
-    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey && !isFormModalOpen && !isViewModalOpen) {
-      setUrlParamsProcessedIntentKey(null);
+    } else {
+      // If URL is clean and we had a processed key, clear it.
+      if (urlParamsProcessedIntentKey) {
+        setUrlParamsProcessedIntentKey(null);
+      }
     }
   }, [
     searchParams,
     isFormModalOpen,
     isViewModalOpen,
     urlParamsProcessedIntentKey,
-    invoices,
+    invoices, // Needed for finding invoiceToEdit/invoiceToView
+    customers, // Potentially needed if prefill logic gets more complex
     router,
-    pathname
+    pathname,
+    setUrlParamsProcessedIntentKey // Include setters from useState if they are called inside
   ]);
 
 
@@ -145,19 +150,24 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      // Only clear URL params if they were responsible for opening this specific type of modal
       const currentAction = searchParams.get('action');
       if (currentAction === 'new' || currentAction === 'edit') {
+        // This modal was likely opened by URL.
+        // Clear the URL params. The useEffect watching searchParams will then handle
+        // clearing urlParamsProcessedIntentKey once it confirms the URL is clean.
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+      } else {
+        // Modal was not opened by URL (e.g., just clicking "Add New Invoice" button without URL change beforehand)
+        // Safe to clear the intent key immediately.
+        setUrlParamsProcessedIntentKey(null);
       }
-      setUrlParamsProcessedIntentKey(null); 
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, router, pathname, setUrlParamsProcessedIntentKey]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
@@ -169,8 +179,8 @@ export default function InvoicesPage() {
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+            // Let the useEffect clean up urlParamsProcessedIntentKey
         }
-        setUrlParamsProcessedIntentKey(null); 
     }
   }, [searchParams, router, pathname]);
 
@@ -253,9 +263,9 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    const calculatedGeneralTaxAmount = 0; 
+    const calculatedGeneralTaxAmount = 0; // General tax is now 0
     const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
-    const calculatedVatAmount = calculatedSubtotal * vatRate;
+    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT on (Base+Excise) subtotal
     const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
 
 
@@ -342,10 +352,10 @@ export default function InvoicesPage() {
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0) })), 
-      subtotal: calculatedSubtotal, 
-      taxAmount: calculatedGeneralTaxAmount, 
-      vatAmount: calculatedVatAmount,
-      totalAmount: calculatedTotalAmount,
+      subtotal: calculatedSubtotal, // Subtotal = Base + Excise
+      taxAmount: calculatedGeneralTaxAmount, // General Tax, now 0
+      vatAmount: calculatedVatAmount, // VAT on (Base + Excise)
+      totalAmount: calculatedTotalAmount, // (Base + Excise) + VAT
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus, 
       amountPaid: newAmountPaid,
@@ -365,7 +375,7 @@ export default function InvoicesPage() {
 
     handleFormModalOpenChange(false);
     setIsSaving(false);
-  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange, pathname, searchParams]);
+  }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
@@ -511,7 +521,7 @@ export default function InvoicesPage() {
 
       {/* View Invoice Details Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print-root-content print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto">
+        <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto print-root-content">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="p-6 space-y-6 animate-pulse">
               <Skeleton className="h-8 w-1/2 mb-2" />
@@ -746,3 +756,6 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
+
+    
