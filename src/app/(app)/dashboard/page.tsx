@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye, ArrowUp, ArrowDown, Archive } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye, ArrowUp, ArrowDown, Archive, ListFilter } from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
@@ -23,6 +23,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+import { DataPlaceholder } from '@/components/common/data-placeholder';
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -44,8 +46,7 @@ export default function DashboardPage() {
     const activeCustomers = new Set(invoices.map(inv => inv.customerId)).size;
     const overdueInvoicesCount = invoices.filter(inv => inv.status === 'Overdue').length;
     const totalCustomerCount = customers.length;
-    const lowStockItemsCount = products.filter(p => p.stockLevel <= p.reorderPoint).length;
-
+    
     return {
       totalRevenue,
       totalPaid,
@@ -54,9 +55,13 @@ export default function DashboardPage() {
       totalInvoices: invoices.length,
       overdueInvoicesCount,
       totalCustomerCount,
-      lowStockItemsCount,
     };
-  }, [invoices, customers, products]);
+  }, [invoices, customers]);
+
+  const lowStockProducts = useMemo(() => {
+    if (isLoading || !products) return [];
+    return products.filter(product => product.stockLevel <= product.reorderPoint);
+  }, [products, isLoading]);
 
   const invoiceStatusData: ChartDataPoint[] = useMemo(() => {
     const statusCounts = invoices.reduce((acc, inv) => {
@@ -150,8 +155,8 @@ export default function DashboardPage() {
       <div className="flex-grow overflow-y-auto pb-6 pr-1"> 
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => ( 
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"> {/* Adjusted grid for 5 items */}
+              {[...Array(5)].map((_, i) => ( // Changed from 6 to 5
                 <Card key={i}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <Skeleton className="h-5 w-2/3" />
@@ -216,6 +221,35 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+            {/* Placeholder for Low Stock Table Skeleton */}
+            <Card>
+              <CardHeader>
+                <CardTitle><Skeleton className="h-6 w-1/2" /></CardTitle>
+                <CardDescription><Skeleton className="h-4 w-3/4" /></CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 sm:p-2">
+                 <div className="max-h-72 overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                        <TableRow>
+                          {[...Array(5)].map((_, i) => (
+                            <TableHead key={i} className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                      {[...Array(3)].map((_, i) => (
+                        <TableRow key={`lst-skel-${i}`}>
+                           {[...Array(5)].map((_, j) => (
+                            <TableCell key={j} className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+              </CardContent>
+            </Card>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2">
                 <CardHeader><CardTitle><Skeleton className="h-6 w-1/2" /></CardTitle></CardHeader>
@@ -274,7 +308,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-6"> {/* Adjusted grid for 5 items */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -341,21 +375,6 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground flex items-center">
                     <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
                     <span className="text-green-600 mr-1">+5</span> new this month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                  <Archive className="h-4 w-4 text-orange-500 dark:text-orange-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-2xl font-bold mb-1 ${stats.lowStockItemsCount > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
-                      {stats.lowStockItemsCount}
-                  </div>
-                  <p className="text-xs text-muted-foreground flex items-center">
-                    <ArrowUp className="h-3 w-3 mr-1 text-orange-500" /> 
-                    <span className="text-orange-500 mr-1">+3</span> items vs last week
                   </p>
                 </CardContent>
               </Card>
@@ -491,6 +510,55 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
+            {/* Low Stock Items Table */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Low Stock Items</CardTitle>
+                <CardDescription>Products at or below their reorder point. Warehouse information is not yet available.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 sm:p-2">
+                <div className="max-h-72 overflow-y-auto">
+                  {lowStockProducts.length > 0 ? (
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                        <TableRow>
+                          <TableHead className="py-2 px-2 sm:px-4 min-w-[100px]">Product ID</TableHead>
+                          <TableHead className="py-2 px-2 sm:px-4 min-w-[150px]">Name</TableHead>
+                          <TableHead className="py-2 px-2 sm:px-4 min-w-[100px]">SKU</TableHead>
+                          <TableHead className="text-right py-2 px-2 sm:px-4 min-w-[100px]">Current Stock</TableHead>
+                          <TableHead className="text-right py-2 px-2 sm:px-4 min-w-[100px]">Reorder Point</TableHead>
+                          <TableHead className="text-right py-2 px-2 sm:px-4 min-w-[100px]">Difference</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lowStockProducts.map((product, index) => (
+                          <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                            <TableCell className="font-medium py-2 px-2 sm:px-4">{product.id}</TableCell>
+                            <TableCell className="py-2 px-2 sm:px-4">{product.name}</TableCell>
+                            <TableCell className="py-2 px-2 sm:px-4">{product.sku}</TableCell>
+                            <TableCell className="text-right font-semibold py-2 px-2 sm:px-4 text-destructive">
+                              {product.stockLevel} {product.unitType}
+                            </TableCell>
+                            <TableCell className="text-right py-2 px-2 sm:px-4">{product.reorderPoint} {product.unitType}</TableCell>
+                            <TableCell className="text-right font-bold py-2 px-2 sm:px-4 text-destructive">
+                              {product.reorderPoint - product.stockLevel} {product.unitType}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Archive className="mx-auto h-12 w-12 mb-2 text-green-500 dark:text-green-400" />
+                      <p className="font-semibold">Stock Levels Healthy!</p>
+                      <p>No items are currently below their reorder point.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -577,7 +645,7 @@ export default function DashboardPage() {
                             {customer.invoiceCount} invoices &bull; ${customer.totalInvoiced.toFixed(2)}
                           </p>
                         </div>
-                        <Link href={`/customers?action=view&id=${customer.id}`} passHref> 
+                        <Link href={`/customers?view=${customer.id}`} passHref> 
                           <Button variant="ghost" size="sm" className="px-2">
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -596,3 +664,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
