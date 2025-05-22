@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle } from 'lucide-react';
+import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/DataContext';
@@ -13,18 +13,18 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
-import type { Product } from '@/types';
-import { addDays, isBefore, parseISO, startOfDay } from 'date-fns'; // Added date-fns imports
+import type { Product, ProductStockLocation } from '@/types'; // Product type already has globalReorderPoint
+import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
 
 export default function InventoryPage() {
-  const { products, isLoading, addProduct, companyProfile } = useData();
+  const { products, productStockLocations, isLoading, addProduct, companyProfile, getTotalStockForProduct } = useData();
   const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null); 
 
   const kpiData = useMemo(() => {
-    if (isLoading || !products || products.length === 0) {
+    if (isLoading || !products || products.length === 0 || !productStockLocations) {
       return {
         totalInventoryValue: 0,
         lowStockItemsCount: 0,
@@ -32,24 +32,31 @@ export default function InventoryPage() {
       };
     }
 
-    const totalInventoryValue = products.reduce((sum, product) => {
-      const stock = typeof product.stockLevel === 'number' ? product.stockLevel : 0;
-      const cost = typeof product.costPrice === 'number' ? product.costPrice : 0;
+    const totalInventoryValue = productStockLocations.reduce((sum, psl) => {
+      const productDetails = products.find(p => p.id === psl.productId);
+      const stock = typeof psl.stockLevel === 'number' ? psl.stockLevel : 0;
+      const cost = productDetails && typeof productDetails.costPrice === 'number' ? productDetails.costPrice : 0;
       return sum + (stock * cost);
     }, 0);
-
-    const lowStockItemsCount = products.filter(product => product.stockLevel <= product.reorderPoint).length;
+    
+    let lowStockItemsCount = 0;
+    products.forEach(product => {
+        const totalStock = getTotalStockForProduct(product.id);
+        if (product.globalReorderPoint !== undefined && totalStock <= product.globalReorderPoint) {
+            lowStockItemsCount++;
+        }
+    });
 
     const today = startOfDay(new Date());
-    const expiryThresholdDate = addDays(today, 30); // Items expiring within the next 30 days
+    const expiryThresholdDate = addDays(today, 30);
 
     const nearingExpiryCount = products.filter(product => {
       if (!product.expiryDate) return false;
       try {
         const expiry = startOfDay(parseISO(product.expiryDate));
-        return isBefore(expiry, expiryThresholdDate) && !isBefore(expiry, today); // Nearing expiry but not yet expired
+        return isBefore(expiry, expiryThresholdDate) && !isBefore(expiry, today);
       } catch (e) {
-        console.warn(`Invalid expiry date format for product ${product.id}: ${product.expiryDate}`);
+        // console.warn(`Invalid expiry date format for product ${product.id}: ${product.expiryDate}`);
         return false;
       }
     }).length;
@@ -59,17 +66,27 @@ export default function InventoryPage() {
       lowStockItemsCount,
       nearingExpiryCount,
     };
-  }, [products, isLoading]);
+  }, [products, productStockLocations, isLoading, getTotalStockForProduct]);
 
-  const lowStockProducts = useMemo(() => {
-    if (isLoading || !products) return [];
-    return products.filter(product => product.stockLevel <= product.reorderPoint);
-  }, [products, isLoading]);
 
   const handleAdjustStock = () => {
     toast({
       title: "Coming Soon!",
-      description: "Stock Adjustment feature will be available in a future update.",
+      description: "Stock Adjustment feature (for specific warehouses) will be available in a future update.",
+    });
+  };
+  
+  const handleAddWarehouse = () => {
+    toast({
+      title: "Coming Soon!",
+      description: "Add New Warehouse feature will be available in a future update.",
+    });
+  };
+
+  const handleTransferStock = () => {
+    toast({
+      title: "Coming Soon!",
+      description: "Stock Transfer feature will be available in a future update.",
     });
   };
 
@@ -96,7 +113,7 @@ export default function InventoryPage() {
       }
     }
     
-    const newProduct: Product = {
+    const newProductDefinition: Product = {
       id: finalProductId,
       name: data.name,
       sku: data.sku || '',
@@ -105,9 +122,8 @@ export default function InventoryPage() {
       piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
-      stockLevel: data.stockLevel || 0, // Default stockLevel for new products
-      reorderPoint: data.reorderPoint || 0,
-      basePrice: data.basePrice || 0,
+      globalReorderPoint: data.reorderPoint || 0, // Form's reorderPoint is the globalReorderPoint
+      basePrice: data.basePrice,
       costPrice: data.costPrice || 0,
       exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
       batchNo: data.batchNo || undefined,
@@ -117,8 +133,8 @@ export default function InventoryPage() {
       createdAt: new Date().toISOString(),
     };
 
-    addProduct(newProduct);
-    toast({ title: "Product Added", description: `${newProduct.name} has been successfully added.` });
+    addProduct(newProductDefinition);
+    toast({ title: "Product Definition Added", description: `${newProductDefinition.name} has been defined. Add stock via Stock Adjustments or Receiving.` });
     setIsFormModalOpen(false);
     setEditingProduct(null);
   };
@@ -130,14 +146,12 @@ export default function InventoryPage() {
         <PageHeader
           title="Inventory Management"
           description="Overview of your product stock levels, item status, and inventory value."
-          actions={
+           actions={
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Button className="w-full sm:w-auto" disabled>
-                <Edit className="mr-2 h-4 w-4" /> Adjust Stock
-              </Button>
-              <Button className="w-full sm:w-auto" disabled>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-              </Button>
+              <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
+              <Button className="w-full sm:w-auto" disabled><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
+              <Button className="w-full sm:w-auto" disabled><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
+              <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
             </div>
           }
         />
@@ -161,7 +175,7 @@ export default function InventoryPage() {
             <Skeleton className="h-4 w-2/3" />
           </CardHeader>
           <CardContent className="flex-grow flex items-center justify-center">
-            <Skeleton className="h-32 w-1/2" />
+             <Skeleton className="h-40 w-full" />
           </CardContent>
         </Card>
       </div>
@@ -172,20 +186,17 @@ export default function InventoryPage() {
     <div className="flex flex-col h-full">
       <PageHeader
         title="Inventory Management"
-        description="Overview of your product stock levels, item status, and inventory value."
+        description="Overview of your multi-warehouse inventory, product stock levels, and inventory value."
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleAdjustStock} className="w-full sm:w-auto">
-              <Edit className="mr-2 h-4 w-4" /> Adjust Stock
-            </Button>
-            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-            </Button>
+            <Button onClick={handleAddWarehouse} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
+            <Button onClick={handleTransferStock} className="w-full sm:w-auto"><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
+            <Button onClick={handleAdjustStock} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
+            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
           </div>
         }
       />
 
-      {/* KPI Cards Section */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6 shrink-0">
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -197,14 +208,14 @@ export default function InventoryPage() {
               ${kpiData.totalInventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Estimated value of all stock on hand.
+              Estimated value across all warehouses.
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+            <CardTitle className="text-sm font-medium">Global Low Stock Items</CardTitle>
             <AlertTriangle className="h-5 w-5 text-destructive" />
           </CardHeader>
           <CardContent>
@@ -212,14 +223,14 @@ export default function InventoryPage() {
               {kpiData.lowStockItemsCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              Items at or below reorder point.
+              Unique products at/below global reorder point.
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Items Nearing Expiry</CardTitle>
+            <CardTitle className="text-sm font-medium">Products Nearing Expiry</CardTitle>
             <CalendarClock className="h-5 w-5 text-amber-600 dark:text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -227,86 +238,54 @@ export default function InventoryPage() {
               {kpiData.nearingExpiryCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              Products expiring within 30 days.
+              Unique products expiring within 30 days.
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Low Stock Items Table */}
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card">
         <CardHeader className="border-b">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-lg">Low Stock Items</CardTitle>
-              <CardDescription>Products at or below their reorder point.</CardDescription>
+              <CardTitle className="text-lg">Inventory Overview</CardTitle>
+              <CardDescription>Detailed stock views and warehouse management coming soon.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" disabled>
-              <ListFilter className="mr-2 h-3.5 w-3.5" /> Filter (Soon)
-            </Button>
           </div>
         </CardHeader>
-        <div className="h-full overflow-y-auto">
-          {lowStockProducts.length > 0 ? (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[150px]">Product Name</TableHead>
-                  <TableHead className="min-w-[100px]">SKU</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Current Stock</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Reorder Point</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Difference</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lowStockProducts.map((product, index) => (
-                  <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.sku}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">
-                      {product.stockLevel} {product.unitType}
-                    </TableCell>
-                    <TableCell className="text-right">{product.reorderPoint} {product.unitType}</TableCell>
-                    <TableCell className="text-right font-bold text-destructive">
-                      {product.reorderPoint - product.stockLevel} {product.unitType}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="h-full flex items-center justify-center p-6">
-              <DataPlaceholder
-                icon={Archive}
-                title="No Low Stock Items"
-                message="All products are currently above their reorder points."
-              />
-            </div>
-          )}
+        <div className="h-full overflow-y-auto p-6">
+          <DataPlaceholder
+            icon={Archive}
+            title="Detailed Inventory Views Coming Soon"
+            message="This area will display comprehensive stock levels per product and warehouse, batch tracking, and more inventory management tools."
+          />
         </div>
       </div>
 
-      {/* Add Product Modal */}
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
         setIsFormModalOpen(isOpen);
         if (!isOpen) setEditingProduct(null);
       }}>
-        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
-            <DialogTitle>Add New Product</DialogTitle>
+            <DialogTitle>Define New Product</DialogTitle>
             <DialogDescription>
-              Enter the details for the new product.
+              Enter details for the new product. Stock will be added separately for each warehouse.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            <ProductForm
-              initialData={null}
-              onSubmit={handleSubmitNewProduct}
-              onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
-            />
+            {isFormModalOpen && (
+                 <ProductForm
+                    initialData={null} 
+                    onSubmit={handleSubmitNewProduct}
+                    onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
+                 />
+            )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+    
