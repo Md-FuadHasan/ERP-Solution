@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye, ArrowUp, ArrowDown, Archive } from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
@@ -27,14 +27,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function DashboardPage() {
-  const { invoices, customers, isLoading, getCustomerById } = useData();
+  const { invoices, customers, products, isLoading, getCustomerById } = useData();
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!isLoading) {
         setLastRefreshed(new Date());
     }
-  }, [invoices, customers, isLoading]);
+  }, [invoices, customers, products, isLoading]);
 
 
   const stats = useMemo(() => {
@@ -44,6 +44,7 @@ export default function DashboardPage() {
     const activeCustomers = new Set(invoices.map(inv => inv.customerId)).size;
     const overdueInvoicesCount = invoices.filter(inv => inv.status === 'Overdue').length;
     const totalCustomerCount = customers.length;
+    const lowStockItemsCount = products.filter(p => p.stockLevel <= p.reorderPoint).length;
 
     return {
       totalRevenue,
@@ -53,8 +54,9 @@ export default function DashboardPage() {
       totalInvoices: invoices.length,
       overdueInvoicesCount,
       totalCustomerCount,
+      lowStockItemsCount,
     };
-  }, [invoices, customers]);
+  }, [invoices, customers, products]);
 
   const invoiceStatusData: ChartDataPoint[] = useMemo(() => {
     const statusCounts = invoices.reduce((acc, inv) => {
@@ -148,8 +150,8 @@ export default function DashboardPage() {
       <div className="flex-grow overflow-y-auto pb-6 pr-1"> 
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              {[...Array(5)].map((_, i) => ( 
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {[...Array(6)].map((_, i) => ( 
                 <Card key={i}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <Skeleton className="h-5 w-2/3" />
@@ -272,7 +274,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -339,6 +341,21 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground flex items-center">
                     <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
                     <span className="text-green-600 mr-1">+5</span> new this month
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+                  <Archive className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold mb-1 ${stats.lowStockItemsCount > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
+                      {stats.lowStockItemsCount}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowUp className="h-3 w-3 mr-1 text-orange-500" /> 
+                    <span className="text-orange-500 mr-1">+3</span> items vs last week
                   </p>
                 </CardContent>
               </Card>
@@ -579,5 +596,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
