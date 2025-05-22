@@ -1,6 +1,6 @@
 
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle } from 'lucide-react';
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
-import type { Product, ProductStockLocation } from '@/types'; // Product type already has globalReorderPoint
+import type { Product, ProductStockLocation } from '@/types';
 import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
 
 export default function InventoryPage() {
@@ -21,6 +21,7 @@ export default function InventoryPage() {
   const { toast } = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  // editingProduct state is not strictly needed here if "Define New Product" only adds
   const [editingProduct, setEditingProduct] = useState<Product | null>(null); 
 
   const kpiData = useMemo(() => {
@@ -41,7 +42,7 @@ export default function InventoryPage() {
     
     let lowStockItemsCount = 0;
     products.forEach(product => {
-        const totalStock = getTotalStockForProduct(product.id);
+        const totalStock = getTotalStockForProduct(product.id); // This is total across warehouses
         if (product.globalReorderPoint !== undefined && totalStock <= product.globalReorderPoint) {
             lowStockItemsCount++;
         }
@@ -90,12 +91,12 @@ export default function InventoryPage() {
     });
   };
 
-  const handleAddNewProduct = () => {
-    setEditingProduct(null);
+  const handleDefineNewProduct = () => {
+    setEditingProduct(null); // Ensure we are adding, not editing
     setIsFormModalOpen(true);
   };
 
-  const handleSubmitNewProduct = (data: ProductFormValues) => {
+  const handleSubmitNewProductDefinition = (data: ProductFormValues) => {
     let finalProductId = data.id;
     if (finalProductId && finalProductId.trim() !== '') {
       if (products.find(p => p.id === finalProductId)) {
@@ -113,6 +114,8 @@ export default function InventoryPage() {
       }
     }
     
+    // ProductForm no longer includes stockLevel or addStockQuantity
+    // globalReorderPoint is taken from form's reorderPoint field.
     const newProductDefinition: Product = {
       id: finalProductId,
       name: data.name,
@@ -122,10 +125,10 @@ export default function InventoryPage() {
       piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
-      globalReorderPoint: data.reorderPoint || 0, // Form's reorderPoint is the globalReorderPoint
-      basePrice: data.basePrice,
-      costPrice: data.costPrice || 0,
-      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
+      globalReorderPoint: data.globalReorderPoint || 0,
+      basePrice: data.basePrice, // This is price per unitType (Base Unit)
+      costPrice: data.costPrice || 0, 
+      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount, // Excise per unitType (Base Unit)
       batchNo: data.batchNo || undefined,
       productionDate: data.productionDate ? data.productionDate.toISOString() : undefined,
       expiryDate: data.expiryDate ? data.expiryDate.toISOString() : undefined,
@@ -136,7 +139,6 @@ export default function InventoryPage() {
     addProduct(newProductDefinition);
     toast({ title: "Product Definition Added", description: `${newProductDefinition.name} has been defined. Add stock via Stock Adjustments or Receiving.` });
     setIsFormModalOpen(false);
-    setEditingProduct(null);
   };
 
 
@@ -192,7 +194,7 @@ export default function InventoryPage() {
             <Button onClick={handleAddWarehouse} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
             <Button onClick={handleTransferStock} className="w-full sm:w-auto"><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
             <Button onClick={handleAdjustStock} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
-            <Button onClick={handleAddNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
+            <Button onClick={handleDefineNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
           </div>
         }
       />
@@ -251,6 +253,7 @@ export default function InventoryPage() {
               <CardTitle className="text-lg">Inventory Overview</CardTitle>
               <CardDescription>Detailed stock views and warehouse management coming soon.</CardDescription>
             </div>
+            {/* Add filters or view toggles here in the future */}
           </div>
         </CardHeader>
         <div className="h-full overflow-y-auto p-6">
@@ -262,23 +265,24 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      {/* Dialog for Defining New Product */}
       <Dialog open={isFormModalOpen} onOpenChange={(isOpen) => {
         setIsFormModalOpen(isOpen);
-        if (!isOpen) setEditingProduct(null);
+        if (!isOpen) setEditingProduct(null); // Reset editingProduct if used
       }}>
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Define New Product</DialogTitle>
             <DialogDescription>
-              Enter details for the new product. Stock will be added separately for each warehouse.
+              Enter details for the new product. Stock levels will be managed separately per warehouse.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && (
+            {isFormModalOpen && ( // Conditionally render to reset form state on open
                  <ProductForm
-                    initialData={null} 
-                    onSubmit={handleSubmitNewProduct}
-                    onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
+                    initialData={null} // Always null for "Define New Product"
+                    onSubmit={handleSubmitNewProductDefinition}
+                    onCancel={() => { setIsFormModalOpen(false); }}
                  />
             )}
           </div>
