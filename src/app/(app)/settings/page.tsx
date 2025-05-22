@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon } from 'lucide-react'; // Added WarehouseIcon
 import {
   Table,
   TableBody,
@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/table';
 import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
+import { WarehouseForm, type WarehouseFormValues } from '@/components/forms/warehouse-form'; // New form
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { CompanyProfile, Manager } from '@/types';
+import type { CompanyProfile, Manager, Warehouse } from '@/types'; // Added Warehouse
 import { MOCK_MANAGERS } from '@/types'; // Managers are still local for now
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
@@ -35,9 +36,28 @@ import { Label } from '@/components/ui/label';
 import { useData } from '@/context/DataContext'; 
 import { Skeleton } from '@/components/ui/skeleton'; 
 import { Database } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter as AlertDialogFooterComponent, // Renamed to avoid conflict
+  AlertDialogHeader as AlertDialogHeaderComponent, // Renamed to avoid conflict
+  AlertDialogTitle as AlertDialogTitleComponent,   // Renamed to avoid conflict
+} from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
-  const { companyProfile, updateCompanyProfile, isLoading: isDataLoading } = useData();
+  const { 
+    companyProfile, 
+    updateCompanyProfile, 
+    warehouses, // New
+    addWarehouse,   // New
+    updateWarehouse,// New
+    deleteWarehouse,// New
+    isLoading: isDataLoading 
+  } = useData();
   
   const [managers, setManagers] = useState<Manager[]>([]); 
   const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
@@ -45,18 +65,23 @@ export default function SettingsPage() {
   const [managerName, setManagerName] = useState('');
   const [managerEmail, setManagerEmail] = useState('');
   const [managerRole, setManagerRole] = useState('');
+  
+  const [isWarehouseFormModalOpen, setIsWarehouseFormModalOpen] = useState(false); // New
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null); // New
+  const [warehouseToDelete, setWarehouseToDelete] = useState<Warehouse | null>(null); // New
+  
   const [localLoading, setLocalLoading] = useState(true);
-
 
   const { toast } = useToast();
   
   useEffect(() => {
+    // Manager loading logic
     try {
       const storedManagers = localStorage.getItem('invoiceflow_managers');
       if (storedManagers) {
         setManagers(JSON.parse(storedManagers));
       } else {
-        setManagers(MOCK_MANAGERS);
+        setManagers(MOCK_MANAGERS); // Use MOCK_MANAGERS if nothing in localStorage
       }
     } catch (error) {
       console.error("Failed to load managers from localStorage", error);
@@ -67,7 +92,7 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!localLoading) {
+    if (!localLoading) { // Prevent writing initial mock data if it was just set
         localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
     }
   }, [managers, localLoading]);
@@ -126,12 +151,48 @@ export default function SettingsPage() {
     setIsUserManagerModalOpen(false);
   };
 
+  // Warehouse Handlers - New
+  const handleAddWarehouse = () => {
+    setEditingWarehouse(null);
+    setIsWarehouseFormModalOpen(true);
+  };
+
+  const handleEditWarehouse = (warehouse: Warehouse) => {
+    setEditingWarehouse(warehouse);
+    setIsWarehouseFormModalOpen(true);
+  };
+
+  const handleWarehouseFormSubmit = (data: WarehouseFormValues) => {
+    if (editingWarehouse) {
+      updateWarehouse({ ...editingWarehouse, ...data });
+      toast({ title: "Warehouse Updated", description: `${data.name} details have been updated.` });
+    } else {
+      addWarehouse({ ...data, id: `WH-${Date.now()}` }); // Simple ID generation
+      toast({ title: "Warehouse Added", description: `${data.name} has been successfully added.` });
+    }
+    setIsWarehouseFormModalOpen(false);
+    setEditingWarehouse(null);
+  };
+
+  const handleDeleteWarehouseConfirm = (warehouse: Warehouse) => {
+    setWarehouseToDelete(warehouse);
+  };
+
+  const confirmDeleteWarehouse = () => {
+    if (warehouseToDelete) {
+      deleteWarehouse(warehouseToDelete.id);
+      toast({ title: "Warehouse Deleted", description: `${warehouseToDelete.name} has been removed.` });
+      setWarehouseToDelete(null);
+    }
+  };
+
+
   if (isDataLoading || localLoading) {
     return (
       <>
-        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
+        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, and data storage." />
         <Tabs defaultValue="company" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-6"> {/* Adjusted for 5 tabs */}
             {SETTINGS_TABS.map(tab => (
               <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm" disabled>
                 <tab.icon className="h-4 w-4" /> {tab.label}
@@ -145,124 +206,195 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
-      <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
-      <Tabs defaultValue="company" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
-          {SETTINGS_TABS.map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm">
-              <tab.icon className="h-4 w-4" /> {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <div className="flex flex-col h-full">
+      <div className="shrink-0">
+        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, and data storage." />
+      </div>
 
-        <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mother Company Details</CardTitle>
-              <CardDescription>Update your company's name, address, and contact information.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CompanyDetailsForm initialData={companyProfile} onSubmit={handleCompanyDetailsSubmit} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+      <div className="flex-grow min-h-0">
+        <Tabs defaultValue="company" className="w-full h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-6 shrink-0"> {/* Adjusted for 5 tabs */}
+            {SETTINGS_TABS.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm">
+                <tab.icon className="h-4 w-4" /> {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        <TabsContent value="tax">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tax Settings</CardTitle>
-              <CardDescription>Configure TAX, VAT, and Excess TAX rates for your invoices.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TaxSettingsForm initialData={companyProfile} onSubmit={handleTaxSettingsSubmit} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <div className="flex-grow min-h-0 overflow-y-auto">
+            <TabsContent value="company" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mother Company Details</CardTitle>
+                  <CardDescription>Update your company's name, address, and contact information.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CompanyDetailsForm initialData={companyProfile!} onSubmit={handleCompanyDetailsSubmit} />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="users">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex-grow">
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Add, edit, or remove managers with custom roles.
-                  <br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small>
-                </CardDescription>
-              </div>
-              <Button onClick={handleAddManager} className="w-full sm:w-auto">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {managers.length > 0 ? (
-                <div className="rounded-lg border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[150px]">Name</TableHead>
-                      <TableHead className="min-w-[200px]">Email</TableHead>
-                      <TableHead className="min-w-[120px]">Role</TableHead>
-                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {managers.map((manager) => (
-                      <TableRow key={manager.id}>
-                        <TableCell>{manager.name}</TableCell>
-                        <TableCell>{manager.email}</TableCell>
-                        <TableCell>{manager.role}</TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex justify-end items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="hover:text-primary">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                </div>
-              ) : (
-                <DataPlaceholder title="No Managers" message="Add managers to help manage your account." action={
-                    <Button onClick={handleAddManager} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
+            <TabsContent value="tax" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tax Settings</CardTitle>
+                  <CardDescription>Configure TAX, VAT, and Excess TAX rates for your invoices.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TaxSettingsForm initialData={companyProfile!} onSubmit={handleTaxSettingsSubmit} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="users" className="mt-0">
+              <Card>
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex-grow">
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>Add, edit, or remove managers with custom roles.
+                      <br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small>
+                    </CardDescription>
+                  </div>
+                  <Button onClick={handleAddManager} className="w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {managers.length > 0 ? (
+                    <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted">
+                        <TableRow>
+                          <TableHead className="min-w-[150px] px-2">Name</TableHead>
+                          <TableHead className="min-w-[200px] px-2">Email</TableHead>
+                          <TableHead className="min-w-[120px] px-2">Role</TableHead>
+                          <TableHead className="text-right min-w-[100px] px-2">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {managers.map((manager, index) => (
+                          <TableRow key={manager.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                            <TableCell className="px-2">{manager.name}</TableCell>
+                            <TableCell className="px-2">{manager.email}</TableCell>
+                            <TableCell className="px-2">{manager.role}</TableCell>
+                            <TableCell className="text-right px-2">
+                              <div className="flex justify-end items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="hover:text-primary">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    </div>
+                  ) : (
+                    <DataPlaceholder title="No Managers" message="Add managers to help manage your account." action={
+                        <Button onClick={handleAddManager} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Manager
+                        </Button>
+                    }/>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="warehouses" className="mt-0">
+              <Card>
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex-grow">
+                        <CardTitle>Warehouse Management</CardTitle>
+                        <CardDescription>Manage your storage locations for inventory.</CardDescription>
+                    </div>
+                    <Button onClick={handleAddWarehouse} className="w-full sm:w-auto">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add New Warehouse
                     </Button>
-                }/>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardHeader>
+                <CardContent>
+                    {warehouses.length > 0 ? (
+                        <div className="rounded-lg border overflow-x-auto">
+                            <Table>
+                                <TableHeader className="bg-muted">
+                                    <TableRow>
+                                        <TableHead className="min-w-[100px] px-2">ID</TableHead>
+                                        <TableHead className="min-w-[200px] px-2">Name</TableHead>
+                                        <TableHead className="min-w-[150px] px-2">Location</TableHead>
+                                        <TableHead className="min-w-[150px] px-2">Type</TableHead>
+                                        <TableHead className="text-right min-w-[100px] px-2">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {warehouses.map((warehouse, index) => (
+                                        <TableRow key={warehouse.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                                            <TableCell className="px-2">{warehouse.id}</TableCell>
+                                            <TableCell className="px-2">{warehouse.name}</TableCell>
+                                            <TableCell className="px-2">{warehouse.location}</TableCell>
+                                            <TableCell className="px-2">{warehouse.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
+                                            <TableCell className="text-right px-2">
+                                                <div className="flex justify-end items-center gap-1">
+                                                    <Button variant="ghost" size="icon" onClick={() => handleEditWarehouse(warehouse)} className="hover:text-primary">
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteWarehouseConfirm(warehouse)} className="hover:text-destructive">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : (
+                        <DataPlaceholder 
+                            title="No Warehouses Found" 
+                            message="Get started by adding your first warehouse."
+                            icon={WarehouseIcon}
+                            action={
+                                <Button onClick={handleAddWarehouse} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Warehouse
+                                </Button>
+                            }
+                        />
+                    )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="storage">
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Storage Configuration</CardTitle>
-              <CardDescription>Settings for connecting to local storage or SQL database systems.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300">
-                 <Database className="h-6 w-6 text-green-500 dark:text-green-400" />
-                <div>
-                  <p className="font-medium">Using Local Storage</p>
-                  <p className="text-sm">
-                    Currently, all application data (invoices, customers, settings) is being stored in your browser's local storage.
-                    Changes are persisted across sessions on this device.
+            <TabsContent value="storage" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Data Storage Configuration</CardTitle>
+                  <CardDescription>Settings for connecting to local storage or SQL database systems.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300">
+                    <Database className="h-6 w-6 text-green-500 dark:text-green-400" />
+                    <div>
+                      <p className="font-medium">Using Local Storage</p>
+                      <p className="text-sm">
+                        Currently, all application data (invoices, customers, products, warehouses, settings) is being stored in your browser's local storage.
+                        Changes are persisted across sessions on this device.
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.
                   </p>
-                </div>
-              </div>
-              <p className="text-muted-foreground">
-                Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.
-              </p>
-               <Button disabled className="w-full sm:w-auto">Configure Cloud Database (Coming Soon)</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  <Button disabled className="w-full sm:w-auto">Configure Cloud Database (Coming Soon)</Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
 
+
+      {/* Manager Modal */}
       <Dialog open={isUserManagerModalOpen} onOpenChange={setIsUserManagerModalOpen}>
         <DialogContent className="w-[90vw] max-w-md">
           <DialogHeader>
@@ -292,6 +424,49 @@ export default function SettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+
+      {/* Warehouse Form Modal - New */}
+      <Dialog open={isWarehouseFormModalOpen} onOpenChange={(isOpen) => {
+          setIsWarehouseFormModalOpen(isOpen);
+          if (!isOpen) setEditingWarehouse(null);
+      }}>
+        <DialogContent className="w-[90vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingWarehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</DialogTitle>
+            <DialogDescription>
+              {editingWarehouse ? 'Update the details for this warehouse.' : 'Enter the details for the new warehouse.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <WarehouseForm
+              initialData={editingWarehouse}
+              onSubmit={handleWarehouseFormSubmit}
+              onCancel={() => { setIsWarehouseFormModalOpen(false); setEditingWarehouse(null); }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Warehouse Confirmation Dialog - New */}
+      <AlertDialog open={!!warehouseToDelete} onOpenChange={(isOpen) => !isOpen && setWarehouseToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the warehouse
+              "{warehouseToDelete?.name}" and all associated stock location records. Product definitions will remain, but their stock in this warehouse will be gone.
+            </AlertDialogDescription>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
+            <AlertDialogCancel onClick={() => setWarehouseToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteWarehouse} className="bg-destructive hover:bg-destructive/90">
+              Delete Warehouse
+            </AlertDialogAction>
+          </AlertDialogFooterComponent>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
+
+    
