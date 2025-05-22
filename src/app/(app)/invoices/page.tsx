@@ -100,48 +100,53 @@ export default function InvoicesPage() {
     }
     
     if (currentUrlIntentKey) {
-      if (urlParamsProcessedIntentKey !== currentUrlIntentKey && !isFormModalOpen && !isViewModalOpen) {
-        if (action === 'new') {
+      if (urlParamsProcessedIntentKey !== currentUrlIntentKey) { // Only process if the intent is new or different
+        if (action === 'new' && !isFormModalOpen && !editingInvoice) { // Ensure modal isn't already open for this or another reason
             setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
             setEditingInvoice(null);
             setIsFormModalOpen(true);
-            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        } else if (action === 'edit' && invoiceIdParam) {
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey); // Mark this intent as processed
+        } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
             const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-            setEditingInvoice(invoiceToEdit || null);
-            setCurrentPrefillValues(null);
-            setIsFormModalOpen(true);
-            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        } else if (action === 'view' && invoiceIdParam) {
+            if (invoiceToEdit) {
+              setEditingInvoice(invoiceToEdit);
+              setCurrentPrefillValues(null);
+              setIsFormModalOpen(true);
+              setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+            } else {
+                // If invoice for edit not found, clean up URL params
+                const newSearchParams = new URLSearchParams(searchParams.toString());
+                newSearchParams.delete('action'); newSearchParams.delete('id');
+                router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+            }
+        } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
              const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
              if (invoiceToView) {
                setInvoiceToViewInModal(invoiceToView);
                setIsViewModalOpen(true);
                setUrlParamsProcessedIntentKey(currentUrlIntentKey);
              } else {
-                // If invoice for view not found, clean up URL params, this part of effect will run again
+                // If invoice for view not found, clean up URL params
                 const newSearchParams = new URLSearchParams(searchParams.toString());
                 newSearchParams.delete('action'); newSearchParams.delete('id');
                 router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
              }
         }
       }
-    } else {
-      // If URL is clean and we had a processed key, clear it.
-      if (urlParamsProcessedIntentKey) {
-        setUrlParamsProcessedIntentKey(null);
+    } else { // No actionable URL parameters
+      if (urlParamsProcessedIntentKey) { // If we had a processed intent key
+        setUrlParamsProcessedIntentKey(null); // Clear it, because the URL is now clean
       }
     }
   }, [
-    searchParams,
-    isFormModalOpen,
-    isViewModalOpen,
-    urlParamsProcessedIntentKey,
-    invoices, // Needed for finding invoiceToEdit/invoiceToView
-    customers, // Potentially needed if prefill logic gets more complex
-    router,
-    pathname,
-    setUrlParamsProcessedIntentKey // Include setters from useState if they are called inside
+    searchParams, 
+    urlParamsProcessedIntentKey, // This ensures we re-evaluate if the processed key changes
+    isFormModalOpen, // Conditions inside check this
+    editingInvoice, // Conditions inside check this
+    isViewModalOpen, // Conditions inside check this
+    invoices, 
+    router, 
+    pathname
   ]);
 
 
@@ -151,36 +156,32 @@ export default function InvoicesPage() {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
       const currentAction = searchParams.get('action');
+      // If the modal was opened via URL params, clear them.
+      // The useEffect watching searchParams will see the cleared params and then clear urlParamsProcessedIntentKey.
       if (currentAction === 'new' || currentAction === 'edit') {
-        // This modal was likely opened by URL.
-        // Clear the URL params. The useEffect watching searchParams will then handle
-        // clearing urlParamsProcessedIntentKey once it confirms the URL is clean.
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-      } else {
-        // Modal was not opened by URL (e.g., just clicking "Add New Invoice" button without URL change beforehand)
-        // Safe to clear the intent key immediately.
-        setUrlParamsProcessedIntentKey(null);
       }
+      // No need to directly clear urlParamsProcessedIntentKey here; let the useEffect handle it based on the clean URL.
     }
-  }, [searchParams, router, pathname, setUrlParamsProcessedIntentKey]);
+  }, [searchParams, router, pathname]); // Dependencies for router and searchParams to clear URL
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
-        setInvoiceToViewInModal(null);
+        setInvoiceToViewInModal(null); // Reset the invoice to view
         const currentAction = searchParams.get('action');
-        if (currentAction === 'view') {
+        if (currentAction === 'view') { // If it was opened by URL param for 'view'
             const newSearchParams = new URLSearchParams(searchParams.toString());
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-            // Let the useEffect clean up urlParamsProcessedIntentKey
         }
+        // The useEffect watching searchParams will then clear urlParamsProcessedIntentKey.
     }
   }, [searchParams, router, pathname]);
 
@@ -188,10 +189,12 @@ export default function InvoicesPage() {
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'new');
+    // Clear any existing id, customerId, customerName from possibly previous actions
     newSearchParams.delete('id');
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    // The useEffect will pick this up and open the modal
   }, [searchParams, router, pathname]);
 
   const filteredInvoices = useMemo(() => {
@@ -224,9 +227,10 @@ export default function InvoicesPage() {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'edit');
     newSearchParams.set('id', invoice.id);
-    newSearchParams.delete('customerId');
+    newSearchParams.delete('customerId'); // Clear customer prefill params
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    // The useEffect will pick this up
   }, [searchParams, router, pathname]);
 
   const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
@@ -234,6 +238,7 @@ export default function InvoicesPage() {
     newSearchParams.set('action', 'view');
     newSearchParams.set('id', invoice.id);
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+     // The useEffect will pick this up
   }, [searchParams, router, pathname]);
 
   useEffect(() => {
@@ -245,7 +250,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -264,8 +269,8 @@ export default function InvoicesPage() {
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
     const calculatedGeneralTaxAmount = 0; // General tax is now 0
-    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
-    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT on (Base+Excise) subtotal
+    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0; // Use 0 if not set
+    const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
 
 
@@ -291,12 +296,12 @@ export default function InvoicesPage() {
     let finalStatus: InvoiceStatus = data.status;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      const paymentAmount = calculatedTotalAmount - newAmountPaid;
-      if (paymentAmount >= 0) { 
+      const paymentAmount = calculatedTotalAmount - newAmountPaid; // Amount needed to reach full payment
+      if (paymentAmount > 0) { // Only add payment record if there's an amount to pay
         newPaymentHistory.push({
           id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
           paymentDate: new Date().toISOString(),
-          amount: paymentAmount,
+          amount: paymentAmount, // Pay the remaining amount to become fully paid
           status: 'Full Payment',
           paymentMethod: data.paymentMethod,
           ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
@@ -306,9 +311,14 @@ export default function InvoicesPage() {
             onlineTransactionNumber: data.onlineTransactionNumber,
           }),
         });
-         newAmountPaid = calculatedTotalAmount;
+         newAmountPaid = calculatedTotalAmount; // Amount paid is now the total amount
+      } else if (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount) {
+        // This case handles if it was already partially paid and now it's fully paid with 0 new payment
+        // but status needs to reflect full payment.
+        newAmountPaid = calculatedTotalAmount;
       }
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
+      // Ensure partial payment doesn't exceed what's owed.
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
         newPaymentHistory.push({
@@ -341,6 +351,7 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else { 
+      // Default to 'Paid' if somehow newRemainingBalance is 0 but conditions above not met
       finalStatus = 'Paid'; 
     }
 
@@ -352,16 +363,16 @@ export default function InvoicesPage() {
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0) })), 
-      subtotal: calculatedSubtotal, // Subtotal = Base + Excise
-      taxAmount: calculatedGeneralTaxAmount, // General Tax, now 0
-      vatAmount: calculatedVatAmount, // VAT on (Base + Excise)
-      totalAmount: calculatedTotalAmount, // (Base + Excise) + VAT
+      subtotal: calculatedSubtotal, 
+      taxAmount: calculatedGeneralTaxAmount, 
+      vatAmount: calculatedVatAmount, 
+      totalAmount: calculatedTotalAmount, 
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus, 
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
-      paymentMethod: data.paymentMethod,
+      paymentMethod: data.paymentMethod, // Save the method used for *this* transaction
       ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
       ...(data.paymentMethod === 'Bank Transfer' && {
         bankName: data.bankName,
@@ -373,7 +384,7 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
-    handleFormModalOpenChange(false);
+    handleFormModalOpenChange(false); // This should trigger URL cleanup and subsequent useEffect to clear intent key
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
@@ -410,7 +421,7 @@ export default function InvoicesPage() {
                   <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
                   <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
                   <TableHead className="min-w-[120px] px-2">Status</TableHead>
-                  <TableHead className="min-w-[150px] text-right px-2">Actions</TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -443,7 +454,7 @@ export default function InvoicesPage() {
                   <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
                   <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
                   <TableHead className="min-w-[120px] px-2">Status</TableHead>
-                  <TableHead className="min-w-[150px] text-right px-2">Actions</TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -467,7 +478,7 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -503,7 +514,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && (
+            {isFormModalOpen && ( // Conditionally render form to ensure fresh state on open
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -636,6 +647,7 @@ export default function InvoicesPage() {
                           <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
                           <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.subtotal === 'number' ? invoiceToViewInModal.subtotal : 0).toFixed(2)}</span>
                         </div>
+                         {/* Removed old general tax display, as it's now 0 */}
                         {invoiceToViewInModal.vatAmount > 0 && (
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
@@ -715,6 +727,7 @@ export default function InvoicesPage() {
                 }} className="w-full sm:w-auto">
                   <Edit className="mr-2 h-4 w-4" /> Edit Invoice
                 </Button>
+                 <Button variant="outline" onClick={() => handleViewModalOpenChange(false)} className="w-full sm:w-auto">Close</Button>
               </DialogFooter>
             </>
           )}
@@ -756,6 +769,5 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
 
     
