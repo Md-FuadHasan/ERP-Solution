@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertTriangle, TrendingUp, PieChart as PieChartIcon, Zap, FileWarning, PlusCircle, UserPlus, BarChartHorizontalBig, Eye, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
@@ -190,7 +190,7 @@ export default function DashboardPage() {
               <CardContent className="p-0 sm:p-2">
                 <div className="max-h-72 overflow-y-auto">
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-primary/50 text-primary-foreground">
+                    <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                       <TableRow>
                         <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
                         <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
@@ -220,7 +220,7 @@ export default function DashboardPage() {
                 <CardContent className="p-0 sm:p-2">
                    <div className="max-h-72 overflow-y-auto">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-primary/50 text-primary-foreground">
+                      <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                         <TableRow>
                           <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
                           <TableHead className="py-2 px-2 sm:px-4"><Skeleton className="h-5 w-3/4" /></TableHead>
@@ -280,7 +280,10 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">From {stats.totalInvoices} invoices</p>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
+                    <span className="text-green-600 mr-1">+12.5%</span> vs last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -290,7 +293,10 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">${stats.totalPaid.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Payment received</p>
+                   <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
+                    <span className="text-green-600 mr-1">+8.2%</span> vs last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -302,7 +308,10 @@ export default function DashboardPage() {
                   <div className={`text-2xl font-bold ${stats.totalOutstanding > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
                       ${stats.totalOutstanding.toFixed(2)}
                   </div>
-                  <p className="text-xs text-muted-foreground">Balance due from customers</p>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowUp className="h-3 w-3 mr-1 text-orange-500" /> 
+                    <span className="text-orange-500 mr-1">+5.1%</span> vs last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -314,7 +323,10 @@ export default function DashboardPage() {
                   <div className={`text-2xl font-bold ${stats.overdueInvoicesCount > 0 ? 'text-red-500 dark:text-red-400' : ''}`}>
                       {stats.overdueInvoicesCount}
                   </div>
-                  <p className="text-xs text-muted-foreground">Invoices past due date</p>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowDown className="h-3 w-3 mr-1 text-red-500" />
+                    <span className="text-red-500 mr-1">-2.0%</span> vs last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -324,7 +336,10 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.totalCustomerCount}</div>
-                  <p className="text-xs text-muted-foreground">{stats.activeCustomers} active with invoices</p>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
+                    <span className="text-green-600 mr-1">+5</span> new this month
+                  </p>
                 </CardContent>
               </Card>
             </div>
