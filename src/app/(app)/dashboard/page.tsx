@@ -279,7 +279,7 @@ export default function DashboardPage() {
                   <DollarSign className="h-4 w-4 text-[hsl(var(--primary))]" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
+                  <div className="text-2xl font-bold mb-1">${stats.totalRevenue.toFixed(2)}</div>
                   <p className="text-xs text-muted-foreground flex items-center">
                     <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
                     <span className="text-green-600 mr-1">+12.5%</span> vs last month
@@ -292,7 +292,7 @@ export default function DashboardPage() {
                   <TrendingUp className="h-4 w-4 text-[hsl(var(--status-paid))]" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">${stats.totalPaid.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">${stats.totalPaid.toFixed(2)}</div>
                    <p className="text-xs text-muted-foreground flex items-center">
                     <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
                     <span className="text-green-600 mr-1">+8.2%</span> vs last month
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                   <AlertTriangle className="h-4 w-4 text-orange-500 dark:text-orange-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${stats.totalOutstanding > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
+                  <div className={`text-2xl font-bold mb-1 ${stats.totalOutstanding > 0 ? 'text-orange-500 dark:text-orange-400' : ''}`}>
                       ${stats.totalOutstanding.toFixed(2)}
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center">
@@ -320,7 +320,7 @@ export default function DashboardPage() {
                   <FileWarning className="h-4 w-4 text-[hsl(var(--status-overdue))]" />
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${stats.overdueInvoicesCount > 0 ? 'text-red-500 dark:text-red-400' : ''}`}>
+                  <div className={`text-2xl font-bold mb-1 ${stats.overdueInvoicesCount > 0 ? 'text-red-500 dark:text-red-400' : ''}`}>
                       {stats.overdueInvoicesCount}
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center">
@@ -335,7 +335,7 @@ export default function DashboardPage() {
                   <Users className="h-4 w-4 text-[hsl(var(--primary))]" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalCustomerCount}</div>
+                  <div className="text-2xl font-bold mb-1">{stats.totalCustomerCount}</div>
                   <p className="text-xs text-muted-foreground flex items-center">
                     <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
                     <span className="text-green-600 mr-1">+5</span> new this month
