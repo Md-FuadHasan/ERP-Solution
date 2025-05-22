@@ -11,12 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { StockAdjustmentForm, type StockAdjustmentFormValues } from '@/components/forms/stock-adjustment-form';
-import type { Product, ProductStockLocation, Warehouse } from '@/types';
+import type { Product, ProductStockLocation, Warehouse, ProductUnitType } from '@/types';
 import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
-import { getDisplayUnit } from '@/app/(app)/products/page'; // Assuming getDisplayUnit is exported
+import { getDisplayUnit } from '@/app/(app)/products/page';
 
 interface EnrichedStockLocation extends ProductStockLocation {
   productName: string;
@@ -38,13 +38,16 @@ export default function InventoryPage() {
     companyProfile,
     getTotalStockForProduct,
     upsertProductStockLocation,
-    getProductById, // Added
-    getWarehouseById, // Added
+    getProductById,
+    getWarehouseById,
+    getStockForProductInWarehouse, // Added
   } = useData();
   const { toast } = useToast();
 
   const [isProductDefineModalOpen, setIsProductDefineModalOpen] = useState(false);
   const [isStockAdjustmentModalOpen, setIsStockAdjustmentModalOpen] = useState(false);
+  // editingProduct state is not used for the Define New Product modal here
+  // but could be useful if an edit product definition feature was on this page.
 
   const kpiData = useMemo(() => {
     if (isLoading || !products || !productStockLocations) {
@@ -79,7 +82,7 @@ export default function InventoryPage() {
         const expiry = startOfDay(parseISO(product.expiryDate));
         return isBefore(expiry, expiryThresholdDate) && !isBefore(expiry, today);
       } catch (e) {
-        return false;
+        return false; // Invalid date string
       }
     }).length;
 
@@ -100,7 +103,7 @@ export default function InventoryPage() {
         ...psl,
         productName: product?.name || 'N/A',
         productSku: product?.sku || 'N/A',
-        productUnitType: product?.unitType || 'N/A',
+        productUnitType: product?.unitType || 'N/A', // Base unit of the product
         warehouseName: warehouse?.name || 'N/A',
         stockValue: psl.stockLevel * costPrice,
         globalReorderPoint: product?.globalReorderPoint,
@@ -110,15 +113,16 @@ export default function InventoryPage() {
   }, [productStockLocations, products, warehouses, isLoading, getProductById, getWarehouseById]);
 
 
-  const handleAdjustStock = () => {
+  const handleOpenStockAdjustmentModal = () => {
     setIsStockAdjustmentModalOpen(true);
   };
 
   const handleAddWarehouse = () => {
     toast({
-      title: "Coming Soon!",
-      description: "Add New Warehouse feature will be available in a future update (via Settings page).",
+      title: "Navigate to Settings",
+      description: "Warehouse management is available on the Settings page.",
     });
+    // Consider router.push('/settings?tab=warehouses');
   };
 
   const handleTransferStock = () => {
@@ -176,24 +180,33 @@ export default function InventoryPage() {
   };
 
   const handleStockAdjustmentSubmit = (data: StockAdjustmentFormValues) => {
+    const currentStock = getStockForProductInWarehouse(data.productId, data.warehouseId);
+    let newCalculatedStockLevel = currentStock;
+
+    if (data.adjustmentType === "Increase Stock") {
+      newCalculatedStockLevel = currentStock + data.adjustmentQuantity;
+    } else if (data.adjustmentType === "Decrease Stock") {
+      newCalculatedStockLevel = Math.max(0, currentStock - data.adjustmentQuantity); // Prevent negative stock
+    }
+
     const productStockRecord: ProductStockLocation = {
-      id: `${data.productId}-${data.warehouseId}-${Date.now()}`, // More unique ID
+      id: `${data.productId}-${data.warehouseId}`, // Use a consistent ID format if you update
       productId: data.productId,
       warehouseId: data.warehouseId,
-      stockLevel: data.newStockLevel,
+      stockLevel: newCalculatedStockLevel,
     };
     upsertProductStockLocation(productStockRecord);
     const productName = products.find(p => p.id === data.productId)?.name || 'Product';
     const warehouseName = warehouses.find(w => w.id === data.warehouseId)?.name || 'Warehouse';
     toast({
       title: "Stock Adjusted",
-      description: `Stock for ${productName} in ${warehouseName} set to ${data.newStockLevel}.`,
+      description: `Stock for ${productName} in ${warehouseName} updated to ${newCalculatedStockLevel}.`,
     });
     setIsStockAdjustmentModalOpen(false);
   };
 
 
-  if (isLoading && !companyProfile) { // Keep skeleton if companyProfile also not loaded yet
+  if (isLoading && !companyProfile) {
     return (
       <div className="flex flex-col h-full">
         <PageHeader
@@ -272,7 +285,7 @@ export default function InventoryPage() {
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button onClick={handleAddWarehouse} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
               <Button onClick={handleTransferStock} className="w-full sm:w-auto"><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
-              <Button onClick={handleAdjustStock} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
+              <Button onClick={handleOpenStockAdjustmentModal} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
               <Button onClick={handleDefineNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
             </div>
           }
@@ -333,7 +346,6 @@ export default function InventoryPage() {
               <CardTitle className="text-lg">Detailed Inventory Stock</CardTitle>
               <CardDescription>Stock levels per product and warehouse.</CardDescription>
             </div>
-            {/* Add filters or view toggles here in the future */}
           </div>
         </CardHeader>
         <div className="h-full overflow-y-auto">
@@ -379,7 +391,7 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {enrichedStockData.map((item, index) => {
-                  const product = getProductById(item.productId); // For getDisplayUnit
+                  const product = getProductById(item.productId);
                   const displayUnit = product ? getDisplayUnit(product, 'base') : item.productUnitType;
                   return (
                     <TableRow key={item.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
@@ -409,7 +421,7 @@ export default function InventoryPage() {
                 title="No Stock Records Found"
                 message="Adjust stock levels for products in your warehouses to see them here."
                 action={
-                    <Button onClick={handleAdjustStock} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                    <Button onClick={handleOpenStockAdjustmentModal} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
                         <Edit className="mr-2 h-4 w-4" /> Adjust Stock
                     </Button>
                 }
@@ -419,11 +431,8 @@ export default function InventoryPage() {
         </div>
       </div>
 
-
       {/* Dialog for Defining New Product */}
-      <Dialog open={isProductDefineModalOpen} onOpenChange={(isOpen) => {
-        setIsProductDefineModalOpen(isOpen);
-      }}>
+      <Dialog open={isProductDefineModalOpen} onOpenChange={setIsProductDefineModalOpen}>
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Define New Product</DialogTitle>
@@ -432,12 +441,12 @@ export default function InventoryPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isProductDefineModalOpen && (
+            {isProductDefineModalOpen && ( // Conditionally render to ensure fresh state if form had complex internal state
                  <ProductForm
-                    initialData={null}
+                    initialData={null} // Always for new product definition from this page
                     onSubmit={handleSubmitNewProductDefinition}
                     onCancel={() => { setIsProductDefineModalOpen(false); }}
-                    isSubmitting={isLoading}
+                    isSubmitting={isLoading} // Pass loading state if needed by form
                  />
             )}
           </div>
@@ -450,11 +459,11 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>Adjust Stock Level</DialogTitle>
             <DialogDescription>
-              Select a product and warehouse, then enter the new total stock quantity.
+              Select product, warehouse, adjustment type, and quantity.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {isStockAdjustmentModalOpen && (
+            {isStockAdjustmentModalOpen && ( // Conditionally render for fresh state
               <StockAdjustmentForm
                 products={products}
                 warehouses={warehouses}
