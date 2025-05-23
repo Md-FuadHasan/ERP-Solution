@@ -44,9 +44,14 @@ const receiveStockFormSchema = z.object({
   receivedItems: z.array(receiveStockItemSchema),
 }).superRefine((data, ctx) => {
   let hasError = false;
+  let anyQuantityReceived = false;
   data.receivedItems.forEach((item, index) => {
     const qtyReceivedNow = item.quantityReceivedNow || 0;
     const qtyPending = item.quantityOrdered - item.quantityAlreadyReceived;
+
+    if (qtyReceivedNow > 0) {
+        anyQuantityReceived = true;
+    }
 
     if (qtyReceivedNow < 0) {
       ctx.addIssue({
@@ -73,7 +78,7 @@ const receiveStockFormSchema = z.object({
     }
   });
 
-  if (!hasError && data.receivedItems.every(item => (item.quantityReceivedNow || 0) === 0)) {
+  if (!hasError && !anyQuantityReceived) {
     ctx.addIssue({
         path: [`receivedItems`], // General error if nothing is received
         message: "Please enter a quantity for at least one item to receive.",
@@ -133,7 +138,7 @@ export function ReceiveStockForm({
           <p className="text-xs text-muted-foreground">Supplier: {purchaseOrder.supplierName || purchaseOrder.supplierId}</p>
         </div>
 
-        {formErrors.receivedItems && formErrors.receivedItems.message && (
+        {formErrors.receivedItems && typeof formErrors.receivedItems.message === 'string' && (
              <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
@@ -146,7 +151,7 @@ export function ReceiveStockForm({
             {fields.map((field, index) => {
               const item = form.getValues(`receivedItems.${index}`);
               const qtyPending = item.quantityOrdered - item.quantityAlreadyReceived;
-              const productDetails = products.find(p => p.id === item.productId);
+              // const productDetails = products.find(p => p.id === item.productId); // Not directly used in render here
 
               return (
                 <div key={field.id} className="p-4 border rounded-md space-y-3 bg-card shadow-sm">
@@ -164,11 +169,11 @@ export function ReceiveStockForm({
                         name={`receivedItems.${index}.quantityReceivedNow`}
                         render={({ field: qtyField }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Quantity Received Now</FormLabel>
+                            <FormLabel className="text-xs">Quantity Received Now ({item.itemUnitType})</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
-                                placeholder={`Max ${qtyPending} ${item.itemUnitType}`}
+                                placeholder={`Max ${qtyPending}`}
                                 {...qtyField}
                                 value={qtyField.value === undefined ? '' : String(qtyField.value)}
                                 onChange={e => qtyField.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
@@ -217,7 +222,7 @@ export function ReceiveStockForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
+          <Button type="submit" disabled={isSubmitting || !form.formState.isDirty}>
             {isSubmitting ? 'Processing Receipt...' : 'Confirm Receipt'}
           </Button>
         </div>

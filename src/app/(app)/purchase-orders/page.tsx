@@ -68,7 +68,7 @@ export default function PurchaseOrdersPage() {
     deletePurchaseOrder,
     getSupplierById,
     getProductById,
-    processPOReceipt, // New context function
+    processPOReceipt, 
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -116,7 +116,7 @@ export default function PurchaseOrdersPage() {
       orderDate: data.orderDate.toISOString(),
       expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
       items: data.items.map(item => ({
-        id: item.id || `poi-${Date.now()}-${Math.random().toString(36).substring(2,5)}`, // Ensure ID
+        id: item.id || `poi-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
         productId: item.productId,
         quantity: item.quantity,
         unitType: item.unitType,
@@ -241,7 +241,7 @@ export default function PurchaseOrdersPage() {
                 {purchaseOrders.map((po, index) => (
                   <TableRow key={po.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2">{po.id}</TableCell>
-                    <TableCell className="px-2">{getSupplierById(po.supplierId)?.name || po.supplierId}</TableCell>
+                    <TableCell className="px-2">{po.supplierName || getSupplierById(po.supplierId)?.name || po.supplierId}</TableCell>
                     <TableCell className="px-2">{format(new Date(po.orderDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell className="px-2">{po.expectedDeliveryDate ? format(new Date(po.expectedDeliveryDate), 'MMM dd, yyyy') : '-'}</TableCell>
                     <TableCell className="text-right px-2">${po.totalAmount.toFixed(2)}</TableCell>
