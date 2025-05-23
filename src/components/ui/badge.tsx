@@ -17,15 +17,15 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
         // Invoice Status Colors
-        statusPaid: 
+        statusPaid:
           "border-transparent bg-status-paid text-status-paid-foreground hover:bg-status-paid/80",
-        statusPartiallyPaid: 
+        statusPartiallyPaid:
           "border-transparent bg-status-partially-paid text-status-partially-paid-foreground hover:bg-status-partially-paid/80",
-        statusPending: 
+        statusPending:
           "border-transparent bg-status-pending text-status-pending-foreground hover:bg-status-pending/80",
-        statusOverdue: 
+        statusOverdue:
           "border-transparent bg-status-overdue text-status-overdue-foreground hover:bg-status-overdue/80",
-        statusCancelled: 
+        statusCancelled:
           "border-transparent bg-status-cancelled text-status-cancelled-foreground hover:bg-status-cancelled/80",
         // Customer Type Colors
         creditCustomer:
@@ -43,6 +43,17 @@ const badgeVariants = cva(
           "border-transparent bg-[hsl(var(--category-dairy-bg))] text-[hsl(var(--category-dairy-fg))] hover:bg-[hsl(var(--category-dairy-bg))]/80",
         categoryBeverages:
           "border-transparent bg-[hsl(var(--category-beverages-bg))] text-[hsl(var(--category-beverages-fg))] hover:bg-[hsl(var(--category-beverages-bg))]/80",
+        // PO Status Colors
+        poDraft:
+          "border-transparent bg-yellow-500 text-yellow-50 hover:bg-yellow-500/80", // Example: Yellow for Draft
+        poSent:
+          "border-transparent bg-blue-500 text-blue-50 hover:bg-blue-500/80",    // Example: Blue for Sent
+        poPartiallyReceived:
+          "border-transparent bg-orange-500 text-orange-50 hover:bg-orange-500/80", // Example: Orange for Partially Received
+        poFullyReceived:
+          "border-transparent bg-green-600 text-green-50 hover:bg-green-600/80", // Example: Green for Fully Received
+        poCancelled:
+          "border-transparent bg-gray-500 text-gray-50 hover:bg-gray-500/80",   // Example: Gray for Cancelled
       },
     },
     defaultVariants: {
@@ -62,4 +73,3 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export { Badge, badgeVariants }
-

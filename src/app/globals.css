@@ -58,16 +58,28 @@ body {
     --status-cancelled-foreground: 0 0% 98%;
 
     /* Product Category Colors */
-    --category-frozen-bg: 200 70% 90%; 
+    --category-frozen-bg: 200 70% 90%;
     --category-frozen-fg: 200 70% 25%;
-    --category-raw-materials-bg: 35 50% 90%; 
-    --category-raw-materials-fg: 35 50% 25%; 
-    --category-packaging-bg: 210 15% 92%; 
-    --category-packaging-fg: 210 15% 25%; 
+    --category-raw-materials-bg: 35 50% 90%;
+    --category-raw-materials-fg: 35 50% 25%;
+    --category-packaging-bg: 210 15% 92%;
+    --category-packaging-fg: 210 15% 25%;
     --category-dairy-bg: 50 80% 92%;
     --category-dairy-fg: 50 60% 30%;
     --category-beverages-bg: 100 60% 90%;
     --category-beverages-fg: 100 50% 25%;
+
+    /* PO Status Colors - using HSL for consistency */
+    --status-po-draft-bg: 45 90% 55%; /* Yellow */
+    --status-po-draft-fg: 45 90% 10%;
+    --status-po-sent-bg: 210 90% 55%; /* Blue */
+    --status-po-sent-fg: 210 90% 95%;
+    --status-po-partially-received-bg: 30 90% 55%; /* Orange */
+    --status-po-partially-received-fg: 30 90% 10%;
+    --status-po-fully-received-bg: 120 70% 40%; /* Green */
+    --status-po-fully-received-fg: 120 70% 95%;
+    --status-po-cancelled-bg: 0 0% 50%; /* Gray */
+    --status-po-cancelled-fg: 0 0% 95%;
   }
   .dark {
     --background: 0 0% 10%; /* Dark Gray for dark mode background */
@@ -89,7 +101,7 @@ body {
     --border: 0 0% 25%;
     --input: 0 0% 22%;
     --ring: 180 100% 35.1%;
-    
+
     --chart-1: 180 76% 71%;
     --chart-2: 180 58% 49%;
     --chart-3: 45 74% 76%;
@@ -101,7 +113,7 @@ body {
     --sidebar-foreground: 0 0% 85%;
     --sidebar-primary: 45 100% 62.2%; /* Yellow accent for active items */
     --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 0 0% 12%; 
+    --sidebar-accent: 0 0% 12%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 0 0% 10%;
     --sidebar-ring: 45 100% 62.2%;
@@ -121,14 +133,26 @@ body {
     /* Dark Product Category Colors */
     --category-frozen-bg: 200 50% 25%;
     --category-frozen-fg: 200 50% 85%;
-    --category-raw-materials-bg: 35 30% 22%; 
-    --category-raw-materials-fg: 35 30% 80%; 
-    --category-packaging-bg: 210 10% 25%; 
-    --category-packaging-fg: 210 10% 75%; 
+    --category-raw-materials-bg: 35 30% 22%;
+    --category-raw-materials-fg: 35 30% 80%;
+    --category-packaging-bg: 210 10% 25%;
+    --category-packaging-fg: 210 10% 75%;
     --category-dairy-bg: 50 40% 28%;
     --category-dairy-fg: 50 60% 88%;
     --category-beverages-bg: 100 30% 25%;
     --category-beverages-fg: 100 40% 85%;
+
+    /* Dark PO Status Colors */
+    --status-po-draft-bg: 45 70% 45%;
+    --status-po-draft-fg: 45 70% 90%;
+    --status-po-sent-bg: 210 70% 45%;
+    --status-po-sent-fg: 210 70% 90%;
+    --status-po-partially-received-bg: 30 70% 45%;
+    --status-po-partially-received-fg: 30 70% 90%;
+    --status-po-fully-received-bg: 120 60% 35%;
+    --status-po-fully-received-fg: 120 60% 90%;
+    --status-po-cancelled-bg: 0 0% 40%;
+    --status-po-cancelled-fg: 0 0% 90%;
   }
 }
 
@@ -172,5 +196,3 @@ body {
   -ms-overflow-style: none;  /* For Internet Explorer and Edge */
   scrollbar-width: none;  /* For Firefox */
 }
-
-    
