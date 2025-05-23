@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, ChevronsUpDown, Check, Filter } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, ChevronsUpDown, Check, Filter, CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -27,7 +27,7 @@ import { StatusFilterDropdown, type InvoiceFilterStatus } from '@/components/com
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { Invoice, Customer, PaymentRecord, InvoiceStatus, PaymentProcessingStatus, PaymentMethod, CompanyProfile, InvoiceItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format, isBefore, startOfDay } from 'date-fns';
+import { format, isBefore, startOfDay, isValid, parseISO, isWithinInterval } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import {
@@ -35,10 +35,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogFooter as AlertDialogFooterComponent,
+  AlertDialogHeader as AlertDialogHeaderComponent,
+  AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,7 +48,19 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Calendar } from '@/components/ui/calendar';
 
+type SortableInvoiceKeys = keyof Pick<Invoice, 'id' | 'dueDate' | 'status' | 'issueDate'> | 'customerName' | 'totalAmount' | 'remainingBalance' | 'amountPaid';
+
+interface SortConfig {
+  key: SortableInvoiceKeys | null;
+  direction: 'ascending' | 'descending';
+}
+
+interface DateRange {
+  from: Date | null;
+  to: Date | null;
+}
 
 export default function InvoicesPage() {
   const {
@@ -83,6 +95,9 @@ export default function InvoicesPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [qrCodeValueForModal, setQrCodeValueForModal] = useState('');
 
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'issueDate', direction: 'descending' });
+  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
+
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -99,13 +114,12 @@ export default function InvoicesPage() {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
     
-    if (currentUrlIntentKey) {
-      if (urlParamsProcessedIntentKey !== currentUrlIntentKey) { // Only process if the intent is new or different
-        if (action === 'new' && !isFormModalOpen && !editingInvoice) { // Ensure modal isn't already open for this or another reason
+    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+        if (action === 'new' && !isFormModalOpen && !editingInvoice) {
             setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
             setEditingInvoice(null);
             setIsFormModalOpen(true);
-            setUrlParamsProcessedIntentKey(currentUrlIntentKey); // Mark this intent as processed
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
         } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
             const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
             if (invoiceToEdit) {
@@ -114,7 +128,6 @@ export default function InvoicesPage() {
               setIsFormModalOpen(true);
               setUrlParamsProcessedIntentKey(currentUrlIntentKey);
             } else {
-                // If invoice for edit not found, clean up URL params
                 const newSearchParams = new URLSearchParams(searchParams.toString());
                 newSearchParams.delete('action'); newSearchParams.delete('id');
                 router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
@@ -126,38 +139,23 @@ export default function InvoicesPage() {
                setIsViewModalOpen(true);
                setUrlParamsProcessedIntentKey(currentUrlIntentKey);
              } else {
-                // If invoice for view not found, clean up URL params
                 const newSearchParams = new URLSearchParams(searchParams.toString());
                 newSearchParams.delete('action'); newSearchParams.delete('id');
                 router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
              }
         }
+      } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
+         setUrlParamsProcessedIntentKey(null);
       }
-    } else { // No actionable URL parameters
-      if (urlParamsProcessedIntentKey) { // If we had a processed intent key
-        setUrlParamsProcessedIntentKey(null); // Clear it, because the URL is now clean
-      }
-    }
-  }, [
-    searchParams, 
-    urlParamsProcessedIntentKey, // This ensures we re-evaluate if the processed key changes
-    isFormModalOpen, // Conditions inside check this
-    editingInvoice, // Conditions inside check this
-    isViewModalOpen, // Conditions inside check this
-    invoices, 
-    router, 
-    pathname
-  ]);
+  }, [searchParams, invoices, router, pathname, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
 
 
- const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
       const currentAction = searchParams.get('action');
-      // If the modal was opened via URL params, clear them.
-      // The useEffect watching searchParams will see the cleared params and then clear urlParamsProcessedIntentKey.
       if (currentAction === 'new' || currentAction === 'edit') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
@@ -166,71 +164,130 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
       }
-      // No need to directly clear urlParamsProcessedIntentKey here; let the useEffect handle it based on the clean URL.
     }
-  }, [searchParams, router, pathname]); // Dependencies for router and searchParams to clear URL
+  }, [searchParams, router, pathname]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
-        setInvoiceToViewInModal(null); // Reset the invoice to view
+        setInvoiceToViewInModal(null);
         const currentAction = searchParams.get('action');
-        if (currentAction === 'view') { // If it was opened by URL param for 'view'
+        if (currentAction === 'view') {
             const newSearchParams = new URLSearchParams(searchParams.toString());
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
         }
-        // The useEffect watching searchParams will then clear urlParamsProcessedIntentKey.
     }
   }, [searchParams, router, pathname]);
-
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'new');
-    // Clear any existing id, customerId, customerName from possibly previous actions
     newSearchParams.delete('id');
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    // The useEffect will pick this up and open the modal
   }, [searchParams, router, pathname]);
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter(invoice => {
-      const customer = getCustomerById(invoice.customerId);
-      const matchesSearch = searchTerm
-        ? invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (invoice.customerName && invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (customer && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase())
-        : true;
-
-      const matchesStatus = statusFilter === 'all'
-        ? true
-        : statusFilter === 'paid'
-          ? invoice.status === 'Paid'
-          : statusFilter === 'unpaid'
-            ? invoice.status === 'Pending' || invoice.status === 'Overdue'
-            : statusFilter === 'partially-paid'
-              ? invoice.status === 'Partially Paid'
-              : statusFilter === 'cancelled'
-                ? invoice.status === 'Cancelled'
-                : false;
-
-      return matchesSearch && matchesStatus;
+  const handleSort = useCallback((key: SortableInvoiceKeys) => {
+    setSortConfig(prevConfig => {
+      if (prevConfig.key === key && prevConfig.direction === 'ascending') {
+        return { key, direction: 'descending' };
+      }
+      return { key, direction: 'ascending' };
     });
-  }, [invoices, searchTerm, statusFilter, getCustomerById]);
+  }, []);
+
+  const handleDateChange = useCallback((type: 'from' | 'to', date: Date | undefined) => {
+    setDateRange(prevRange => ({ ...prevRange, [type]: date || null }));
+  }, []);
+
+  const filteredInvoices = useMemo(() => {
+    let_filtered = [...invoices];
+
+    // Apply search term filter
+    if (searchTerm) {
+      _filtered = _filtered.filter(invoice => {
+        const customer = getCustomerById(invoice.customerId);
+        return invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               (invoice.customerName && invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+               (customer && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+               invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      _filtered = _filtered.filter(invoice => {
+        if (statusFilter === 'paid') return invoice.status === 'Paid';
+        if (statusFilter === 'unpaid') return ['Pending', 'Overdue'].includes(invoice.status);
+        if (statusFilter === 'partially-paid') return invoice.status === 'Partially Paid';
+        if (statusFilter === 'cancelled') return invoice.status === 'Cancelled';
+        return true;
+      });
+    }
+    
+    // Apply date range filter (on issueDate)
+    if (dateRange.from || dateRange.to) {
+        _filtered = _filtered.filter(invoice => {
+            const issueDate = parseISO(invoice.issueDate);
+            if (!isValid(issueDate)) return false;
+            
+            const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+            const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
+
+            if (fromDate && toDate) {
+                return isWithinInterval(issueDate, { start: fromDate, end: toDate });
+            }
+            if (fromDate) {
+                return issueDate >= fromDate;
+            }
+            if (toDate) {
+                return issueDate <= toDate;
+            }
+            return true;
+        });
+    }
+
+    // Apply sorting
+    if (sortConfig.key) {
+      _filtered.sort((a, b) => {
+        let aValue: any = a[sortConfig.key as keyof Invoice];
+        let bValue: any = b[sortConfig.key as keyof Invoice];
+
+        if (sortConfig.key === 'customerName') {
+          aValue = a.customerName || getCustomerById(a.customerId)?.name || '';
+          bValue = b.customerName || getCustomerById(b.customerId)?.name || '';
+        }
+        
+        if (sortConfig.key === 'issueDate' || sortConfig.key === 'dueDate') {
+            aValue = new Date(aValue).getTime();
+            bValue = new Date(bValue).getTime();
+        }
+
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return _filtered;
+  }, [invoices, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
+
 
   const handleEditInvoice = useCallback((invoice: Invoice) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'edit');
     newSearchParams.set('id', invoice.id);
-    newSearchParams.delete('customerId'); // Clear customer prefill params
+    newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    // The useEffect will pick this up
   }, [searchParams, router, pathname]);
 
   const handleViewInvoiceInModal = useCallback((invoice: Invoice) => {
@@ -238,7 +295,6 @@ export default function InvoicesPage() {
     newSearchParams.set('action', 'view');
     newSearchParams.set('id', invoice.id);
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-     // The useEffect will pick this up
   }, [searchParams, router, pathname]);
 
   useEffect(() => {
@@ -250,7 +306,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -268,11 +324,10 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    const calculatedGeneralTaxAmount = 0; // General tax is now 0
-    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0; // Use 0 if not set
+    const calculatedGeneralTaxAmount = 0;
+    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
     const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
-
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -296,12 +351,12 @@ export default function InvoicesPage() {
     let finalStatus: InvoiceStatus = data.status;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      const paymentAmount = calculatedTotalAmount - newAmountPaid; // Amount needed to reach full payment
-      if (paymentAmount > 0) { // Only add payment record if there's an amount to pay
+      const paymentAmount = calculatedTotalAmount - newAmountPaid;
+      if (paymentAmount > 0) {
         newPaymentHistory.push({
           id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
           paymentDate: new Date().toISOString(),
-          amount: paymentAmount, // Pay the remaining amount to become fully paid
+          amount: paymentAmount,
           status: 'Full Payment',
           paymentMethod: data.paymentMethod,
           ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
@@ -311,14 +366,11 @@ export default function InvoicesPage() {
             onlineTransactionNumber: data.onlineTransactionNumber,
           }),
         });
-         newAmountPaid = calculatedTotalAmount; // Amount paid is now the total amount
+         newAmountPaid = calculatedTotalAmount;
       } else if (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount) {
-        // This case handles if it was already partially paid and now it's fully paid with 0 new payment
-        // but status needs to reflect full payment.
         newAmountPaid = calculatedTotalAmount;
       }
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
-      // Ensure partial payment doesn't exceed what's owed.
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
         newPaymentHistory.push({
@@ -351,10 +403,8 @@ export default function InvoicesPage() {
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else { 
-      // Default to 'Paid' if somehow newRemainingBalance is 0 but conditions above not met
       finalStatus = 'Paid'; 
     }
-
 
     const invoiceToSave: Invoice = {
       id: data.id,
@@ -362,7 +412,7 @@ export default function InvoicesPage() {
       customerName: customer?.name || 'N/A',
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
-      items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0) })), 
+      items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0), sourceWarehouseId: item.sourceWarehouseId })), 
       subtotal: calculatedSubtotal, 
       taxAmount: calculatedGeneralTaxAmount, 
       vatAmount: calculatedVatAmount, 
@@ -372,7 +422,7 @@ export default function InvoicesPage() {
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
-      paymentMethod: data.paymentMethod, // Save the method used for *this* transaction
+      paymentMethod: data.paymentMethod,
       ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
       ...(data.paymentMethod === 'Bank Transfer' && {
         bankName: data.bankName,
@@ -384,12 +434,19 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
-    handleFormModalOpenChange(false); // This should trigger URL cleanup and subsequent useEffect to clear intent key
+    handleFormModalOpenChange(false);
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
+
+  const renderSortIcon = (columnKey: SortableInvoiceKeys) => {
+    if (sortConfig.key !== columnKey) {
+      return <ChevronsUpDown className="ml-2 h-3 w-3" />;
+    }
+    return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -404,36 +461,64 @@ export default function InvoicesPage() {
           }
         />
         <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-80" />
-          <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-auto" />
+          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full sm:w-auto md:w-64" />
+          <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full sm:w-auto md:w-[200px]" />
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.from ? format(dateRange.from, "PPP") : <span>Issue Date From</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.to ? format(dateRange.to, "PPP") : <span>Issue Date To</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8 flex flex-col overflow-hidden">
         <div className="h-full overflow-y-auto">
           {isDataContextLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Customer</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
-                  <TableHead className="min-w-[120px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">Invoice ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm">Customer</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm">Issue Date</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm">Due Date</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Balance</TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2">
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
                         <Skeleton className="h-8 w-8" />
                         <Skeleton className="h-8 w-8" />
@@ -448,29 +533,49 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Customer</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2">Balance</TableHead>
-                  <TableHead className="min-w-[120px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                    <div className="flex items-center">Invoice ID {renderSortIcon('id')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerName')}>
+                     <div className="flex items-center">Customer {renderSortIcon('customerName')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('issueDate')}>
+                    <div className="flex items-center">Issue Date {renderSortIcon('issueDate')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('dueDate')}>
+                    <div className="flex items-center">Due Date {renderSortIcon('dueDate')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('totalAmount')}>
+                    <div className="flex items-center justify-end">Amount {renderSortIcon('totalAmount')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('amountPaid')}>
+                    <div className="flex items-center justify-end">Paid {renderSortIcon('amountPaid')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('remainingBalance')}>
+                    <div className="flex items-center justify-end">Balance {renderSortIcon('remainingBalance')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">Status {renderSortIcon('status')}</div>
+                  </TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices.map((invoice, index) => (
-                  <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-muted/70")}>
-                    <TableCell className="font-medium px-2">{invoice.id}</TableCell>
-                    <TableCell className="px-2">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-right px-2">${invoice.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right px-2">${invoice.amountPaid.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold px-2">${invoice.remainingBalance.toFixed(2)}</TableCell>
-                    <TableCell className="px-2">
+                  <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                    <TableCell className="font-medium px-2 text-xs">{invoice.id}</TableCell>
+                    <TableCell className="px-2 text-xs">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
+                    <TableCell className="px-2 text-xs">{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell className="px-2 text-xs">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell className="text-right px-2 text-xs">${invoice.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right px-2 text-xs">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold px-2 text-xs">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell className="px-2 text-xs">
                       <Badge variant={getStatusBadgeVariant(invoice.status)}>
                         {invoice.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right px-2">
+                    <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
                           <Eye className="h-4 w-4" />
@@ -478,7 +583,7 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -488,12 +593,12 @@ export default function InvoicesPage() {
               </TableBody>
             </Table>
           ) : (
-             <div className="h-full flex items-center justify-center">
+             <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
                 title="No Invoices Found"
-                message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
+                message={searchTerm || statusFilter !== 'all' || dateRange.from || dateRange.to ? "Try adjusting your search or filter criteria." : "Get started by adding your first invoice."}
                 icon={PlusCircle}
-                action={!searchTerm && statusFilter === 'all' ? (
+                action={!searchTerm && statusFilter === 'all' && !dateRange.from && !dateRange.to ? (
                   <Button onClick={handleAddNewInvoice} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Invoice
                   </Button>
@@ -514,7 +619,7 @@ export default function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && ( // Conditionally render form to ensure fresh state on open
+            {isFormModalOpen && (
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
@@ -647,7 +752,6 @@ export default function InvoicesPage() {
                           <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
                           <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.subtotal === 'number' ? invoiceToViewInModal.subtotal : 0).toFixed(2)}</span>
                         </div>
-                         {/* Removed old general tax display, as it's now 0 */}
                         {invoiceToViewInModal.vatAmount > 0 && (
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
@@ -739,35 +843,33 @@ export default function InvoicesPage() {
 
       <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+            <AlertDialogDesc>
               This action cannot be undone. This will permanently delete the invoice
               "{invoiceToDelete?.id}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
+            </AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
             <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
-          </AlertDialogFooter>
+          </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Credit Limit Exceeded</AlertDialogTitle>
-            <AlertDialogDescription>{creditLimitAlertMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Credit Limit Exceeded</AlertDialogTitleComponent>
+            <AlertDialogDesc>{creditLimitAlertMessage}</AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
             <AlertDialogAction onClick={() => setIsCreditLimitAlertOpen(false)}>OK</AlertDialogAction>
-          </AlertDialogFooter>
+          </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
-
-    
