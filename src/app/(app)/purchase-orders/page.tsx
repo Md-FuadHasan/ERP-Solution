@@ -19,7 +19,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -167,7 +167,7 @@ export default function PurchaseOrdersPage() {
         productId: item.productId,
         quantityNewlyReceived: item.quantityReceivedNow!,
         warehouseId: item.destinationWarehouseId!,
-        itemUnitType: item.itemUnitType,
+        itemUnitType: item.itemUnitType, // Make sure this is passed from the form
       }));
 
     if (itemsToProcess.length > 0) {
