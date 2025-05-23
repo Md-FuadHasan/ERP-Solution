@@ -18,9 +18,9 @@ import {
 import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
 import { WarehouseForm, type WarehouseFormValues } from '@/components/forms/warehouse-form';
-import { SupplierForm, type SupplierFormValues } from '@/components/forms/supplier-form'; // New
+import { SupplierForm, type SupplierFormValues } from '@/components/forms/supplier-form';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { CompanyProfile, Manager, Warehouse, Supplier } from '@/types'; // Added Supplier
+import type { CompanyProfile, Manager, Warehouse, Supplier } from '@/types';
 import { MOCK_MANAGERS } from '@/types';
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -57,10 +57,10 @@ export default function SettingsPage() {
     addWarehouse,
     updateWarehouse,
     deleteWarehouse,
-    suppliers, // New
-    addSupplier,   // New
-    updateSupplier,// New
-    deleteSupplier,// New
+    suppliers,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
     isLoading: isDataLoading
   } = useData();
 
@@ -75,9 +75,9 @@ export default function SettingsPage() {
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [warehouseToDelete, setWarehouseToDelete] = useState<Warehouse | null>(null);
 
-  const [isSupplierFormModalOpen, setIsSupplierFormModalOpen] = useState(false); // New
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null); // New
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null); // New
+  const [isSupplierFormModalOpen, setIsSupplierFormModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   const [localLoading, setLocalLoading] = useState(true);
   const { toast } = useToast();
@@ -95,9 +95,9 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!localLoading && managers.length > 0) { // Only save if managers array is not empty and not initial load
+    if (!localLoading && managers.length > 0) {
         localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
-    } else if (!localLoading && managers.length === 0) { // If managers array becomes empty after initial load, clear it
+    } else if (!localLoading && managers.length === 0) {
         localStorage.removeItem('invoiceflow_managers');
     }
   }, [managers, localLoading]);
@@ -152,7 +152,8 @@ export default function SettingsPage() {
       updateWarehouse({ ...editingWarehouse, ...data });
       toast({ title: "Warehouse Updated", description: `${data.name} updated.` });
     } else {
-      addWarehouse({ ...data, id: `WH-${Date.now()}` });
+      // ID generation handled by DataContext's addWarehouse
+      addWarehouse(data as Omit<Warehouse, 'id'>);
       toast({ title: "Warehouse Added", description: `${data.name} added.` });
     }
     setIsWarehouseFormModalOpen(false); setEditingWarehouse(null);
@@ -166,7 +167,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Supplier Handlers - New
   const handleAddSupplier = () => { setEditingSupplier(null); setIsSupplierFormModalOpen(true); };
   const handleEditSupplier = (supplier: Supplier) => { setEditingSupplier(supplier); setIsSupplierFormModalOpen(true); };
   const handleSupplierFormSubmit = (data: SupplierFormValues) => {
@@ -174,7 +174,7 @@ export default function SettingsPage() {
       updateSupplier({ ...editingSupplier, ...data, createdAt: editingSupplier.createdAt });
       toast({ title: "Supplier Updated", description: `${data.name} updated.` });
     } else {
-      addSupplier({ ...data, id: `SUPP-${Date.now()}`, createdAt: new Date().toISOString() });
+      addSupplier(data as Omit<Supplier, 'id' | 'createdAt'>);
       toast({ title: "Supplier Added", description: `${data.name} added.` });
     }
     setIsSupplierFormModalOpen(false); setEditingSupplier(null);
@@ -190,19 +190,23 @@ export default function SettingsPage() {
 
   if (isDataLoading || localLoading) {
     return (
-      <>
-        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, suppliers, and data storage." />
-        <Tabs defaultValue="company" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
+      <div className="flex flex-col h-full">
+        <div className="shrink-0">
+          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, suppliers, and data storage." />
+        </div>
+        <Tabs defaultValue="company" className="w-full flex-grow min-h-0 flex flex-col">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6 shrink-0">
             {SETTINGS_TABS.map(tab => (
               <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm" disabled>
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
-          <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+          <div className="flex-grow min-h-0 overflow-y-auto">
+            <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+          </div>
         </Tabs>
-      </>
+      </div>
     )
   }
 
@@ -261,7 +265,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="suppliers" className="mt-0"> {/* New Tab */}
+            <TabsContent value="suppliers" className="mt-0">
               <Card>
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex-grow"><CardTitle>Supplier Management</CardTitle><CardDescription>Manage your vendors and suppliers.</CardDescription></div>
@@ -295,16 +299,17 @@ export default function SettingsPage() {
         <DialogContent className="w-[90vw] max-w-lg"><DialogHeader><DialogTitle>{editingWarehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</DialogTitle><DialogDescription>{editingWarehouse ? 'Update the details for this warehouse.' : 'Enter the details for the new warehouse.'}</DialogDescription></DialogHeader><div className="py-4"><WarehouseForm initialData={editingWarehouse} onSubmit={handleWarehouseFormSubmit} onCancel={() => { setIsWarehouseFormModalOpen(false); setEditingWarehouse(null); }} /></div></DialogContent>
       </Dialog>
       <AlertDialog open={!!warehouseToDelete} onOpenChange={(isOpen) => !isOpen && setWarehouseToDelete(null)}>
-        <AlertDialogContent><AlertDialogHeaderComponent><AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent><AlertDialogDescription>This action cannot be undone. This will permanently delete the warehouse "{warehouseToDelete?.name}" and all associated stock location records. Product definitions will remain, but their stock in this warehouse will be gone.</AlertDialogDescription></AlertDialogHeaderComponent><AlertDialogFooterComponent><AlertDialogCancel onClick={() => setWarehouseToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteWarehouse} className="bg-destructive hover:bg-destructive/90">Delete Warehouse</AlertDialogAction></AlertDialogFooterComponent></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeaderComponent><AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent><AlertDialogDesc>This action cannot be undone. This will permanently delete the warehouse "{warehouseToDelete?.name}" and all associated stock location records. Product definitions will remain, but their stock in this warehouse will be gone.</AlertDialogDesc></AlertDialogHeaderComponent><AlertDialogFooterComponent><AlertDialogCancel onClick={() => setWarehouseToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteWarehouse} className="bg-destructive hover:bg-destructive/90">Delete Warehouse</AlertDialogAction></AlertDialogFooterComponent></AlertDialogContent>
       </AlertDialog>
 
-      {/* Supplier Modals - New */}
       <Dialog open={isSupplierFormModalOpen} onOpenChange={(isOpen) => { setIsSupplierFormModalOpen(isOpen); if (!isOpen) setEditingSupplier(null); }}>
         <DialogContent className="w-[90vw] max-w-lg"><DialogHeader><DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle><DialogDescription>{editingSupplier ? 'Update the details for this supplier.' : 'Enter the details for the new supplier.'}</DialogDescription></DialogHeader><div className="py-4"><SupplierForm initialData={editingSupplier} onSubmit={handleSupplierFormSubmit} onCancel={() => { setIsSupplierFormModalOpen(false); setEditingSupplier(null); }} /></div></DialogContent>
       </Dialog>
       <AlertDialog open={!!supplierToDelete} onOpenChange={(isOpen) => !isOpen && setSupplierToDelete(null)}>
-        <AlertDialogContent><AlertDialogHeaderComponent><AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent><AlertDialogDescription>This action cannot be undone. This will permanently delete the supplier "{supplierToDelete?.name}".</AlertDialogDescription></AlertDialogHeaderComponent><AlertDialogFooterComponent><AlertDialogCancel onClick={() => setSupplierToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSupplier} className="bg-destructive hover:bg-destructive/90">Delete Supplier</AlertDialogAction></AlertDialogFooterComponent></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeaderComponent><AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent><AlertDialogDesc>This action cannot be undone. This will permanently delete the supplier "{supplierToDelete?.name}".</AlertDialogDesc></AlertDialogHeaderComponent><AlertDialogFooterComponent><AlertDialogCancel onClick={() => setSupplierToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSupplier} className="bg-destructive hover:bg-destructive/90">Delete Supplier</AlertDialogAction></AlertDialogFooterComponent></AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
+    
