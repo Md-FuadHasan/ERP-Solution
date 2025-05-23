@@ -110,7 +110,8 @@ export default function SettingsPage() {
 
   const handleTaxSettingsSubmit = (data: TaxSettingsFormValues) => {
     updateCompanyProfile({
-      taxRate: data.taxRate,
+      // taxRate field has been removed from CompanyProfile type and form.
+      // Keep vatRate and excessTaxRate logic as is.
       vatRate: data.vatRate,
       excessTaxRate: data.excessTaxRate
     });
@@ -171,10 +172,10 @@ export default function SettingsPage() {
   const handleEditSupplier = (supplier: Supplier) => { setEditingSupplier(supplier); setIsSupplierFormModalOpen(true); };
   const handleSupplierFormSubmit = (data: SupplierFormValues) => {
     if (editingSupplier) {
-      updateSupplier({ ...editingSupplier, ...data, createdAt: editingSupplier.createdAt });
+      updateSupplier({ ...editingSupplier, ...data, createdAt: editingSupplier.createdAt }); // Ensure createdAt is preserved
       toast({ title: "Supplier Updated", description: `${data.name} updated.` });
     } else {
-      addSupplier(data as Omit<Supplier, 'id' | 'createdAt'>);
+      addSupplier(data as Omit<Supplier, 'id' | 'createdAt'>); // Let DataContext handle id and createdAt
       toast({ title: "Supplier Added", description: `${data.name} added.` });
     }
     setIsSupplierFormModalOpen(false); setEditingSupplier(null);
@@ -195,9 +196,9 @@ export default function SettingsPage() {
           <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, suppliers, and data storage." />
         </div>
         <Tabs defaultValue="company" className="w-full flex-grow min-h-0 flex flex-col">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6 shrink-0">
+           <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar"> {/* Changed from grid to flex */}
             {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm" disabled>
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5"> {/* Added flex-shrink-0 */}
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
@@ -218,9 +219,9 @@ export default function SettingsPage() {
 
       <div className="flex-grow min-h-0">
         <Tabs defaultValue="company" className="w-full h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 mb-6 shrink-0">
+          <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar"> {/* Changed from grid to flex */}
             {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 text-xs sm:text-sm">
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5"> {/* Added flex-shrink-0 */}
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
@@ -235,7 +236,7 @@ export default function SettingsPage() {
             </TabsContent>
             <TabsContent value="tax" className="mt-0">
               <Card>
-                <CardHeader><CardTitle>Tax Settings</CardTitle><CardDescription>Configure TAX, VAT, and Excess TAX rates for your invoices.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Tax Settings</CardTitle><CardDescription>Configure VAT and Excess TAX rates for your invoices.</CardDescription></CardHeader>
                 <CardContent><TaxSettingsForm initialData={companyProfile!} onSubmit={handleTaxSettingsSubmit} /></CardContent>
               </Card>
             </TabsContent>
