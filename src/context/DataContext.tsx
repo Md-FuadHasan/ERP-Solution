@@ -53,7 +53,7 @@ interface DataContextType {
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
   getProductById: (productId: string) => Product | undefined;
-  addWarehouse: (warehouse: Warehouse) => void;
+  addWarehouse: (warehouse: Omit<Warehouse, 'id'>) => void;
   updateWarehouse: (warehouse: Warehouse) => void;
   deleteWarehouse: (warehouseId: string) => void;
   getWarehouseById: (warehouseId: string) => Warehouse | undefined;
@@ -66,12 +66,13 @@ interface DataContextType {
   getTotalStockForProduct: (productId: string) => number;
   getStockForProductInWarehouse: (productId: string, warehouseId: string) => number;
   addStockTransaction: (transaction: Omit<StockTransaction, 'id' | 'date' | 'productName' | 'warehouseName'>) => void;
-  addSupplier: (supplier: Supplier) => void;
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => void;
   updateSupplier: (supplier: Supplier) => void;
   deleteSupplier: (supplierId: string) => void;
   getSupplierById: (supplierId: string) => Supplier | undefined;
-  addPurchaseOrder: (po: PurchaseOrder) => void;
+  addPurchaseOrder: (po: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'subtotal' | 'totalAmount'>) => void;
   updatePurchaseOrder: (po: PurchaseOrder) => void;
+  // getPurchaseOrderById: (poId: string) => PurchaseOrder | undefined; // Placeholder for later
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -161,8 +162,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateCustomer = useCallback((updatedCustomer: Customer) => setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c).sort((a,b) => a.name.localeCompare(b.name))), []);
   const deleteCustomer = useCallback((customerId: string) => {
     setCustomers(prev => prev.filter(c => c.id !== customerId));
-    // Also delete associated invoices (consider if this is desired behavior)
-    // setInvoices(prevInvoices => prevInvoices.filter(inv => inv.customerId !== customerId));
   }, []);
 
   const updateCompanyProfile = useCallback((profileUpdate: Partial<CompanyProfile>) => {
@@ -178,8 +177,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
   const getProductById = useCallback((productId: string) => products.find(product => product.id === productId), [products]);
 
-  const addWarehouse = useCallback((warehouse: Warehouse) => {
-    const newWarehouse = { ...warehouse, id: warehouse.id || `WH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` };
+  const addWarehouse = useCallback((warehouseData: Omit<Warehouse, 'id'>) => {
+    const newWarehouse: Warehouse = { ...warehouseData, id: `WH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` };
     setWarehouses(prev => [...prev, newWarehouse].sort((a,b) => a.name.localeCompare(b.name)));
   }, []);
   const updateWarehouse = useCallback((updatedWarehouse: Warehouse) => setWarehouses(prev => prev.map(wh => wh.id === updatedWarehouse.id ? updatedWarehouse : wh).sort((a,b) => a.name.localeCompare(b.name))), []);
@@ -214,40 +213,45 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existingIndex = prev.findIndex(psl => psl.productId === productId && psl.warehouseId === warehouseId);
       let quantityChange = newStockLevel;
       let oldStockLevel = 0;
-      let transactionType: StockTransactionType = 'Adjustment - Increase';
+      let transactionType: StockTransactionType = 'Adjustment - Increase'; // Default, will be refined
 
       if (existingIndex > -1) {
         oldStockLevel = prev[existingIndex].stockLevel;
         quantityChange = newStockLevel - oldStockLevel;
         const updatedPsl = [...prev];
         updatedPsl[existingIndex] = { ...updatedPsl[existingIndex], stockLevel: newStockLevel };
-        transactionType = quantityChange >= 0 ? 'Adjustment - Increase' : 'Adjustment - Decrease';
+        
+        if (reason.startsWith('Transfer')) {
+          transactionType = reason as StockTransactionType;
+        } else {
+          transactionType = quantityChange >= 0 ? 'Adjustment - Increase' : 'Adjustment - Decrease';
+        }
+        
          addStockTransaction({
           productId,
           warehouseId,
           type: transactionType,
           quantityChange,
           newStockLevelAfterTransaction: newStockLevel,
-          reason: reason as StockAdjustmentReason, // Keep original reason for adjustment
+          reason: reason as StockAdjustmentReason,
           reference,
         });
         return updatedPsl.sort((a,b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
-      } else {
+      } else { // New stock location
         const newPsl: ProductStockLocation = {
           id: `PSL-${productId}-${warehouseId}-${Date.now()}`,
           productId,
           warehouseId,
           stockLevel: newStockLevel,
         };
-        // For initial entry, the 'reason' often becomes the 'type'
-        transactionType = reason as StockTransactionType;
+        transactionType = 'Initial Stock Entry'; // Or use reason if appropriate for new entries
          addStockTransaction({
           productId,
           warehouseId,
           type: transactionType,
           quantityChange: newStockLevel,
           newStockLevelAfterTransaction: newStockLevel,
-          reason: reason as StockAdjustmentReason, // Store the specific reason
+          reason: reason as StockAdjustmentReason,
           reference,
         });
         return [...prev, newPsl].sort((a,b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
@@ -270,7 +274,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deductStockForInvoiceItem = useCallback((
     productId: string,
-    warehouseId: string,
+    warehouseId: string, // Which warehouse to deduct from - IMPORTANT
     quantityToDeductInBaseUnits: number,
     invoiceId: string
   ) => {
@@ -279,35 +283,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const stockLocationIndex = updatedPsl.findIndex(psl => psl.productId === productId && psl.warehouseId === warehouseId);
 
         if (stockLocationIndex !== -1) {
-        const oldStockLevel = updatedPsl[stockLocationIndex].stockLevel;
-        const newStockLevel = Math.max(0, oldStockLevel - quantityToDeductInBaseUnits);
-        const actualDeductedAmount = oldStockLevel - newStockLevel;
+            const oldStockLevel = updatedPsl[stockLocationIndex].stockLevel;
+            if (oldStockLevel < quantityToDeductInBaseUnits) {
+                console.warn(`Stock deduction warning for Invoice ${invoiceId}: Insufficient stock for product ${productId} in warehouse ${warehouseId}. Available: ${oldStockLevel}, Required: ${quantityToDeductInBaseUnits}. Deducting available stock.`);
+                quantityToDeductInBaseUnits = oldStockLevel; // Deduct only what's available
+            }
+            const newStockLevel = oldStockLevel - quantityToDeductInBaseUnits;
+            
+            updatedPsl[stockLocationIndex] = {
+                ...updatedPsl[stockLocationIndex],
+                stockLevel: newStockLevel,
+            };
 
-        updatedPsl[stockLocationIndex] = {
-            ...updatedPsl[stockLocationIndex],
-            stockLevel: newStockLevel,
-        };
-
-        if (actualDeductedAmount > 0) {
-            addStockTransaction({
-                productId,
-                warehouseId,
-                type: 'Sale',
-                quantityChange: -actualDeductedAmount,
-                newStockLevelAfterTransaction: newStockLevel,
-                reference: `Invoice ${invoiceId}`,
-            });
-        }
+            if (quantityToDeductInBaseUnits > 0) { // Only log if actual deduction happened
+                addStockTransaction({
+                    productId,
+                    warehouseId,
+                    type: 'Sale',
+                    quantityChange: -quantityToDeductInBaseUnits,
+                    newStockLevelAfterTransaction: newStockLevel,
+                    reference: `Invoice ${invoiceId}`,
+                });
+            }
+            return updatedPsl.sort((a,b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
         } else {
-        console.warn(`Stock deduction: Product ${productId} not found or no stock in warehouse ${warehouseId} for invoice ${invoiceId}. Stock not deducted.`);
+            console.warn(`Stock deduction error for Invoice ${invoiceId}: Product ${productId} not found in warehouse ${warehouseId}. Stock not deducted.`);
+            return prevPsl; // No change if product not found in warehouse
         }
-        return updatedPsl.sort((a,b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
     });
   }, [addStockTransaction]);
 
   const returnStockForInvoiceItem = useCallback((
     productId: string,
-    warehouseId: string,
+    warehouseId: string, // Which warehouse to return to
     quantityToReturnInBaseUnits: number,
     invoiceId: string
   ) => {
@@ -331,22 +339,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 reference: `Invoice ${invoiceId} (Return/Cancel)`,
             });
         } else {
-        const newPslRecord: ProductStockLocation = {
-            id: `PSL-${productId}-${warehouseId}-${Date.now()}`,
-            productId,
-            warehouseId,
-            stockLevel: quantityToReturnInBaseUnits,
-        };
-        updatedPsl.push(newPslRecord);
-        addStockTransaction({
-            productId,
-            warehouseId,
-            type: 'Sale Return',
-            quantityChange: quantityToReturnInBaseUnits,
-            newStockLevelAfterTransaction: quantityToReturnInBaseUnits,
-            reference: `Invoice ${invoiceId} (Return to new loc)`,
-        });
-        console.warn(`Stock return: Product ${productId} had no prior stock in warehouse ${warehouseId}. Created new stock location for invoice ${invoiceId}.`);
+            // If product wasn't in warehouse, create new stock location (e.g. return to a different WH)
+            const newPslRecord: ProductStockLocation = {
+                id: `PSL-${productId}-${warehouseId}-${Date.now()}`,
+                productId,
+                warehouseId,
+                stockLevel: quantityToReturnInBaseUnits,
+            };
+            updatedPsl.push(newPslRecord);
+            addStockTransaction({
+                productId,
+                warehouseId,
+                type: 'Sale Return',
+                quantityChange: quantityToReturnInBaseUnits,
+                newStockLevelAfterTransaction: quantityToReturnInBaseUnits,
+                reference: `Invoice ${invoiceId} (Return to new loc)`,
+            });
         }
         return updatedPsl.sort((a,b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
     });
@@ -364,31 +372,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (productDetails.unitType.toLowerCase() === 'pcs' && productDetails.packagingUnit?.toLowerCase().includes('carton') && productDetails.itemsPerPackagingUnit) {
               quantityToDeductInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
             } else if (productDetails.unitType.toLowerCase().includes('carton')) {
-              quantityToDeductInBaseUnits = item.quantity;
+              quantityToDeductInBaseUnits = item.quantity; // Item sold as base unit which is carton
             } else if (productDetails.packagingUnit && productDetails.itemsPerPackagingUnit && productDetails.packagingUnit.toLowerCase() === item.unitType.toLowerCase()) {
-                quantityToDeductInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
+                quantityToDeductInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit; // Item sold as optional larger package
             }
           } else { // Item sold in PCS
             if (productDetails.unitType.toLowerCase() === 'pcs') {
               quantityToDeductInBaseUnits = item.quantity;
-            } else if (productDetails.piecesInBaseUnit) {
+            } else if (productDetails.piecesInBaseUnit && productDetails.piecesInBaseUnit > 0) { // Base unit is a package, selling individual piece from it
               quantityToDeductInBaseUnits = item.quantity / productDetails.piecesInBaseUnit;
               if (!Number.isInteger(quantityToDeductInBaseUnits)) {
-                console.warn(`Stock deduction: fractional base units for ${productDetails.id}. Deducting rounded up.`);
-                quantityToDeductInBaseUnits = Math.ceil(quantityToDeductInBaseUnits);
+                console.warn(`Stock deduction: fractional base units for ${productDetails.id} (selling PCS from package). This should ideally be handled by item definition.`);
+                // For now, we'll assume such sales aren't allowed or unitType on item would match product.unitType
+                return; 
               }
+            } else { // Base unit is not PCS and no piecesInBaseUnit defined, cannot sell as PCS
+                 console.warn(`Stock deduction: Cannot sell product ${productDetails.id} as PCS. Its base unit is ${productDetails.unitType}.`);
+                 return;
             }
           }
-          // Simplified: Deduct from first warehouse with stock.
-          // A real system needs warehouse ID per line item from invoice form.
+          // TODO: Implement logic to select source warehouse for deduction. For now, uses first available.
           const pslToDeductFrom = productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel >= quantityToDeductInBaseUnits)
                                   || productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel > 0);
-
-          const sourceWarehouseId = pslToDeductFrom?.warehouseId || warehouses[0]?.id; // Fallback to first warehouse if no ideal one found
+          const sourceWarehouseId = pslToDeductFrom?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : undefined);
           
-          if (sourceWarehouseId) {
+          if (sourceWarehouseId && quantityToDeductInBaseUnits > 0) {
             deductStockForInvoiceItem(item.productId, sourceWarehouseId, quantityToDeductInBaseUnits, invoice.id);
-          } else {
+          } else if (!sourceWarehouseId) {
             console.warn(`No warehouse found to deduct stock for product ${item.productId} on invoice ${invoice.id}`);
           }
         }
@@ -399,30 +409,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateInvoice = useCallback((updatedInvoice: Invoice) => {
     const originalInvoice = invoices.find(inv => inv.id === updatedInvoice.id);
 
+    // Return stock from original invoice items if it wasn't cancelled
     if (originalInvoice && originalInvoice.status !== 'Cancelled') {
       originalInvoice.items.forEach(item => {
         const productDetails = getProductById(item.productId || '');
         if (productDetails && item.productId) {
           let quantityToReturnInBaseUnits = item.quantity;
+          // Add conversion logic similar to addInvoice if unitType differs
            if (item.unitType === 'Cartons') { /* ... conversion logic ... */ }
-           else { /* ... conversion logic ... */ }
-          const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId)?.warehouseId || warehouses[0]?.id;
-          if (sourceWarehouseId) {
+           else { /* ... conversion logic ... */ } // Simplified for brevity
+          const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId)?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : undefined); // Simplified warehouse selection
+          if (sourceWarehouseId && quantityToReturnInBaseUnits > 0) {
             returnStockForInvoiceItem(item.productId, sourceWarehouseId, quantityToReturnInBaseUnits, updatedInvoice.id);
           }
         }
       });
     }
 
+    // Deduct stock for new/updated invoice items if not cancelled
     if (updatedInvoice.status !== 'Cancelled') {
       updatedInvoice.items.forEach(item => {
         const productDetails = getProductById(item.productId || '');
          if (productDetails && item.productId) {
            let quantityToDeductInBaseUnits = item.quantity;
+           // Add conversion logic similar to addInvoice
             if (item.unitType === 'Cartons') { /* ... conversion logic ... */ }
-            else { /* ... conversion logic ... */ }
-           const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel >= quantityToDeductInBaseUnits)?.warehouseId || productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel > 0)?.warehouseId || warehouses[0]?.id;
-           if (sourceWarehouseId) {
+            else { /* ... conversion logic ... */ } // Simplified for brevity
+           const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel >= quantityToDeductInBaseUnits)?.warehouseId || productStockLocations.find(psl => psl.productId === item.productId && psl.stockLevel > 0)?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : undefined); // Simplified warehouse selection
+           if (sourceWarehouseId && quantityToDeductInBaseUnits > 0) {
              deductStockForInvoiceItem(item.productId, sourceWarehouseId, quantityToDeductInBaseUnits, updatedInvoice.id);
            }
          }
@@ -438,10 +452,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const productDetails = getProductById(item.productId || '');
             if (productDetails && item.productId) {
                 let quantityToReturnInBaseUnits = item.quantity;
+                // Add conversion logic similar to addInvoice
                 if (item.unitType === 'Cartons') { /* ... conversion logic ... */ }
-                else { /* ... conversion logic ... */ }
-                const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId)?.warehouseId || warehouses[0]?.id;
-                 if (sourceWarehouseId) {
+                else { /* ... conversion logic ... */ } // Simplified for brevity
+                const sourceWarehouseId = productStockLocations.find(psl => psl.productId === item.productId)?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : undefined); // Simplified warehouse selection
+                 if (sourceWarehouseId && quantityToReturnInBaseUnits > 0) {
                     returnStockForInvoiceItem(item.productId, sourceWarehouseId, quantityToReturnInBaseUnits, invoiceToDelete.id);
                  }
             }
@@ -460,20 +475,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [invoices]);
 
   // Supplier and Purchase Order Functions
-  const addSupplier = useCallback((supplier: Supplier) => {
-    const newSupplier = { ...supplier, id: supplier.id || `SUPP-${Date.now()}-${Math.random().toString(36).substring(2,7)}`, createdAt: new Date().toISOString() };
+  const addSupplier = useCallback((supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
+    const newSupplier: Supplier = { ...supplierData, id: `SUPP-${Date.now()}-${Math.random().toString(36).substring(2,7)}`, createdAt: new Date().toISOString() };
     setSuppliers(prev => [...prev, newSupplier].sort((a,b) => a.name.localeCompare(b.name)));
   }, []);
   const updateSupplier = useCallback((updatedSupplier: Supplier) => setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? updatedSupplier : s).sort((a,b) => a.name.localeCompare(b.name))), []);
   const deleteSupplier = useCallback((supplierId: string) => setSuppliers(prev => prev.filter(s => s.id !== supplierId)), []);
   const getSupplierById = useCallback((supplierId: string) => suppliers.find(s => s.id === supplierId), [suppliers]);
 
-  const addPurchaseOrder = useCallback((po: PurchaseOrder) => {
-     const newPO = { ...po, id: po.id || `PO-${Date.now()}-${Math.random().toString(36).substring(2,7)}`, createdAt: new Date().toISOString() };
+  const addPurchaseOrder = useCallback((poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'subtotal' | 'totalAmount'>) => {
+     const subtotal = poData.items.reduce((sum, item) => sum + item.total, 0);
+     // Add tax calculation for PO if needed, e.g., based on supplier terms
+     const taxAmount = 0; // Placeholder
+     const totalAmount = subtotal + taxAmount;
+
+     const newPO: PurchaseOrder = {
+      ...poData,
+      id: `PO-${String(Date.now()).slice(-6)}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`,
+      createdAt: new Date().toISOString(),
+      status: 'Draft',
+      subtotal,
+      taxAmount,
+      totalAmount,
+    };
     setPurchaseOrders(prev => [...prev, newPO].sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
   }, []);
   const updatePurchaseOrder = useCallback((updatedPO: PurchaseOrder) => {
-    setPurchaseOrders(prev => prev.map(po => po.id === updatedPO.id ? { ...po, ...updatedPO, updatedAt: new Date().toISOString() } : po).sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
+    const subtotal = updatedPO.items.reduce((sum, item) => sum + item.total, 0);
+    const taxAmount = updatedPO.taxAmount || 0;
+    const totalAmount = subtotal + taxAmount;
+
+    setPurchaseOrders(prev => prev.map(po => po.id === updatedPO.id ? { ...updatedPO, subtotal, totalAmount, updatedAt: new Date().toISOString() } : po).sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
   }, []);
 
 
@@ -505,3 +537,5 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
+    

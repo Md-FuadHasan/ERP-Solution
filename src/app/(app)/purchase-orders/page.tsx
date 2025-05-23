@@ -1,23 +1,65 @@
 
 'use client';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShoppingBasket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ShoppingBasket } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-// More imports will be needed: useData, useState, Dialogs, Table, POForm, etc.
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { useData } from '@/context/DataContext';
+import type { PurchaseOrder, Supplier, Product } from '@/types';
+import { PurchaseOrderForm, type PurchaseOrderFormValues } from '@/components/forms/purchase-order-form';
+import { useToast } from '@/hooks/use-toast';
+
+// More imports will be needed: Table components for listing POs
 
 export default function PurchaseOrdersPage() {
-  // Placeholder state and handlers - will be expanded
-  // const { purchaseOrders, isLoading } = useData();
-  // const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  // const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
+  const { 
+    purchaseOrders, 
+    suppliers, 
+    products, 
+    addPurchaseOrder, 
+    isLoading 
+  } = useData();
+  const { toast } = useToast();
+
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null); // For future edit functionality
 
   const handleAddPO = () => {
-    // setIsFormModalOpen(true);
-    // setEditingPO(null);
-    alert("Add New Purchase Order functionality coming soon!");
+    setEditingPO(null);
+    setIsFormModalOpen(true);
+  };
+
+  const handleSubmitPO = (data: PurchaseOrderFormValues) => {
+    // In a real app, you might want to add more fields like PO ID generation here
+    // or do it in the DataContext's addPurchaseOrder function.
+    // For now, DataContext handles basic ID, createdAt, status, and total calculations.
+    
+    const poDataForContext = {
+      supplierId: data.supplierId,
+      orderDate: data.orderDate.toISOString(),
+      expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
+      items: data.items.map(item => ({
+        ...item,
+        total: (item.quantity || 0) * (item.unitPrice || 0) // Ensure total is calculated
+      })),
+      notes: data.notes,
+    };
+
+    addPurchaseOrder(poDataForContext);
+    toast({
+      title: "Purchase Order Created",
+      description: "The new purchase order has been successfully added.",
+    });
+    setIsFormModalOpen(false);
   };
 
   return (
@@ -27,7 +69,7 @@ export default function PurchaseOrdersPage() {
           title="Purchase Orders"
           description="Manage your purchase orders with suppliers for raw materials and packaging."
           actions={
-            <Button onClick={handleAddPO} className="w-full sm:w-auto">
+            <Button onClick={handleAddPO} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New PO
             </Button>
           }
@@ -39,20 +81,44 @@ export default function PurchaseOrdersPage() {
         <CardHeader className="border-b">
           <CardTitle>Purchase Order List</CardTitle>
           <CardDescription>
-            Overview of all purchase orders.
+            Overview of all purchase orders. Table display coming soon.
           </CardDescription>
         </CardHeader>
         <div className="h-full overflow-y-auto">
           {/* Placeholder for PO Table or Loading Skeleton */}
+          {/* TODO: Implement table to list purchaseOrders */}
           <DataPlaceholder
             icon={ShoppingBasket}
-            title="Purchase Orders Coming Soon"
-            message="This section will display a list of your purchase orders. Functionality to create and manage POs is under development."
+            title="Purchase Order Listing Coming Soon"
+            message="This section will display a list of your purchase orders."
           />
         </div>
       </div>
 
-      {/* Modal for PO Form will go here */}
+      <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
+        <DialogContent className="w-[95vw] max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>{editingPO ? 'Edit Purchase Order' : 'Create New Purchase Order'}</DialogTitle>
+            <DialogDescription>
+              {editingPO ? 'Update the details for this purchase order.' : 'Fill in the details to create a new purchase order.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow overflow-y-auto p-6">
+            {isFormModalOpen && ( // Conditionally render to ensure fresh state
+              <PurchaseOrderForm
+                initialData={editingPO}
+                suppliers={suppliers}
+                products={products}
+                onSubmit={handleSubmitPO}
+                onCancel={() => setIsFormModalOpen(false)}
+                isSubmitting={isLoading} // Or a specific submitting state for PO form
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+    
