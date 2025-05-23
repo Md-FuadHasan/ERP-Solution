@@ -19,7 +19,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -129,8 +129,9 @@ export default function PurchaseOrdersPage() {
   const handleSubmitPO = (data: PurchaseOrderFormValues) => {
     const itemsWithTotals = data.items.map(item => ({
       ...item,
+      id: item.id || `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, // Ensure ID exists for new items too
       total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-      quantityReceived: item.id ? (editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0) : 0,
+      quantityReceived: item.id && editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0,
     }));
 
     const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
@@ -154,6 +155,9 @@ export default function PurchaseOrdersPage() {
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
+        // Ensure existing fields not in poDataForContext are preserved if needed
+        status: editingPO.status, // Preserve status unless specifically changed
+        createdAt: editingPO.createdAt, // Preserve original creation date
       });
       toast({
         title: "Purchase Order Updated",
@@ -178,7 +182,6 @@ export default function PurchaseOrdersPage() {
       return { 
         ...item, 
         productName: product?.name || item.productId,
-        // Ensure quantityReceived is a number for display
         quantityReceived: typeof item.quantityReceived === 'number' ? item.quantityReceived : 0,
       };
     });
@@ -198,7 +201,7 @@ export default function PurchaseOrdersPage() {
         productId: item.productId,
         quantityNewlyReceived: Number(item.quantityReceivedNow)!,
         warehouseId: item.destinationWarehouseId!,
-        itemUnitType: item.itemUnitType,
+        itemUnitType: item.itemUnitType, // Pass the unit type from the PO item
       }));
 
     if (itemsToProcess.length > 0) {
@@ -394,22 +397,8 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
           )}
-          <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row">
-            {(poForViewModal?.status === 'Draft' || poForViewModal?.status === 'Sent') && (
-                <Button 
-                    variant="destructive" 
-                    onClick={() => {
-                        if(poToView) {
-                            setIsViewModalOpen(false); 
-                            setTimeout(() => handleCancelPOConfirm(poToView), 100); // Ensure modal closes before alert opens
-                        }
-                    }} 
-                    className="w-full sm:w-auto"
-                >
-                  <XCircle className="mr-2 h-4 w-4" /> Cancel PO
-                </Button>
-            )}
-             {(poForViewModal?.status === 'Sent' || poForViewModal?.status === 'Partially Received') && (
+          <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row sm:justify-end gap-2">
+            {(poForViewModal?.status === 'Sent' || poForViewModal?.status === 'Partially Received') && (
                 <Button 
                     variant="default" 
                     onClick={() => { if(poToView) { setIsViewModalOpen(false); setTimeout(() => handleOpenReceiveStockModal(poToView), 100); }}} 
@@ -418,9 +407,25 @@ export default function PurchaseOrdersPage() {
                   <Truck className="mr-2 h-4 w-4" /> Receive Stock
                 </Button>
             )}
-            <Button variant="outline" onClick={() => { if (poToView) { setIsViewModalOpen(false); setTimeout(() => handleEditPO(poToView), 100); } }} className="w-full sm:w-auto" disabled={poToView?.status !== 'Draft'}>
-              <Edit className="mr-2 h-4 w-4" /> Edit PO
-            </Button>
+             {(poForViewModal?.status === 'Draft' || poForViewModal?.status === 'Sent') && (
+                <Button 
+                    variant="destructive" 
+                    onClick={() => {
+                        if(poToView) {
+                            setIsViewModalOpen(false); 
+                            setTimeout(() => handleCancelPOConfirm(poToView), 100);
+                        }
+                    }} 
+                    className="w-full sm:w-auto"
+                >
+                  <XCircle className="mr-2 h-4 w-4" /> Cancel PO
+                </Button>
+            )}
+            {poForViewModal?.status === 'Draft' && (
+              <Button variant="outline" onClick={() => { if (poToView) { setIsViewModalOpen(false); setTimeout(() => handleEditPO(poToView), 100); } }} className="w-full sm:w-auto">
+                <Edit className="mr-2 h-4 w-4" /> Edit PO
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto">Close</Button>
           </DialogFooter>
         </DialogContent>
