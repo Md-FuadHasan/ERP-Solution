@@ -32,6 +32,7 @@ interface EnrichedWarehouseStockItem extends ProductStockLocation {
   globalReorderPoint?: number;
   basePrice: number; // per base unit
   exciseTax: number; // per base unit
+  piecesInBaseUnit?: number;
 }
 
 export default function WarehouseStockDetailPage() {
@@ -57,7 +58,7 @@ export default function WarehouseStockDetailPage() {
       .filter(psl => psl.warehouseId === warehouseId)
       .map(psl => {
         const product = getProductById(psl.productId);
-        if (!product) return null; // Should ideally not happen if data is consistent
+        if (!product) return null;
         const costPrice = product.costPrice || 0;
         return {
           ...psl,
@@ -70,6 +71,7 @@ export default function WarehouseStockDetailPage() {
           globalReorderPoint: product.globalReorderPoint,
           basePrice: product.basePrice,
           exciseTax: product.exciseTax || 0,
+          piecesInBaseUnit: product.piecesInBaseUnit,
         };
       })
       .filter(item => item !== null) as EnrichedWarehouseStockItem[];
@@ -88,17 +90,17 @@ export default function WarehouseStockDetailPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
-                    <TableHead className="min-w-[80px] px-2 text-sm">ID</TableHead>
-                    <TableHead className="min-w-[150px] px-2 text-sm">Name</TableHead>
-                    <TableHead className="min-w-[80px] px-2 text-xs">SKU</TableHead>
-                    <TableHead className="min-w-[100px] px-2 text-sm">Category</TableHead>
-                    <TableHead className="min-w-[70px] px-2 text-center text-sm">Stock</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">Stock Value</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">Base Price</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">Excise Tax</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">PCS Price</TableHead>
-                    <TableHead className="min-w-[90px] px-2 text-right text-sm">Pkg Price</TableHead>
+                    <TableHead className="min-w-[80px] px-2 text-sm text-left">ID</TableHead>
+                    <TableHead className="min-w-[150px] px-2 text-sm text-left">Name</TableHead>
+                    <TableHead className="min-w-[80px] px-2 text-[11px] text-left">SKU</TableHead>
+                    <TableHead className="min-w-[100px] px-2 text-sm text-left">Category</TableHead>
+                    <TableHead className="min-w-[70px] px-2 text-sm text-center">Stock</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">Stock Value</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">Base Price</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">Excise Tax</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">Sale Price / PCS</TableHead>
+                    <TableHead className="min-w-[90px] px-2 text-sm text-right">Sale Price / Pkg</TableHead>
                   </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,24 +145,24 @@ export default function WarehouseStockDetailPage() {
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 my-4 md:my-6 lg:my-8">
         <CardHeader className="border-b">
           <CardTitle>Products in {warehouse.name}</CardTitle>
-          <CardDescription>List of all products and their current stock levels in this warehouse.</CardDescription>
+          <CardDescription>List of all products and their current stock levels, base prices, and calculated sale prices in this warehouse.</CardDescription>
         </CardHeader>
         <div className="h-full overflow-y-auto">
           {enrichedWarehouseStockData.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[80px] px-2 text-sm text-left">Product ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2 text-sm text-left">Name</TableHead>
-                  <TableHead className="min-w-[80px] px-2 text-[11px] text-left">SKU</TableHead>
-                  <TableHead className="min-w-[100px] px-2 text-sm text-left">Category</TableHead>
-                  <TableHead className="min-w-[70px] px-2 text-sm text-center">Stock</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">Stock Value</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">Base Price</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">Excise Tax</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">VAT ({companyProfile.vatRate}%)</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">Sale Price / PCS</TableHead>
-                  <TableHead className="min-w-[90px] px-2 text-sm text-right">Sale Price / Pkg</TableHead>
+                  <TableHead className="text-left min-w-[80px] px-2 text-sm">Product ID</TableHead>
+                  <TableHead className="text-left min-w-[150px] px-2 text-sm">Name</TableHead>
+                  <TableHead className="text-left min-w-[80px] px-2 text-[11px]">SKU</TableHead>
+                  <TableHead className="text-left min-w-[100px] px-2 text-sm">Category</TableHead>
+                  <TableHead className="text-center min-w-[70px] px-2 text-sm">Stock</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Stock Value</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Base Price</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Excise Tax</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">VAT ({companyProfile.vatRate}%)</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Sale Price / PCS</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Sale Price / Pkg</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,28 +173,30 @@ export default function WarehouseStockDetailPage() {
                   const stockUnit = getDisplayUnit(productDetails, 'base');
                   const basePriceInfo = getDisplayBasePriceInfo(productDetails);
                   const exciseTaxInfo = getDisplayExciseTaxInfo(productDetails);
-                  const vatInfo = getDisplayVatInfo(productDetails, companyProfile);
+                  const vatInfo = getDisplayVatInfo(productDetails, companyProfile); // Uses product basePrice and exciseTax
+                  
+                  // Use the full product definition for calculating final prices
                   const finalPcsPriceInfo = calculateFinalPcsPriceWithVatAndExcise(productDetails, companyProfile);
-                  const finalPkgPriceInfo = calculateFinalPkgPriceWithVatAndExcise(productDetails, companyProfile, 'package'); // Assuming 'package' refers to unitType if package, or packagingUnit if larger
+                  const finalPkgPriceInfo = calculateFinalPkgPriceWithVatAndExcise(productDetails, companyProfile);
                   
                   return (
                     <TableRow key={`${item.productId}-${item.warehouseId}`} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium px-2 text-xs text-left">{item.productId}</TableCell>
-                      <TableCell className="px-2 text-xs text-left">{item.productName}</TableCell>
-                      <TableCell className="px-2 text-[11px] text-left">{item.productSku}</TableCell>
-                      <TableCell className="px-2 text-xs text-left">{item.productCategory}</TableCell>
+                      <TableCell className="text-left font-medium px-2 text-xs">{item.productId}</TableCell>
+                      <TableCell className="text-left px-2 text-xs">{item.productName}</TableCell>
+                      <TableCell className="text-left px-2 text-[11px]">{item.productSku}</TableCell>
+                      <TableCell className="text-left px-2 text-xs">{item.productCategory}</TableCell>
                       <TableCell className={cn(
-                        "font-medium px-2 text-xs text-center",
+                        "text-center font-medium px-2 text-xs",
                         productDetails.globalReorderPoint !== undefined && item.stockLevel <= productDetails.globalReorderPoint ? "text-destructive" : ""
                       )}>
                         {item.stockLevel} {stockUnit}
                       </TableCell>
-                      <TableCell className="px-2 text-xs text-right">${item.stockValue.toFixed(2)}</TableCell>
-                      <TableCell className="px-2 text-xs text-right">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
-                      <TableCell className="px-2 text-xs text-right">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
-                      <TableCell className="px-2 text-xs text-right">${vatInfo.vatAmount.toFixed(2)} / {vatInfo.unit}</TableCell>
-                      <TableCell className="px-2 text-xs text-right">${finalPcsPriceInfo.price.toFixed(2)}</TableCell>
-                      <TableCell className="px-2 text-xs text-right">{finalPkgPriceInfo.price !== null ? `$${finalPkgPriceInfo.price.toFixed(2)} / ${finalPkgPriceInfo.unit}` : '-'}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">${item.stockValue.toFixed(2)}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">${vatInfo.vatAmount.toFixed(2)} / {vatInfo.unit}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">${finalPcsPriceInfo.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right px-2 text-xs">{finalPkgPriceInfo.price !== null ? `$${finalPkgPriceInfo.price.toFixed(2)} / ${finalPkgPriceInfo.unit}` : '-'}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -212,4 +216,3 @@ export default function WarehouseStockDetailPage() {
     </div>
   );
 }
-
