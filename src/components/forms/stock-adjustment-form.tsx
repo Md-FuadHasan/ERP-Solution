@@ -25,18 +25,18 @@ import {
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Textarea } from '@/components/ui/textarea'; // For reference field
 import { Check, ChevronsUpDown } from 'lucide-react';
-import type { Product, Warehouse } from '@/types';
+import type { Product, Warehouse, StockAdjustmentReason } from '@/types';
+import { STOCK_ADJUSTMENT_REASONS } from '@/types';
 import { cn } from '@/lib/utils';
-
-const ADJUSTMENT_TYPES = ["Increase Stock", "Decrease Stock"] as const;
-type AdjustmentType = typeof ADJUSTMENT_TYPES[number];
 
 const stockAdjustmentFormSchema = z.object({
   productId: z.string().min(1, "Product is required."),
   warehouseId: z.string().min(1, "Warehouse is required."),
-  adjustmentType: z.enum(ADJUSTMENT_TYPES, { required_error: "Adjustment type is required." }),
+  adjustmentReason: z.enum(STOCK_ADJUSTMENT_REASONS, { required_error: "Adjustment reason is required." }),
   adjustmentQuantity: z.coerce.number().min(0.01, "Adjustment quantity must be positive and greater than zero."),
+  reference: z.string().max(100, "Reference cannot exceed 100 characters.").optional().nullable(),
 });
 
 export type StockAdjustmentFormValues = z.infer<typeof stockAdjustmentFormSchema>;
@@ -47,7 +47,7 @@ interface StockAdjustmentFormProps {
   onSubmit: (data: StockAdjustmentFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
-  initialData?: { productId?: string; warehouseId?: string }; // currentStock is no longer needed here
+  initialData?: { productId?: string; warehouseId?: string };
 }
 
 export function StockAdjustmentForm({
@@ -63,8 +63,9 @@ export function StockAdjustmentForm({
     defaultValues: {
       productId: initialData?.productId || '',
       warehouseId: initialData?.warehouseId || '',
-      adjustmentType: "Increase Stock",
-      adjustmentQuantity: undefined, // Default to undefined so placeholder shows
+      adjustmentReason: STOCK_ADJUSTMENT_REASONS[0], // Default to the first reason
+      adjustmentQuantity: undefined,
+      reference: '',
     },
   });
 
@@ -190,20 +191,20 @@ export function StockAdjustmentForm({
 
         <FormField
           control={form.control}
-          name="adjustmentType"
+          name="adjustmentReason"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Adjustment Type *</FormLabel>
+              <FormLabel>Adjustment Reason *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select adjustment type" />
+                    <SelectValue placeholder="Select reason for adjustment" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {ADJUSTMENT_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                  {STOCK_ADJUSTMENT_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -222,29 +223,50 @@ export function StockAdjustmentForm({
               <FormControl>
                 <Input 
                   type="number" 
-                  placeholder={`Enter quantity to add/remove`} 
+                  placeholder={`Enter quantity`} 
                   {...field}
                   value={field.value === undefined ? '' : String(field.value)}
                   onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                 />
               </FormControl>
               <FormDescription>
-                Enter the quantity of product to increase or decrease.
+                Enter the quantity to adjust. The selected reason determines if it's an increase or decrease.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
+         <FormField
+          control={form.control}
+          name="reference"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Reference / Notes (Optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="e.g., Stock Take ID, Damage Report #, PO Number for manual receipt"
+                  {...field}
+                  value={field.value || ''}
+                  className="min-h-[60px]"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
-            {isSubmitting ? 'Saving...' : 'Adjust Stock'}
+            {isSubmitting ? 'Saving...' : 'Apply Adjustment'}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
+
+    

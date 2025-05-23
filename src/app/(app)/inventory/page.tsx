@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +17,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { StockAdjustmentForm, type StockAdjustmentFormValues } from '@/components/forms/stock-adjustment-form';
 import { StockTransferForm, type StockTransferFormValues } from '@/components/forms/stock-transfer-form';
-import type { Product, Warehouse } from '@/types';
+import type { Product, Warehouse, ProductStockLocation, StockAdjustmentReason, StockTransactionType } from '@/types';
 import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
+import { getDisplayUnit } from '@/app/(app)/products/page'; // Assuming getDisplayUnit is exported
+
+
+interface EnrichedStockData extends ProductStockLocation {
+    productName: string;
+    productSku: string;
+    productUnitType: string; // Base unit for this product
+    warehouseName: string;
+    costPrice: number;
+    stockValue: number;
+    globalReorderPoint?: number;
+}
+
 
 export default function InventoryPage() {
   const {
@@ -31,6 +44,8 @@ export default function InventoryPage() {
     getTotalStockForProduct,
     upsertProductStockLocation,
     getStockForProductInWarehouse,
+    getProductById,
+    getWarehouseById,
   } = useData();
   const { toast } = useToast();
   const router = useRouter();
@@ -82,6 +97,36 @@ export default function InventoryPage() {
       nearingExpiryCount,
     };
   }, [products, productStockLocations, isLoading, getTotalStockForProduct, companyProfile]);
+
+
+  const enrichedStockData: EnrichedStockData[] = useMemo(() => {
+        if (isLoading || !productStockLocations || !products || !warehouses) return [];
+        return productStockLocations
+            .map(psl => {
+                const product = getProductById(psl.productId);
+                const warehouse = getWarehouseById(psl.warehouseId);
+                if (!product || !warehouse) return null;
+
+                return {
+                    ...psl,
+                    productName: product.name,
+                    productSku: product.sku,
+                    productUnitType: product.unitType,
+                    warehouseName: warehouse.name,
+                    costPrice: product.costPrice || 0,
+                    stockValue: psl.stockLevel * (product.costPrice || 0),
+                    globalReorderPoint: product.globalReorderPoint,
+                };
+            })
+            .filter(item => item !== null)
+            .sort((a, b) => {
+                if (a!.productName < b!.productName) return -1;
+                if (a!.productName > b!.productName) return 1;
+                if (a!.warehouseName < b!.warehouseName) return -1;
+                if (a!.warehouseName > b!.warehouseName) return 1;
+                return 0;
+            }) as EnrichedStockData[];
+    }, [isLoading, productStockLocations, products, warehouses, getProductById, getWarehouseById]);
 
 
   const handleOpenStockAdjustmentModal = () => setIsStockAdjustmentModalOpen(true);
@@ -136,35 +181,49 @@ export default function InventoryPage() {
     };
 
     addProduct(newProductDefinition);
-    toast({ title: "Product Defined", description: `${newProductDefinition.name} created. Add stock via Stock Adjustments.` });
+    toast({ title: "Product Defined", description: `${newProductDefinition.name} created. Use 'Adjust Stock' to set initial quantities.` });
     setIsProductDefineModalOpen(false);
   };
 
   const handleStockAdjustmentSubmit = (data: StockAdjustmentFormValues) => {
     const currentStock = getStockForProductInWarehouse(data.productId, data.warehouseId);
-    let newCalculatedStockLevel = currentStock;
+    let quantityChange = data.adjustmentQuantity;
+    let transactionType: StockTransactionType = data.adjustmentReason as StockTransactionType; // Default to reason
 
-    if (data.adjustmentType === "Increase Stock") {
+    // Determine if it's an increase or decrease based on reason
+    const increaseReasons: StockAdjustmentReason[] = ["Initial Stock Entry", "Stock Take Gain", "Goods Received (Manual)", "Other Increase"];
+    const decreaseReasons: StockAdjustmentReason[] = ["Stock Take Loss", "Damaged Goods", "Expired Goods", "Internal Consumption", "Promotion/Sample", "Other Decrease"];
+
+    let newCalculatedStockLevel: number;
+
+    if (increaseReasons.includes(data.adjustmentReason)) {
       newCalculatedStockLevel = currentStock + data.adjustmentQuantity;
-    } else if (data.adjustmentType === "Decrease Stock") {
+      transactionType = 'Adjustment - Increase';
+    } else if (decreaseReasons.includes(data.adjustmentReason)) {
       newCalculatedStockLevel = Math.max(0, currentStock - data.adjustmentQuantity);
+      quantityChange = -(currentStock - newCalculatedStockLevel); // Actual change might be less if current stock is low
+      transactionType = 'Adjustment - Decrease';
+    } else {
+      // Should not happen if form is validated
+      toast({ title: "Error", description: "Invalid adjustment reason.", variant: "destructive" });
+      return;
     }
+    
+    upsertProductStockLocation(
+        { productId: data.productId, warehouseId: data.warehouseId, stockLevel: newCalculatedStockLevel },
+        data.adjustmentReason, // This is the specific reason from the form
+        data.reference || undefined
+    );
 
-    const productStockRecord: ProductStockLocation = {
-      id: `${data.productId}-${data.warehouseId}`, // Ensure a consistent ID for upsert
-      productId: data.productId,
-      warehouseId: data.warehouseId,
-      stockLevel: newCalculatedStockLevel,
-    };
-    upsertProductStockLocation(productStockRecord); // This will create or update
     const productName = products.find(p => p.id === data.productId)?.name || 'Product';
     const warehouseName = warehouses.find(w => w.id === data.warehouseId)?.name || 'Warehouse';
     toast({
       title: "Stock Adjusted",
-      description: `Stock for ${productName} in ${warehouseName} updated to ${newCalculatedStockLevel}.`,
+      description: `Stock for ${productName} in ${warehouseName} updated to ${newCalculatedStockLevel}. Reason: ${data.adjustmentReason}`,
     });
     setIsStockAdjustmentModalOpen(false);
   };
+
 
   const handleStockTransferSubmit = (data: StockTransferFormValues) => {
     const { productId, sourceWarehouseId, destinationWarehouseId, transferQuantity } = data;
@@ -181,17 +240,15 @@ export default function InventoryPage() {
     const newDestStock = currentDestStock + transferQuantity;
 
     upsertProductStockLocation({
-      id: `${productId}-${sourceWarehouseId}`,
       productId,
       warehouseId: sourceWarehouseId,
       stockLevel: newSourceStock,
-    });
+    }, 'Transfer Out', `To WH: ${destinationWarehouseId}`);
     upsertProductStockLocation({
-      id: `${productId}-${destinationWarehouseId}`,
       productId,
       warehouseId: destinationWarehouseId,
       stockLevel: newDestStock,
-    });
+    }, 'Transfer In', `From WH: ${sourceWarehouseId}`);
     
     const productName = products.find(p => p.id === productId)?.name || 'Product';
     const sourceWhName = warehouses.find(w => w.id === sourceWarehouseId)?.name || 'Source';
@@ -232,7 +289,7 @@ export default function InventoryPage() {
             </Card>
           ))}
         </div>
-        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+         <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
           <CardHeader className="border-b">
              <Skeleton className="h-6 w-1/3 mb-1" />
              <Skeleton className="h-4 w-2/3" />
@@ -241,10 +298,10 @@ export default function InventoryPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Name</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Location</TableHead>
-                  <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                  <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
+                  <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
+                  <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
                   <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -322,24 +379,20 @@ export default function InventoryPage() {
         </Card>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
         <CardHeader className="border-b">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-lg">Warehouses</CardTitle>
-              <CardDescription>List of all registered warehouses. Click to view stock details.</CardDescription>
-            </div>
-          </div>
+          <CardTitle>Warehouses Overview</CardTitle>
+          <CardDescription>List of all warehouses. Click to view detailed stock.</CardDescription>
         </CardHeader>
         <div className="h-full overflow-y-auto">
-          {isLoading || !companyProfile ? (
+          {isLoading ? (
              <Table>
                 <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                   <TableRow>
-                    <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
-                    <TableHead className="min-w-[180px] px-2">Name</TableHead>
-                    <TableHead className="min-w-[150px] px-2">Location</TableHead>
-                    <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                    <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
+                    <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
+                    <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
+                    <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
                     <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -359,10 +412,10 @@ export default function InventoryPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Name</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Location</TableHead>
-                  <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                  <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
+                  <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
+                  <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
                   <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -415,7 +468,7 @@ export default function InventoryPage() {
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Define New Product</DialogTitle>
-            <DialogDescription>Enter product details. Stock is managed per warehouse.</DialogDescription>
+            <DialogDescription>Enter product details. Stock is managed per warehouse via Stock Adjustments.</DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
             {isProductDefineModalOpen && (
@@ -443,6 +496,7 @@ export default function InventoryPage() {
                 warehouses={warehouses}
                 onSubmit={handleStockAdjustmentSubmit}
                 onCancel={() => setIsStockAdjustmentModalOpen(false)}
+                isSubmitting={isLoading}
               />
             )}
           </div>
@@ -471,3 +525,5 @@ export default function InventoryPage() {
     </div>
   );
 }
+
+    
