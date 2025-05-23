@@ -59,10 +59,10 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  // Subtotal = Sum of all (item.quantity * item.unitPrice). This subtotal INCLUDES product-specific excise taxes.
+  // Subtotal = Sum of all (item.quantity * (product.basePrice + product.exciseTax)).
   subtotal: number;
   taxAmount: number; // General tax - typically 0 if VAT is primary.
-  // vatAmount = VAT on subtotal (which already includes item-specific excise).
+  // vatAmount = VAT on subtotal.
   vatAmount: number;
   totalAmount: number; // subtotal + taxAmount + vatAmount.
   status: InvoiceStatus;
@@ -82,7 +82,7 @@ export interface CompanyProfile {
   address: string;
   phone: string;
   email: string;
-  taxRate: number | string; // General tax rate - typically 0 if VAT is primary.
+  taxRate: number | string; // General tax rate - set to 0 assuming VAT is primary.
   vatRate: number | string; // VAT rate e.g. 15 for 15%
   excessTaxRate?: number | string;
 }
@@ -120,18 +120,18 @@ export interface Product {
   sku: string;
   category: ProductCategory;
   unitType: ProductUnitType;      // This is the primary unit for stockLevel & primary pricing
-  piecesInBaseUnit?: number;     // If unitType is a package (e.g., Carton), how many individual conceptual pieces (e.g., PCS) does it contain?
-  packagingUnit?: string;        // Optional LARGER sales package (e.g., Pallet, if unitType is Carton)
-  itemsPerPackagingUnit?: number;// Number of 'unitType's in one 'packagingUnit' (e.g., 20 Cartons in 1 Pallet)
-  basePrice: number;             // Base selling price for one 'unitType' (BEFORE any taxes)
-  costPrice: number;             // Cost per 'unitType'
-  exciseTax?: number;            // Excise tax amount PER 'unitType'
+  piecesInBaseUnit?: number;      // If unitType is a package (e.g., Carton), how many individual conceptual "pieces" (e.g., PCS) does it contain?
+  packagingUnit?: string;         // Optional LARGER sales package (e.g., Pallet, if unitType is Carton)
+  itemsPerPackagingUnit?: number; // Number of 'unitType's in one 'packagingUnit' (e.g., 20 Cartons in 1 Pallet)
+  basePrice: number;              // Base selling price for one 'unitType' (BEFORE any taxes)
+  costPrice: number;              // Cost per 'unitType'
+  exciseTax?: number;             // Excise tax amount PER 'unitType'
   batchNo?: string;
   productionDate?: string; // ISO string
   expiryDate?: string;     // ISO string
   discountRate?: number;   // Percentage e.g., 10 for 10%
   createdAt?: string;
-  globalReorderPoint?: number; // General reorder threshold for the product across all locations
+  globalReorderPoint?: number;   // General reorder threshold for the product across all locations
 }
 
 export type WarehouseType = 'city_store' | 'production_store' | 'main_office_store';
@@ -174,7 +174,8 @@ export type StockTransactionType =
   | 'Sale'
   | 'Sale Return'
   | 'Production Output' // From production to finished goods
-  | 'Production Input Consumption'; // Raw materials consumed by production
+  | 'Production Input Consumption' // Raw materials consumed by production
+  | 'PO Receipt'; // New type for goods received against a PO
 
 export interface StockTransaction {
   id: string; // Unique ID for the transaction
@@ -191,14 +192,56 @@ export interface StockTransaction {
   userId?: string; // Placeholder for future user tracking, who performed the action
 }
 
+// Supplier and Purchase Order Types - NEW
+export interface Supplier {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  contactPerson?: string;
+  createdAt: string;
+}
+
+export interface PurchaseOrderItem {
+  id: string; // Or just productId if unique per PO
+  productId: string;
+  productName?: string; // Denormalized for display
+  quantity: number;
+  unitType: ProductUnitType; // The unit in which it was ordered
+  unitPrice: number; // Price per unitType for this PO
+  total: number; // quantity * unitPrice
+}
+
+export type POStatus = 'Draft' | 'Sent' | 'Partially Received' | 'Fully Received' | 'Cancelled';
+export const ALL_PO_STATUSES: POStatus[] = ['Draft', 'Sent', 'Partially Received', 'Fully Received', 'Cancelled'];
+
+export interface PurchaseOrder {
+  id: string; // e.g., PO-2024-001
+  supplierId: string;
+  supplierName?: string; // Denormalized
+  orderDate: string; // ISO string
+  expectedDeliveryDate?: string; // ISO string
+  items: PurchaseOrderItem[];
+  subtotal: number;
+  taxAmount?: number; // If applicable on POs
+  totalAmount: number;
+  status: POStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+
+// MOCK DATA
 
 export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   name: 'InvoiceFlow Solutions Inc.',
   address: '123 App Dev Lane, Suite 404, Logic City, OS 12345',
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
-  taxRate: 0,
-  vatRate: 15,
+  taxRate: 0, // General tax rate - set to 0 as VAT is primary.
+  vatRate: 15, // VAT rate e.g. 15 for 15%
   excessTaxRate: 0,
 };
 
@@ -238,7 +281,7 @@ export const MOCK_PRODUCT_STOCK_LOCATIONS: ProductStockLocation[] = [
   // PROD001 (Blueberry Ice Cream Cone - Base Unit: Cartons)
   { id: 'PSL001', productId: 'PROD001', warehouseId: 'WH-HO-ICE', stockLevel: 50, reorderPoint: 5 },
   { id: 'PSL002', productId: 'PROD001', warehouseId: 'WH-JED-01', stockLevel: 20, reorderPoint: 2 },
-  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 15, reorderPoint: 1 }, // Adjusted for low stock KPI
+  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 1, reorderPoint: 1 },
 
   // PROD002 (Laban 900ml - Base Unit: PCS)
   { id: 'PSL004', productId: 'PROD002', warehouseId: 'WH-HO-LABAN', stockLevel: 1000, reorderPoint: 100 },
@@ -251,18 +294,17 @@ export const MOCK_PRODUCT_STOCK_LOCATIONS: ProductStockLocation[] = [
 
   // PROD005 (Vanilla Ice Cream Tub - Base Unit: PCS)
   { id: 'PSL009', productId: 'PROD005', warehouseId: 'WH-HO-ICE', stockLevel: 100, reorderPoint: 20 },
-  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 18, reorderPoint: 6 }, // Adjusted for low stock KPI
+  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 6, reorderPoint: 6 },
 
   // PROD009 (Sugar - Base Unit: Kgs)
   { id: 'PSL011', productId: 'PROD009', warehouseId: 'WH-HO-ICE', stockLevel: 500, reorderPoint: 100 },
   { id: 'PSL012', productId: 'PROD009', warehouseId: 'WH-HO-TETRA', stockLevel: 300, reorderPoint: 50 },
 
   // PROD008 (Vanilla/Strawberry Ice Cream Cone - Base Unit: Cartons)
-  { id: 'PSL013', productId: 'PROD008', warehouseId: 'WH-HO-ICE', stockLevel: 10, reorderPoint: 1 }, // Adjusted
+  { id: 'PSL013', productId: 'PROD008', warehouseId: 'WH-HO-ICE', stockLevel: 10, reorderPoint: 1 },
 ];
 
 export const MOCK_STOCK_TRANSACTIONS: StockTransaction[] = []; // Start with empty transactions
-
 
 export const MOCK_CUSTOMERS: Customer[] = [
   { id: 'CUST001', name: 'Alpha Solutions', email: 'contact@alpha.com', phone: '555-0101', billingAddress: '123 Tech Road, Silicon Valley, CA', createdAt: new Date().toISOString(), customerType: 'Credit', creditLimit: 5000, invoiceAgingDays: 30, registrationNumber: 'CRN12345ALPHA', vatNumber: 'VATALPHA001' },
@@ -270,6 +312,7 @@ export const MOCK_CUSTOMERS: Customer[] = [
   { id: 'CUST003', name: 'Gamma Services', email: 'support@gamma.io', phone: '555-0103', billingAddress: '789 Server Street, Cloud Town, WA', createdAt: new Date().toISOString(), customerType: 'Credit', creditLimit: 10000, invoiceAgingDays: 60, registrationNumber: 'CRNGAMMA00112', vatNumber: 'VATGAMMA003' },
 ];
 
+// Adjusted MOCK_INVOICES to use basePrice from MOCK_PRODUCTS
 const mockInvoiceItems1: InvoiceItem[] = [
   { id: 'item1-inv1', productId: 'PROD001', description: MOCK_PRODUCTS[0].name, quantity: 2, unitType: 'Cartons', unitPrice: MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0), total: (MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0)) * 2 }
 ];
@@ -297,8 +340,8 @@ const mockInvoiceItems4: InvoiceItem[] = [
     id: 'item1-inv4',
     productId: 'PROD004',
     description: MOCK_PRODUCTS[3].name,
-    quantity: 1, // Assuming this means 1 Carton of 18 PCS
-    unitType: 'Cartons', // Selling the whole package
+    quantity: 1,
+    unitType: 'Cartons',
     unitPrice: (MOCK_PRODUCTS[3].basePrice + (MOCK_PRODUCTS[3].exciseTax || 0)) * (MOCK_PRODUCTS[3].itemsPerPackagingUnit || 1),
     total: (MOCK_PRODUCTS[3].basePrice + (MOCK_PRODUCTS[3].exciseTax || 0)) * (MOCK_PRODUCTS[3].itemsPerPackagingUnit || 1) * 1
   }
@@ -360,4 +403,10 @@ export const MOCK_MANAGERS: Manager[] = [
   { id: 'MGR002', name: 'Bob The Builder', email: 'bob@invoiceflow.com', role: 'Invoice Manager' },
 ];
 
-    
+export const MOCK_SUPPLIERS: Supplier[] = [
+    { id: 'SUPP001', name: 'Global Packaging Solutions', email: 'sales@gps.com', phone: '555-0201', address: '1 Packing Way, Industrial Zone', contactPerson: 'Mr. Boxwell', createdAt: new Date().toISOString() },
+    { id: 'SUPP002', name: 'FarmFresh Ingredients Co.', email: 'orders@farmfresh.com', phone: '555-0202', address: '23 Orchard Lane, Countryside', contactPerson: 'Ms. Berry', createdAt: new Date().toISOString() },
+    { id: 'SUPP003', name: 'SweetnerPro Ltd.', email: 'contact@sweetner.pro', phone: '555-0203', address: '15 Sugar Mill Road, Factoria', contactPerson: 'Mr. Cane', createdAt: new Date().toISOString() },
+];
+
+export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = []; // Start with empty POs
