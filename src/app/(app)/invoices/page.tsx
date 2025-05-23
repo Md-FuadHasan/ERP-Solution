@@ -35,10 +35,11 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,6 +73,9 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
+    products, // For InvoiceForm
+    warehouses, // For InvoiceForm
+    getStockForProductInWarehouse, // For InvoiceForm
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,6 +159,7 @@ export default function InvoicesPage() {
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
+      // Only clear URL params if they were responsible for opening this specific (edit/new) modal
       const currentAction = searchParams.get('action');
       if (currentAction === 'new' || currentAction === 'edit') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -163,6 +168,8 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+         // This ensures the effect processing the URL sees a "clean" state.
+        setUrlParamsProcessedIntentKey(null);
       }
     }
   }, [searchParams, router, pathname]);
@@ -177,6 +184,7 @@ export default function InvoicesPage() {
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+            setUrlParamsProcessedIntentKey(null); 
         }
     }
   }, [searchParams, router, pathname]);
@@ -204,7 +212,7 @@ export default function InvoicesPage() {
   }, []);
 
   const filteredInvoices = useMemo(() => {
-    let_filtered = [...invoices];
+    let _filtered = [...invoices]; // Corrected variable name
 
     // Apply search term filter
     if (searchTerm) {
@@ -306,7 +314,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoice = useCallback((invoice: Invoice) => {
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => { // Renamed from handleDeleteInvoice
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -324,7 +332,7 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    const calculatedGeneralTaxAmount = 0;
+    const calculatedGeneralTaxAmount = 0; // Assuming general tax is 0
     const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
     const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
@@ -414,7 +422,7 @@ export default function InvoicesPage() {
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0), sourceWarehouseId: item.sourceWarehouseId })), 
       subtotal: calculatedSubtotal, 
-      taxAmount: calculatedGeneralTaxAmount, 
+      taxAmount: calculatedGeneralTaxAmount, // This is now 0 based on latest requirement
       vatAmount: calculatedVatAmount, 
       totalAmount: calculatedTotalAmount, 
       status: finalStatus,
@@ -490,7 +498,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8 flex flex-col overflow-hidden">
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
         <div className="h-full overflow-y-auto">
           {isDataContextLoading ? (
             <Table>
@@ -583,9 +591,28 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeaderComponent>
+                              <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+                              <AlertDialogDesc>
+                                This action cannot be undone. This will permanently delete the invoice
+                                "{invoiceToDelete?.id}".
+                              </AlertDialogDesc>
+                            </AlertDialogHeaderComponent>
+                            <AlertDialogFooterComponent>
+                              <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooterComponent>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -625,6 +652,9 @@ export default function InvoicesPage() {
                 customers={customers}
                 companyProfile={companyProfile!}
                 invoices={invoices}
+                products={products}
+                warehouses={warehouses}
+                getStockForProductInWarehouse={getStockForProductInWarehouse}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
                 onCancel={() => handleFormModalOpenChange(false)}
@@ -717,20 +747,25 @@ export default function InvoicesPage() {
                           <TableHeader className="bg-muted/50">
                             <TableRow>
                               <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
+                              <TableHead className="w-32">Source Warehouse</TableHead>
                               <TableHead className="text-center w-24">Qty</TableHead>
                               <TableHead className="text-right w-32">Unit Price (incl. Excise)</TableHead>
                               <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount (incl. Excise)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {invoiceToViewInModal.items.map((item: InvoiceItem, index: number) => (
-                              <TableRow key={item.id || index} className="even:bg-muted/20">
-                                <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
-                                <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
-                                <TableCell className="text-right text-muted-foreground py-3">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
-                              </TableRow>
-                            ))}
+                            {invoiceToViewInModal.items.map((item: InvoiceItem, index: number) => {
+                              const warehouseName = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId)?.name : 'N/A';
+                              return (
+                                <TableRow key={item.id || index} className="even:bg-muted/20">
+                                  <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
+                                  <TableCell className="text-muted-foreground py-3">{warehouseName}</TableCell>
+                                  <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
+                                  <TableCell className="text-right text-muted-foreground py-3">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
+                                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -841,23 +876,7 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeaderComponent>
-            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-            <AlertDialogDesc>
-              This action cannot be undone. This will permanently delete the invoice
-              "{invoiceToDelete?.id}".
-            </AlertDialogDesc>
-          </AlertDialogHeaderComponent>
-          <AlertDialogFooterComponent>
-            <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooterComponent>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation Dialog is now part of the table row mapping */}
 
       <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
         <AlertDialogContent>
@@ -873,3 +892,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
