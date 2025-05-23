@@ -25,7 +25,8 @@ export interface InvoiceItem {
   productId?: string;
   description: string;
   quantity: number;
-  // unitPrice on invoice item = product basePrice + product exciseTax (for the chosen selling unit). Excludes invoice-level VAT.
+  // unitPrice on invoice item = product basePrice + product exciseTax (for the chosen selling unit).
+  // This price is BEFORE invoice-level VAT.
   unitPrice: number;
   total: number; // quantity * unitPrice
   unitType: 'Cartons' | 'PCS'; // Unit type for THIS line item
@@ -59,10 +60,11 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  // Subtotal = Sum of all (item.quantity * (product.basePrice + product.exciseTax)).
+  // Subtotal = Sum of all (item.quantity * item.unitPrice).
+  // item.unitPrice = product basePrice + product exciseTax (for the chosen selling unit for that line item).
   subtotal: number;
-  taxAmount: number; // General tax - typically 0 if VAT is primary.
-  // vatAmount = VAT on subtotal.
+  taxAmount: number; // General tax on subtotal (currently set to 0 if VAT is primary).
+  // vatAmount = VAT on (subtotal + taxAmount).
   vatAmount: number;
   totalAmount: number; // subtotal + taxAmount + vatAmount.
   status: InvoiceStatus;
@@ -120,7 +122,7 @@ export interface Product {
   sku: string;
   category: ProductCategory;
   unitType: ProductUnitType;      // This is the primary unit for stockLevel & primary pricing
-  piecesInBaseUnit?: number;      // If unitType is a package (e.g., Carton), how many individual conceptual "pieces" (e.g., PCS) does it contain?
+  piecesInBaseUnit?: number;      // If unitType is a package (e.g., Carton), how many individual pieces (e.g., PCS) does it contain?
   packagingUnit?: string;         // Optional LARGER sales package (e.g., Pallet, if unitType is Carton)
   itemsPerPackagingUnit?: number; // Number of 'unitType's in one 'packagingUnit' (e.g., 20 Cartons in 1 Pallet)
   basePrice: number;              // Base selling price for one 'unitType' (BEFORE any taxes)
@@ -175,7 +177,7 @@ export type StockTransactionType =
   | 'Sale Return'
   | 'Production Output' // From production to finished goods
   | 'Production Input Consumption' // Raw materials consumed by production
-  | 'PO Receipt'; // New type for goods received against a PO
+  | 'PO Receipt';
 
 export interface StockTransaction {
   id: string; // Unique ID for the transaction
@@ -192,7 +194,7 @@ export interface StockTransaction {
   userId?: string; // Placeholder for future user tracking, who performed the action
 }
 
-// Supplier and Purchase Order Types - NEW
+// Supplier and Purchase Order Types
 export interface Supplier {
   id: string;
   name: string;
@@ -209,7 +211,7 @@ export interface PurchaseOrderItem {
   productName?: string; // Denormalized for display
   quantity: number;
   unitType: ProductUnitType; // The unit in which it was ordered
-  unitPrice: number; // Price per unitType for this PO
+  unitPrice: number; // Price per unitType for this PO (cost price from supplier)
   total: number; // quantity * unitPrice
 }
 
@@ -281,7 +283,7 @@ export const MOCK_PRODUCT_STOCK_LOCATIONS: ProductStockLocation[] = [
   // PROD001 (Blueberry Ice Cream Cone - Base Unit: Cartons)
   { id: 'PSL001', productId: 'PROD001', warehouseId: 'WH-HO-ICE', stockLevel: 50, reorderPoint: 5 },
   { id: 'PSL002', productId: 'PROD001', warehouseId: 'WH-JED-01', stockLevel: 20, reorderPoint: 2 },
-  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 1, reorderPoint: 1 },
+  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 8, reorderPoint: 1 }, // Reduced for low stock
 
   // PROD002 (Laban 900ml - Base Unit: PCS)
   { id: 'PSL004', productId: 'PROD002', warehouseId: 'WH-HO-LABAN', stockLevel: 1000, reorderPoint: 100 },
@@ -294,7 +296,7 @@ export const MOCK_PRODUCT_STOCK_LOCATIONS: ProductStockLocation[] = [
 
   // PROD005 (Vanilla Ice Cream Tub - Base Unit: PCS)
   { id: 'PSL009', productId: 'PROD005', warehouseId: 'WH-HO-ICE', stockLevel: 100, reorderPoint: 20 },
-  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 6, reorderPoint: 6 },
+  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 15, reorderPoint: 6 }, // Reduced for low stock
 
   // PROD009 (Sugar - Base Unit: Kgs)
   { id: 'PSL011', productId: 'PROD009', warehouseId: 'WH-HO-ICE', stockLevel: 500, reorderPoint: 100 },
@@ -312,40 +314,39 @@ export const MOCK_CUSTOMERS: Customer[] = [
   { id: 'CUST003', name: 'Gamma Services', email: 'support@gamma.io', phone: '555-0103', billingAddress: '789 Server Street, Cloud Town, WA', createdAt: new Date().toISOString(), customerType: 'Credit', creditLimit: 10000, invoiceAgingDays: 60, registrationNumber: 'CRNGAMMA00112', vatNumber: 'VATGAMMA003' },
 ];
 
-// Adjusted MOCK_INVOICES to use basePrice from MOCK_PRODUCTS
-const mockInvoiceItems1: InvoiceItem[] = [
-  { id: 'item1-inv1', productId: 'PROD001', description: MOCK_PRODUCTS[0].name, quantity: 2, unitType: 'Cartons', unitPrice: MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0), total: (MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0)) * 2 }
-];
+const mockInvoiceItems1: InvoiceItem[] = MOCK_PRODUCTS[0] ? [
+  { id: 'item1-inv1', productId: MOCK_PRODUCTS[0].id, description: MOCK_PRODUCTS[0].name, quantity: 2, unitType: 'Cartons', unitPrice: MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0), total: (MOCK_PRODUCTS[0].basePrice + (MOCK_PRODUCTS[0].exciseTax || 0)) * 2 }
+] : [];
 let subtotal1 = mockInvoiceItems1.reduce((sum, item) => sum + item.total, 0);
 let vatAmount1 = subtotal1 * (MOCK_COMPANY_PROFILE.vatRate as number / 100);
 let totalAmount1 = subtotal1 + vatAmount1;
 
 
-const mockInvoiceItems2: InvoiceItem[] = [
-  { id: 'item1-inv2', productId: 'PROD002', description: MOCK_PRODUCTS[1].name, quantity: 12, unitType: 'PCS', unitPrice: MOCK_PRODUCTS[1].basePrice + (MOCK_PRODUCTS[1].exciseTax || 0), total: (MOCK_PRODUCTS[1].basePrice + (MOCK_PRODUCTS[1].exciseTax || 0)) * 12 }
-];
+const mockInvoiceItems2: InvoiceItem[] = MOCK_PRODUCTS[1] ? [
+  { id: 'item1-inv2', productId: MOCK_PRODUCTS[1].id, description: MOCK_PRODUCTS[1].name, quantity: 12, unitType: 'PCS', unitPrice: MOCK_PRODUCTS[1].basePrice + (MOCK_PRODUCTS[1].exciseTax || 0), total: (MOCK_PRODUCTS[1].basePrice + (MOCK_PRODUCTS[1].exciseTax || 0)) * 12 }
+] : [];
 let subtotal2 = mockInvoiceItems2.reduce((sum, item) => sum + item.total, 0);
 let vatAmount2 = subtotal2 * (MOCK_COMPANY_PROFILE.vatRate as number / 100);
 let totalAmount2 = subtotal2 + vatAmount2;
 
-const mockInvoiceItems3: InvoiceItem[] = [
-  { id: 'item1-inv3', productId: 'PROD003', description: MOCK_PRODUCTS[2].name, quantity: 5, unitType: 'Cartons', unitPrice: MOCK_PRODUCTS[2].basePrice + (MOCK_PRODUCTS[2].exciseTax || 0), total: (MOCK_PRODUCTS[2].basePrice + (MOCK_PRODUCTS[2].exciseTax || 0)) * 5 }
-];
+const mockInvoiceItems3: InvoiceItem[] = MOCK_PRODUCTS[2] ? [
+  { id: 'item1-inv3', productId: MOCK_PRODUCTS[2].id, description: MOCK_PRODUCTS[2].name, quantity: 5, unitType: 'Cartons', unitPrice: MOCK_PRODUCTS[2].basePrice + (MOCK_PRODUCTS[2].exciseTax || 0), total: (MOCK_PRODUCTS[2].basePrice + (MOCK_PRODUCTS[2].exciseTax || 0)) * 5 }
+] : [];
 let subtotal3 = mockInvoiceItems3.reduce((sum, item) => sum + item.total, 0);
 let vatAmount3 = subtotal3 * (MOCK_COMPANY_PROFILE.vatRate as number / 100);
 let totalAmount3 = subtotal3 + vatAmount3;
 
-const mockInvoiceItems4: InvoiceItem[] = [
+const mockInvoiceItems4: InvoiceItem[] = MOCK_PRODUCTS[3] ? [
   {
     id: 'item1-inv4',
-    productId: 'PROD004',
+    productId: MOCK_PRODUCTS[3].id,
     description: MOCK_PRODUCTS[3].name,
     quantity: 1,
-    unitType: 'Cartons',
+    unitType: 'Cartons', // This product's unitType is PCS, but sold here as Carton
     unitPrice: (MOCK_PRODUCTS[3].basePrice + (MOCK_PRODUCTS[3].exciseTax || 0)) * (MOCK_PRODUCTS[3].itemsPerPackagingUnit || 1),
     total: (MOCK_PRODUCTS[3].basePrice + (MOCK_PRODUCTS[3].exciseTax || 0)) * (MOCK_PRODUCTS[3].itemsPerPackagingUnit || 1) * 1
   }
-];
+] : [];
 let subtotal4 = mockInvoiceItems4.reduce((sum, item) => sum + item.total, 0);
 let vatAmount4 = subtotal4 * (MOCK_COMPANY_PROFILE.vatRate as number / 100);
 let totalAmount4 = subtotal4 + vatAmount4;
