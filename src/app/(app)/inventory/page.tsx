@@ -14,10 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { StockAdjustmentForm, type StockAdjustmentFormValues } from '@/components/forms/stock-adjustment-form';
-import { StockTransferForm, type StockTransferFormValues } from '@/components/forms/stock-transfer-form'; // New import
-import type { Product, ProductStockLocation, Warehouse, ProductUnitType } from '@/types';
+import { StockTransferForm, type StockTransferFormValues } from '@/components/forms/stock-transfer-form';
+import type { Product, ProductStockLocation, Warehouse, ProductUnitType, CompanyProfile } from '@/types';
 import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
-import { getDisplayUnit } from '@/app/(app)/products/page';
+import { getDisplayUnit } from '@/app/(app)/products/page'; // Assuming getDisplayUnit is exported
 
 interface EnrichedStockLocation extends ProductStockLocation {
   productName: string;
@@ -47,10 +47,10 @@ export default function InventoryPage() {
 
   const [isProductDefineModalOpen, setIsProductDefineModalOpen] = useState(false);
   const [isStockAdjustmentModalOpen, setIsStockAdjustmentModalOpen] = useState(false);
-  const [isStockTransferModalOpen, setIsStockTransferModalOpen] = useState(false); // New state
+  const [isStockTransferModalOpen, setIsStockTransferModalOpen] = useState(false);
 
   const kpiData = useMemo(() => {
-    if (isLoading || !products || !productStockLocations) {
+    if (isLoading || !products || !productStockLocations || !companyProfile) {
       return {
         totalInventoryValue: 0,
         lowStockItemsCount: 0,
@@ -82,7 +82,7 @@ export default function InventoryPage() {
         const expiry = startOfDay(parseISO(product.expiryDate));
         return isBefore(expiry, expiryThresholdDate) && !isBefore(expiry, today);
       } catch (e) {
-        return false; 
+        return false;
       }
     }).length;
 
@@ -91,7 +91,7 @@ export default function InventoryPage() {
       lowStockItemsCount,
       nearingExpiryCount,
     };
-  }, [products, productStockLocations, isLoading, getTotalStockForProduct]);
+  }, [products, productStockLocations, isLoading, getTotalStockForProduct, companyProfile]);
 
   const enrichedStockData: EnrichedStockLocation[] = useMemo(() => {
     if (isLoading || !productStockLocations || !products || !warehouses) return [];
@@ -101,7 +101,7 @@ export default function InventoryPage() {
       const costPrice = product?.costPrice || 0;
       return {
         ...psl,
-        productId: psl.productId, // Ensure productId is present
+        productId: psl.productId,
         productName: product?.name || 'N/A',
         productSku: product?.sku || 'N/A',
         productUnitType: product?.unitType || 'N/A',
@@ -115,7 +115,7 @@ export default function InventoryPage() {
 
 
   const handleOpenStockAdjustmentModal = () => setIsStockAdjustmentModalOpen(true);
-  const handleOpenStockTransferModal = () => setIsStockTransferModalOpen(true); // New handler
+  const handleOpenStockTransferModal = () => setIsStockTransferModalOpen(true);
 
   const handleAddWarehouse = () => {
     toast({
@@ -234,19 +234,21 @@ export default function InventoryPage() {
   if (isLoading && !companyProfile) { // Simplified loading condition for initial full page skeleton
     return (
       <div className="flex flex-col h-full">
-        <PageHeader
-          title="Inventory Management"
-          description="Overview of your product stock levels, item status, and inventory value."
-           actions={
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
-              <Button className="w-full sm:w-auto" disabled><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
-              <Button className="w-full sm:w-auto" disabled><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
-              <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
-            </div>
-          }
-        />
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
+        <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
+          <PageHeader
+            title="Inventory Management"
+            description="Overview of your multi-warehouse inventory, product stock levels, and inventory value."
+            actions={
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
+                <Button className="w-full sm:w-auto" disabled><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
+                <Button className="w-full sm:w-auto" disabled><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
+                <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
+              </div>
+            }
+          />
+        </div>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6 shrink-0 px-4 md:px-6 lg:px-8 mt-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -260,42 +262,40 @@ export default function InventoryPage() {
             </Card>
           ))}
         </div>
-        <Card className="flex-grow flex flex-col shadow-lg">
-          <CardHeader>
-            <Skeleton className="h-6 w-1/3 mb-1" />
-            <Skeleton className="h-4 w-2/3" />
+        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+          <CardHeader className="border-b">
+             <Skeleton className="h-6 w-1/3 mb-1" />
+             <Skeleton className="h-4 w-2/3" />
           </CardHeader>
-          <CardContent className="flex-grow p-0">
-            <div className="h-full overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px] px-2">Prod. ID</TableHead>
-                    <TableHead className="min-w-[180px] px-2">Product Name</TableHead>
-                    <TableHead className="min-w-[100px] px-2">SKU</TableHead>
-                    <TableHead className="min-w-[150px] px-2">Warehouse</TableHead>
-                    <TableHead className="text-center min-w-[100px] px-2">Stock</TableHead>
-                    <TableHead className="text-right min-w-[120px] px-2">Stock Value</TableHead>
-                    <TableHead className="text-center min-w-[100px] px-2">Global R.P.</TableHead>
+          <div className="h-full overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="min-w-[100px] px-2">Prod. ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">Product Name</TableHead>
+                  <TableHead className="min-w-[100px] px-2">SKU</TableHead>
+                  <TableHead className="min-w-[150px] px-2">Warehouse</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Stock</TableHead>
+                  <TableHead className="text-right min-w-[120px] px-2">Stock Value</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Global R.P.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={`skel-stock-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(7)].map((_, i) => (
-                    <TableRow key={`skel-stock-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
-                      <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                      <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
     );
   }
@@ -325,7 +325,7 @@ export default function InventoryPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> : `$${kpiData.totalInventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {isLoading || !companyProfile ? <Skeleton className="h-8 w-3/4" /> : `$${kpiData.totalInventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
             <p className="text-xs text-muted-foreground">Estimated value across all warehouses.</p>
           </CardContent>
@@ -337,7 +337,7 @@ export default function InventoryPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {isLoading ? <Skeleton className="h-8 w-1/4" /> : kpiData.lowStockItemsCount}
+              {isLoading || !companyProfile ? <Skeleton className="h-8 w-1/4" /> : kpiData.lowStockItemsCount}
             </div>
             <p className="text-xs text-muted-foreground">Unique products at/below global reorder point.</p>
           </CardContent>
@@ -349,7 +349,7 @@ export default function InventoryPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-500">
-              {isLoading ? <Skeleton className="h-8 w-1/4" /> : kpiData.nearingExpiryCount}
+              {isLoading || !companyProfile ? <Skeleton className="h-8 w-1/4" /> : kpiData.nearingExpiryCount}
             </div>
             <p className="text-xs text-muted-foreground">Unique products expiring within 30 days.</p>
           </CardContent>
@@ -366,7 +366,7 @@ export default function InventoryPage() {
           </div>
         </CardHeader>
         <div className="h-full overflow-y-auto">
-          {isLoading ? (
+          {isLoading || !companyProfile ? (
              <Table>
                 <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                   <TableRow>
@@ -486,7 +486,6 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Stock Transfer Modal */}
       <Dialog open={isStockTransferModalOpen} onOpenChange={setIsStockTransferModalOpen}>
         <DialogContent className="w-[90vw] sm:max-w-lg md:max-w-xl">
           <DialogHeader>
@@ -500,7 +499,7 @@ export default function InventoryPage() {
                 warehouses={warehouses}
                 onSubmit={handleStockTransferSubmit}
                 onCancel={() => setIsStockTransferModalOpen(false)}
-                isSubmitting={isLoading} 
+                isSubmitting={isLoading}
               />
             )}
           </div>
@@ -509,3 +508,5 @@ export default function InventoryPage() {
     </div>
   );
 }
+
+    
