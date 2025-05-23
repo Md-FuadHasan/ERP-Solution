@@ -1,9 +1,11 @@
 
 'use client';
-import { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle } from 'lucide-react';
+import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle, Eye } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/DataContext';
@@ -11,23 +13,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { StockAdjustmentForm, type StockAdjustmentFormValues } from '@/components/forms/stock-adjustment-form';
 import { StockTransferForm, type StockTransferFormValues } from '@/components/forms/stock-transfer-form';
-import type { Product, ProductStockLocation, Warehouse, ProductUnitType, CompanyProfile } from '@/types';
+import type { Product, Warehouse } from '@/types';
 import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
-import { getDisplayUnit } from '@/app/(app)/products/page'; // Assuming getDisplayUnit is exported
-
-interface EnrichedStockLocation extends ProductStockLocation {
-  productName: string;
-  productSku: string;
-  productUnitType: string;
-  warehouseName: string;
-  stockValue: number;
-  globalReorderPoint?: number;
-  costPrice: number;
-}
 
 export default function InventoryPage() {
   const {
@@ -39,11 +30,10 @@ export default function InventoryPage() {
     companyProfile,
     getTotalStockForProduct,
     upsertProductStockLocation,
-    getProductById,
-    getWarehouseById,
     getStockForProductInWarehouse,
   } = useData();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isProductDefineModalOpen, setIsProductDefineModalOpen] = useState(false);
   const [isStockAdjustmentModalOpen, setIsStockAdjustmentModalOpen] = useState(false);
@@ -93,26 +83,6 @@ export default function InventoryPage() {
     };
   }, [products, productStockLocations, isLoading, getTotalStockForProduct, companyProfile]);
 
-  const enrichedStockData: EnrichedStockLocation[] = useMemo(() => {
-    if (isLoading || !productStockLocations || !products || !warehouses) return [];
-    return productStockLocations.map(psl => {
-      const product = getProductById(psl.productId);
-      const warehouse = getWarehouseById(psl.warehouseId);
-      const costPrice = product?.costPrice || 0;
-      return {
-        ...psl,
-        productId: psl.productId,
-        productName: product?.name || 'N/A',
-        productSku: product?.sku || 'N/A',
-        productUnitType: product?.unitType || 'N/A',
-        warehouseName: warehouse?.name || 'N/A',
-        stockValue: psl.stockLevel * costPrice,
-        globalReorderPoint: product?.globalReorderPoint,
-        costPrice: costPrice,
-      };
-    }).sort((a, b) => a.productName.localeCompare(b.productName) || a.warehouseName.localeCompare(b.warehouseName));
-  }, [productStockLocations, products, warehouses, isLoading, getProductById, getWarehouseById]);
-
 
   const handleOpenStockAdjustmentModal = () => setIsStockAdjustmentModalOpen(true);
   const handleOpenStockTransferModal = () => setIsStockTransferModalOpen(true);
@@ -122,7 +92,7 @@ export default function InventoryPage() {
       title: "Navigate to Settings",
       description: "Warehouse management is available on the Settings page.",
     });
-    // Consider router.push('/settings?tab=warehouses');
+    router.push('/settings?tab=warehouses');
   };
 
   const handleDefineNewProduct = () => setIsProductDefineModalOpen(true);
@@ -181,12 +151,12 @@ export default function InventoryPage() {
     }
 
     const productStockRecord: ProductStockLocation = {
-      id: `${data.productId}-${data.warehouseId}`,
+      id: `${data.productId}-${data.warehouseId}`, // Ensure a consistent ID for upsert
       productId: data.productId,
       warehouseId: data.warehouseId,
       stockLevel: newCalculatedStockLevel,
     };
-    upsertProductStockLocation(productStockRecord);
+    upsertProductStockLocation(productStockRecord); // This will create or update
     const productName = products.find(p => p.id === data.productId)?.name || 'Product';
     const warehouseName = warehouses.find(w => w.id === data.warehouseId)?.name || 'Warehouse';
     toast({
@@ -231,7 +201,7 @@ export default function InventoryPage() {
     setIsStockTransferModalOpen(false);
   };
 
-  if (isLoading && !companyProfile) { // Simplified loading condition for initial full page skeleton
+  if (isLoading && !companyProfile) {
     return (
       <div className="flex flex-col h-full">
         <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
@@ -240,10 +210,10 @@ export default function InventoryPage() {
             description="Overview of your multi-warehouse inventory, product stock levels, and inventory value."
             actions={
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
                 <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
                 <Button className="w-full sm:w-auto" disabled><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
                 <Button className="w-full sm:w-auto" disabled><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
-                <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
               </div>
             }
           />
@@ -271,25 +241,21 @@ export default function InventoryPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">Prod. ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Product Name</TableHead>
-                  <TableHead className="min-w-[100px] px-2">SKU</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Warehouse</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Stock</TableHead>
-                  <TableHead className="text-right min-w-[120px] px-2">Stock Value</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Global R.P.</TableHead>
+                  <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">Name</TableHead>
+                  <TableHead className="min-w-[150px] px-2">Location</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...Array(7)].map((_, i) => (
-                  <TableRow key={`skel-stock-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                {[...Array(5)].map((_, i) => (
+                  <TableRow key={`skel-wh-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-8 w-20 mx-auto" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -308,10 +274,10 @@ export default function InventoryPage() {
           description="Overview of your multi-warehouse inventory, product stock levels, and inventory value."
           actions={
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button onClick={handleDefineNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
               <Button onClick={handleAddWarehouse} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
               <Button onClick={handleOpenStockTransferModal} className="w-full sm:w-auto"><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
               <Button onClick={handleOpenStockAdjustmentModal} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
-              <Button onClick={handleDefineNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
             </div>
           }
         />
@@ -360,8 +326,8 @@ export default function InventoryPage() {
         <CardHeader className="border-b">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-lg">Detailed Inventory Stock</CardTitle>
-              <CardDescription>Stock levels per product and warehouse.</CardDescription>
+              <CardTitle className="text-lg">Warehouses</CardTitle>
+              <CardDescription>List of all registered warehouses. Click to view stock details.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -370,76 +336,73 @@ export default function InventoryPage() {
              <Table>
                 <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                   <TableRow>
-                    <TableHead className="min-w-[100px] px-2">Prod. ID</TableHead>
-                    <TableHead className="min-w-[180px] px-2">Product Name</TableHead>
-                    <TableHead className="min-w-[100px] px-2">SKU</TableHead>
-                    <TableHead className="min-w-[150px] px-2">Warehouse</TableHead>
-                    <TableHead className="text-center min-w-[100px] px-2">Stock</TableHead>
-                    <TableHead className="text-right min-w-[120px] px-2">Stock Value</TableHead>
-                    <TableHead className="text-center min-w-[100px] px-2">Global R.P.</TableHead>
+                    <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
+                    <TableHead className="min-w-[180px] px-2">Name</TableHead>
+                    <TableHead className="min-w-[150px] px-2">Location</TableHead>
+                    <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                    <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...Array(7)].map((_, i) => (
-                    <TableRow key={`skel-stock-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={`skel-wh-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
                       <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                       <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                       <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                       <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
-                      <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                      <TableCell className="text-center px-2"><Skeleton className="h-5 w-3/4 mx-auto" /></TableCell>
+                      <TableCell className="text-center px-2"><Skeleton className="h-8 w-20 mx-auto" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-          ) : enrichedStockData.length > 0 ? (
+          ) : warehouses.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">Prod. ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">Product Name</TableHead>
-                  <TableHead className="min-w-[100px] px-2">SKU</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Warehouse</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Stock</TableHead>
-                  <TableHead className="text-right min-w-[120px] px-2">Stock Value</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Global R.P.</TableHead>
+                  <TableHead className="min-w-[100px] px-2">Warehouse ID</TableHead>
+                  <TableHead className="min-w-[180px] px-2">Name</TableHead>
+                  <TableHead className="min-w-[150px] px-2">Location</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Type</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {enrichedStockData.map((item, index) => {
-                  const product = getProductById(item.productId);
-                  const displayUnit = product ? getDisplayUnit(product, 'base') : item.productUnitType;
-                  return (
-                    <TableRow key={`${item.productId}-${item.warehouseId}`} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium px-2">{item.productId}</TableCell>
-                      <TableCell className="px-2">{item.productName}</TableCell>
-                      <TableCell className="px-2">{item.productSku}</TableCell>
-                      <TableCell className="px-2">{item.warehouseName}</TableCell>
-                      <TableCell className={cn(
-                          "text-center font-medium px-2",
-                          product?.globalReorderPoint !== undefined && item.stockLevel <= product.globalReorderPoint ? "text-destructive" : ""
-                        )}>
-                        {item.stockLevel} {displayUnit}
-                      </TableCell>
-                      <TableCell className="text-right px-2">${item.stockValue.toFixed(2)}</TableCell>
+                {warehouses.map((warehouse, index) => (
+                    <TableRow 
+                        key={warehouse.id} 
+                        className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10 cursor-pointer")}
+                        onClick={() => router.push(`/inventory/${warehouse.id}`)}
+                    >
+                      <TableCell className="font-medium px-2">{warehouse.id}</TableCell>
+                      <TableCell className="px-2">{warehouse.name}</TableCell>
+                      <TableCell className="px-2">{warehouse.location}</TableCell>
+                      <TableCell className="px-2">{warehouse.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
                       <TableCell className="text-center px-2">
-                        {item.globalReorderPoint !== undefined ? `${item.globalReorderPoint} ${displayUnit}` : '-'}
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                router.push(`/inventory/${warehouse.id}`);
+                            }}
+                            className="hover:text-primary"
+                        >
+                            <Eye className="mr-1 h-4 w-4" /> View Stock
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
+                  ))}
               </TableBody>
             </Table>
           ) : (
             <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
-                icon={Archive}
-                title="No Stock Records Found"
-                message="Adjust stock levels for products in your warehouses to see them here."
+                icon={WarehouseIcon}
+                title="No Warehouses Found"
+                message="Define warehouses in Settings to start managing inventory locations."
                 action={
-                    <Button onClick={handleOpenStockAdjustmentModal} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                        <Edit className="mr-2 h-4 w-4" /> Adjust Stock
+                    <Button onClick={handleAddWarehouse} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Go to Settings to Add Warehouse
                     </Button>
                 }
               />
@@ -508,5 +471,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    
