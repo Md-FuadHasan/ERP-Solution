@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -126,17 +127,14 @@ export default function PurchaseOrdersPage() {
 
 
   const handleSubmitPO = (data: PurchaseOrderFormValues) => {
-    // Calculate totals for each item
     const itemsWithTotals = data.items.map(item => ({
       ...item,
       total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-      // Ensure quantityReceived is preserved or initialized for new items
       quantityReceived: item.id ? (editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0) : 0,
     }));
 
-    // Calculate overall PO totals
     const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = 0; // Assuming no tax on PO for now, can be a percentage of subtotal
+    const taxAmount = 0; 
     const totalAmount = subtotal + taxAmount;
     const supplier = getSupplierById(data.supplierId);
 
@@ -154,15 +152,14 @@ export default function PurchaseOrdersPage() {
 
     if (editingPO) {
       updatePurchaseOrder({
-        ...editingPO, // Spread existing PO to keep id, createdAt, status etc.
-        ...poDataForContext, // Spread new/updated values
+        ...editingPO,
+        ...poDataForContext,
       });
       toast({
         title: "Purchase Order Updated",
         description: `Purchase Order ${editingPO.id} has been successfully updated.`,
       });
     } else {
-      // addPurchaseOrder in DataContext will handle generating id, createdAt, default status, etc.
       addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status'>);
       toast({
         title: "Purchase Order Created",
@@ -176,11 +173,16 @@ export default function PurchaseOrdersPage() {
   const poForViewModal = useMemo(() => {
     if (!poToView) return null;
     const supplier = getSupplierById(poToView.supplierId);
-    const itemsWithNames = poToView.items.map(item => {
+    const itemsWithProductDetails = poToView.items.map(item => {
       const product = getProductById(item.productId);
-      return { ...item, productName: product?.name || item.productId };
+      return { 
+        ...item, 
+        productName: product?.name || item.productId,
+        // Ensure quantityReceived is a number for display
+        quantityReceived: typeof item.quantityReceived === 'number' ? item.quantityReceived : 0,
+      };
     });
-    return { ...poToView, supplierName: supplier?.name, items: itemsWithNames };
+    return { ...poToView, supplierName: supplier?.name, items: itemsWithProductDetails };
   }, [poToView, getSupplierById, getProductById]);
 
   const handleOpenReceiveStockModal = (po: PurchaseOrder) => {
@@ -398,8 +400,8 @@ export default function PurchaseOrdersPage() {
                     variant="destructive" 
                     onClick={() => {
                         if(poToView) {
-                            setIsViewModalOpen(false); // Close view modal first
-                            handleCancelPOConfirm(poToView); // Then open cancel confirm modal
+                            setIsViewModalOpen(false); 
+                            setTimeout(() => handleCancelPOConfirm(poToView), 100); // Ensure modal closes before alert opens
                         }
                     }} 
                     className="w-full sm:w-auto"
@@ -407,7 +409,16 @@ export default function PurchaseOrdersPage() {
                   <XCircle className="mr-2 h-4 w-4" /> Cancel PO
                 </Button>
             )}
-            <Button variant="outline" onClick={() => { if (poToView) { setIsViewModalOpen(false); handleEditPO(poToView); } }} className="w-full sm:w-auto" disabled={poToView?.status !== 'Draft'}>
+             {(poForViewModal?.status === 'Sent' || poForViewModal?.status === 'Partially Received') && (
+                <Button 
+                    variant="default" 
+                    onClick={() => { if(poToView) { setIsViewModalOpen(false); setTimeout(() => handleOpenReceiveStockModal(poToView), 100); }}} 
+                    className="w-full sm:w-auto"
+                >
+                  <Truck className="mr-2 h-4 w-4" /> Receive Stock
+                </Button>
+            )}
+            <Button variant="outline" onClick={() => { if (poToView) { setIsViewModalOpen(false); setTimeout(() => handleEditPO(poToView), 100); } }} className="w-full sm:w-auto" disabled={poToView?.status !== 'Draft'}>
               <Edit className="mr-2 h-4 w-4" /> Edit PO
             </Button>
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto">Close</Button>
@@ -471,3 +482,5 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
+
+    
