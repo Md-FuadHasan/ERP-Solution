@@ -24,15 +24,16 @@ import { CalendarIcon, PlusCircle, Trash2, DollarSign, ChevronsUpDown, Check } f
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, Product, ProductUnitType } from '@/types';
-import { PRODUCT_UNIT_TYPES } from '@/types'; // Assuming you have this array of unit types
+import { PRODUCT_UNIT_TYPES } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const purchaseOrderItemSchema = z.object({
-  id: z.string().optional(), // For existing items during edit
+  id: z.string().optional(),
   productId: z.string().min(1, "Product is required."),
+  productName: z.string().optional(), // For display in form if product not found by id
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
   unitType: z.enum(PRODUCT_UNIT_TYPES, { required_error: "Unit type is required." }),
-  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."), // Cost price from supplier
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
 });
 
 const purchaseOrderFormSchema = z.object({
@@ -48,7 +49,7 @@ export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
 interface PurchaseOrderFormProps {
   initialData?: PurchaseOrder | null;
   suppliers: Supplier[];
-  products: Product[]; // To select products for line items
+  products: Product[];
   onSubmit: (data: PurchaseOrderFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -74,7 +75,9 @@ export function PurchaseOrderForm({
           items: initialData.items.map(item => ({
             ...item,
             id: item.id || `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            productName: products.find(p => p.id === item.productId)?.name || item.productName || item.productId,
           })),
+          notes: initialData.notes || '',
         }
       : {
           supplierId: '',
@@ -83,6 +86,7 @@ export function PurchaseOrderForm({
           items: [{
             id: `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             productId: '',
+            productName: '',
             quantity: 1,
             unitType: PRODUCT_UNIT_TYPES[0],
             unitPrice: 0,
@@ -98,6 +102,17 @@ export function PurchaseOrderForm({
 
   const watchedItems = form.watch("items");
 
+  // Direct calculation for subtotal and total to ensure reactivity
+  const subtotal = watchedItems.reduce((acc, item) => {
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    return acc + (quantity * unitPrice);
+  }, 0);
+
+  const taxAmount = subtotal * 0; // Placeholder for supplier VAT or other taxes
+  const totalAmount = subtotal + taxAmount;
+
+
   const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
   const [currentSupplierSearchInput, setCurrentSupplierSearchInput] = React.useState(
     initialData?.supplierId ? suppliers.find(s => s.id === initialData.supplierId)?.name || '' : ''
@@ -112,7 +127,6 @@ export function PurchaseOrderForm({
       const supplierName = suppliers.find(s => s.id === initialData.supplierId)?.name;
       setCurrentSupplierSearchInput(supplierName || '');
     }
-    // Populate initial product search inputs if editing
     initialData?.items.forEach((item, index) => {
         const productName = products.find(p => p.id === item.productId)?.name;
         if (productName) {
@@ -142,35 +156,23 @@ export function PurchaseOrderForm({
     update(index, {
       ...currentItem,
       productId: product.id,
-      unitType: product.unitType, // Default to product's base unit
-      unitPrice: product.costPrice || 0, // Default to product's cost price
+      productName: product.name,
+      unitType: product.unitType,
+      unitPrice: product.costPrice || 0,
     });
     setCurrentProductSearchInput(prev => ({ ...prev, [index]: product.name }));
     setIsProductPopoverOpen(prev => ({ ...prev, [index]: false }));
   };
-
-
-  const subtotal = React.useMemo(() => {
-    return watchedItems.reduce((acc, item) => {
-      const quantity = item.quantity || 0;
-      const unitPrice = item.unitPrice || 0;
-      return acc + quantity * unitPrice;
-    }, 0);
-  }, [watchedItems]);
-
-  // Assuming tax on PO is simple for now, can be expanded
-  const taxAmount = subtotal * 0; // Placeholder for supplier VAT or other taxes
-  const totalAmount = subtotal + taxAmount;
 
   const handleSubmitPo = (values: PurchaseOrderFormValues) => {
     const dataToSubmit = {
         ...values,
         items: values.items.map(item => ({
             ...item,
-            total: (item.quantity || 0) * (item.unitPrice || 0)
+            total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
         }))
     };
-    onSubmit(dataToSubmit as any); // Type assertion needed if onSubmit expects full PO with totals
+    onSubmit(dataToSubmit as any);
   };
 
 
@@ -303,8 +305,8 @@ export function PurchaseOrderForm({
                       >
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
-                              {field.value ? products.find(p => p.id === field.value)?.name : "Select product"}
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between text-sm", !field.value && "text-muted-foreground")}>
+                              {field.value ? (products.find(p => p.id === field.value)?.name || form.getValues(`items.${index}.productName`)) : "Select product"}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
@@ -361,7 +363,7 @@ export function PurchaseOrderForm({
                 )}
               />
               <div className="text-right md:text-left w-full md:w-24 pt-1 md:pt-0 md:pl-2">
-                <span className="font-medium text-sm">${((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0)).toFixed(2)}</span>
+                <span className="font-medium text-sm">${((Number(watchedItems[index]?.quantity) || 0) * (Number(watchedItems[index]?.unitPrice) || 0)).toFixed(2)}</span>
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:bg-destructive/10 self-center md:self-auto">
                 <Trash2 className="h-4 w-4" />
@@ -374,6 +376,7 @@ export function PurchaseOrderForm({
             onClick={() => append({
                 id: `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
                 productId: '',
+                productName: '',
                 quantity: 1,
                 unitType: PRODUCT_UNIT_TYPES[0],
                 unitPrice: 0
@@ -414,6 +417,3 @@ export function PurchaseOrderForm({
       </form>
     </Form>
   );
-}
-
-    

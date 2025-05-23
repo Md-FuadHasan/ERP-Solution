@@ -1,10 +1,9 @@
-
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck } from 'lucide-react';
+import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -19,7 +18,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -43,8 +42,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
-
-// Helper function for PO status badge variants
 const getPOStatusBadgeVariant = (status: POStatus) => {
   switch (status) {
     case 'Draft': return 'poDraft';
@@ -66,9 +63,10 @@ export default function PurchaseOrdersPage() {
     addPurchaseOrder,
     updatePurchaseOrder,
     deletePurchaseOrder,
+    cancelPurchaseOrder,
     getSupplierById,
     getProductById,
-    processPOReceipt, 
+    processPOReceipt,
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -78,6 +76,8 @@ export default function PurchaseOrdersPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [poToView, setPoToView] = useState<PurchaseOrder | null>(null);
   const [poToDelete, setPoToDelete] = useState<PurchaseOrder | null>(null);
+  const [poToCancel, setPoToCancel] = useState<PurchaseOrder | null>(null);
+  const [isCancelConfirmModalOpen, setIsCancelConfirmModalOpen] = useState(false);
 
   const [isReceiveStockModalOpen, setIsReceiveStockModalOpen] = useState(false);
   const [poToReceiveStock, setPoToReceiveStock] = useState<PurchaseOrder | null>(null);
@@ -110,31 +110,60 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const handleCancelPOConfirm = (po: PurchaseOrder) => {
+    setPoToCancel(po);
+    setIsCancelConfirmModalOpen(true);
+  };
+
+  const confirmCancelPO = () => {
+    if (poToCancel) {
+      cancelPurchaseOrder(poToCancel.id);
+      toast({ title: "Purchase Order Cancelled", description: `PO ${poToCancel.id} has been cancelled.` });
+      setPoToCancel(null);
+    }
+    setIsCancelConfirmModalOpen(false);
+  };
+
+
   const handleSubmitPO = (data: PurchaseOrderFormValues) => {
+    // Calculate totals for each item
+    const itemsWithTotals = data.items.map(item => ({
+      ...item,
+      total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+      // Ensure quantityReceived is preserved or initialized for new items
+      quantityReceived: item.id ? (editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0) : 0,
+    }));
+
+    // Calculate overall PO totals
+    const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
+    const taxAmount = 0; // Assuming no tax on PO for now, can be a percentage of subtotal
+    const totalAmount = subtotal + taxAmount;
+    const supplier = getSupplierById(data.supplierId);
+
     const poDataForContext = {
       supplierId: data.supplierId,
+      supplierName: supplier?.name || data.supplierId,
       orderDate: data.orderDate.toISOString(),
       expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
-      items: data.items.map(item => ({
-        id: item.id || `poi-${Date.now()}-${Math.random().toString(36).substring(2,5)}`,
-        productId: item.productId,
-        quantity: item.quantity,
-        unitType: item.unitType,
-        unitPrice: item.unitPrice,
-        total: (item.quantity || 0) * (item.unitPrice || 0),
-        quantityReceived: item.id ? (editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0) : 0,
-      })),
+      items: itemsWithTotals,
+      subtotal,
+      taxAmount,
+      totalAmount,
       notes: data.notes,
     };
 
     if (editingPO) {
-      updatePurchaseOrder({ ...editingPO, ...poDataForContext, status: editingPO.status });
+      updatePurchaseOrder({
+        ...editingPO, // Spread existing PO to keep id, createdAt, status etc.
+        ...poDataForContext, // Spread new/updated values
+      });
       toast({
         title: "Purchase Order Updated",
         description: `Purchase Order ${editingPO.id} has been successfully updated.`,
       });
     } else {
-      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'subtotal' | 'taxAmount' | 'totalAmount'>);
+      // addPurchaseOrder in DataContext will handle generating id, createdAt, default status, etc.
+      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status'>);
       toast({
         title: "Purchase Order Created",
         description: "The new purchase order has been successfully added.",
@@ -161,13 +190,13 @@ export default function PurchaseOrdersPage() {
 
   const handleReceiveStockSubmit = (data: ReceiveStockFormValues) => {
     const itemsToProcess = data.receivedItems
-      .filter(item => (item.quantityReceivedNow || 0) > 0 && item.destinationWarehouseId)
+      .filter(item => (Number(item.quantityReceivedNow) || 0) > 0 && item.destinationWarehouseId)
       .map(item => ({
         poItemId: item.poItemId,
         productId: item.productId,
-        quantityNewlyReceived: item.quantityReceivedNow!,
+        quantityNewlyReceived: Number(item.quantityReceivedNow)!,
         warehouseId: item.destinationWarehouseId!,
-        itemUnitType: item.itemUnitType, // Make sure this is passed from the form
+        itemUnitType: item.itemUnitType,
       }));
 
     if (itemsToProcess.length > 0) {
@@ -195,7 +224,7 @@ export default function PurchaseOrdersPage() {
         />
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
         <CardHeader className="border-b">
           <CardTitle>Purchase Order List</CardTitle>
           <CardDescription>
@@ -213,7 +242,7 @@ export default function PurchaseOrdersPage() {
                   <TableHead className="min-w-[100px] px-2">Exp. Delivery</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2">Total</TableHead>
                   <TableHead className="min-w-[110px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -234,7 +263,7 @@ export default function PurchaseOrdersPage() {
                   <TableHead className="min-w-[100px] px-2">Exp. Delivery</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2">Total</TableHead>
                   <TableHead className="min-w-[110px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2">Actions</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -255,6 +284,9 @@ export default function PurchaseOrdersPage() {
                         )}
                         <Button variant="ghost" size="icon" onClick={() => handleViewPO(po)} className="hover:text-primary" title="View PO"><Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditPO(po)} className="hover:text-primary" title="Edit PO" disabled={po.status !== 'Draft'}><Edit className="h-4 w-4" /></Button>
+                        {(po.status === 'Draft' || po.status === 'Sent') && (
+                           <Button variant="ghost" size="icon" onClick={() => handleCancelPOConfirm(po)} className="hover:text-destructive" title="Cancel PO"><XCircle className="h-4 w-4" /></Button>
+                        )}
                         <Button variant="ghost" size="icon" onClick={() => handleDeletePOConfirm(po)} className="hover:text-destructive" title="Delete PO"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
@@ -284,7 +316,7 @@ export default function PurchaseOrdersPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && ( 
+            {isFormModalOpen && (
               <PurchaseOrderForm
                 initialData={editingPO}
                 suppliers={suppliers}
@@ -361,6 +393,20 @@ export default function PurchaseOrdersPage() {
             </div>
           )}
           <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row">
+            {(poForViewModal?.status === 'Draft' || poForViewModal?.status === 'Sent') && (
+                <Button 
+                    variant="destructive" 
+                    onClick={() => {
+                        if(poToView) {
+                            setIsViewModalOpen(false); // Close view modal first
+                            handleCancelPOConfirm(poToView); // Then open cancel confirm modal
+                        }
+                    }} 
+                    className="w-full sm:w-auto"
+                >
+                  <XCircle className="mr-2 h-4 w-4" /> Cancel PO
+                </Button>
+            )}
             <Button variant="outline" onClick={() => { if (poToView) { setIsViewModalOpen(false); handleEditPO(poToView); } }} className="w-full sm:w-auto" disabled={poToView?.status !== 'Draft'}>
               <Edit className="mr-2 h-4 w-4" /> Edit PO
             </Button>
@@ -406,6 +452,22 @@ export default function PurchaseOrdersPage() {
           </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={setIsCancelConfirmModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Confirm Cancellation</AlertDialogTitleComponent>
+            <AlertDialogDesc>
+              Are you sure you want to cancel Purchase Order "{poToCancel?.id}"? This action cannot be undone.
+            </AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
+            <AlertDialogCancel onClick={() => { setIsCancelConfirmModalOpen(false); setPoToCancel(null);}}>Keep PO</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelPO} className="bg-destructive hover:bg-destructive/90">Cancel PO</AlertDialogAction>
+          </AlertDialogFooterComponent>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
