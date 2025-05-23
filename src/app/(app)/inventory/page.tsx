@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle, Eye } from 'lucide-react';
+import { Coins, AlertTriangle, CalendarClock, Archive, Edit, ListFilter, PlusCircle, Warehouse as WarehouseIcon, Shuffle, Eye, BookOpen } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/DataContext';
@@ -17,9 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { StockAdjustmentForm, type StockAdjustmentFormValues } from '@/components/forms/stock-adjustment-form';
 import { StockTransferForm, type StockTransferFormValues } from '@/components/forms/stock-transfer-form';
-import type { Product, Warehouse, ProductStockLocation, StockAdjustmentReason, StockTransactionType } from '@/types';
-import { addDays, isBefore, parseISO, startOfDay } from 'date-fns';
-import { getDisplayUnit } from '@/app/(app)/products/page'; // Assuming getDisplayUnit is exported
+import type { Product, Warehouse, ProductStockLocation, StockAdjustmentReason, StockTransactionType, StockTransaction } from '@/types';
+import { addDays, isBefore, parseISO, startOfDay, format } from 'date-fns';
+import { getDisplayUnit } from '@/app/(app)/products/page';
 
 
 interface EnrichedStockData extends ProductStockLocation {
@@ -38,6 +38,7 @@ export default function InventoryPage() {
     products,
     warehouses,
     productStockLocations,
+    stockTransactions,
     isLoading,
     addProduct,
     companyProfile,
@@ -99,36 +100,6 @@ export default function InventoryPage() {
   }, [products, productStockLocations, isLoading, getTotalStockForProduct, companyProfile]);
 
 
-  const enrichedStockData: EnrichedStockData[] = useMemo(() => {
-        if (isLoading || !productStockLocations || !products || !warehouses) return [];
-        return productStockLocations
-            .map(psl => {
-                const product = getProductById(psl.productId);
-                const warehouse = getWarehouseById(psl.warehouseId);
-                if (!product || !warehouse) return null;
-
-                return {
-                    ...psl,
-                    productName: product.name,
-                    productSku: product.sku,
-                    productUnitType: product.unitType,
-                    warehouseName: warehouse.name,
-                    costPrice: product.costPrice || 0,
-                    stockValue: psl.stockLevel * (product.costPrice || 0),
-                    globalReorderPoint: product.globalReorderPoint,
-                };
-            })
-            .filter(item => item !== null)
-            .sort((a, b) => {
-                if (a!.productName < b!.productName) return -1;
-                if (a!.productName > b!.productName) return 1;
-                if (a!.warehouseName < b!.warehouseName) return -1;
-                if (a!.warehouseName > b!.warehouseName) return 1;
-                return 0;
-            }) as EnrichedStockData[];
-    }, [isLoading, productStockLocations, products, warehouses, getProductById, getWarehouseById]);
-
-
   const handleOpenStockAdjustmentModal = () => setIsStockAdjustmentModalOpen(true);
   const handleOpenStockTransferModal = () => setIsStockTransferModalOpen(true);
 
@@ -187,31 +158,22 @@ export default function InventoryPage() {
 
   const handleStockAdjustmentSubmit = (data: StockAdjustmentFormValues) => {
     const currentStock = getStockForProductInWarehouse(data.productId, data.warehouseId);
-    let quantityChange = data.adjustmentQuantity;
-    let transactionType: StockTransactionType = data.adjustmentReason as StockTransactionType; // Default to reason
-
-    // Determine if it's an increase or decrease based on reason
-    const increaseReasons: StockAdjustmentReason[] = ["Initial Stock Entry", "Stock Take Gain", "Goods Received (Manual)", "Other Increase"];
-    const decreaseReasons: StockAdjustmentReason[] = ["Stock Take Loss", "Damaged Goods", "Expired Goods", "Internal Consumption", "Promotion/Sample", "Other Decrease"];
-
     let newCalculatedStockLevel: number;
+    let quantityChange = data.adjustmentQuantity;
 
-    if (increaseReasons.includes(data.adjustmentReason)) {
+    if (data.adjustmentReason === "Initial Stock Entry" || data.adjustmentReason === "Stock Take Gain" || data.adjustmentReason === "Goods Received (Manual)" || data.adjustmentReason === "Other Increase") {
       newCalculatedStockLevel = currentStock + data.adjustmentQuantity;
-      transactionType = 'Adjustment - Increase';
-    } else if (decreaseReasons.includes(data.adjustmentReason)) {
+    } else if (data.adjustmentReason === "Stock Take Loss" || data.adjustmentReason === "Damaged Goods" || data.adjustmentReason === "Expired Goods" || data.adjustmentReason === "Internal Consumption" || data.adjustmentReason === "Promotion/Sample" || data.adjustmentReason === "Other Decrease") {
       newCalculatedStockLevel = Math.max(0, currentStock - data.adjustmentQuantity);
-      quantityChange = -(currentStock - newCalculatedStockLevel); // Actual change might be less if current stock is low
-      transactionType = 'Adjustment - Decrease';
+      quantityChange = -(currentStock - newCalculatedStockLevel);
     } else {
-      // Should not happen if form is validated
       toast({ title: "Error", description: "Invalid adjustment reason.", variant: "destructive" });
       return;
     }
     
     upsertProductStockLocation(
         { productId: data.productId, warehouseId: data.warehouseId, stockLevel: newCalculatedStockLevel },
-        data.adjustmentReason, // This is the specific reason from the form
+        data.adjustmentReason,
         data.reference || undefined
     );
 
@@ -229,13 +191,13 @@ export default function InventoryPage() {
     const { productId, sourceWarehouseId, destinationWarehouseId, transferQuantity } = data;
 
     const currentSourceStock = getStockForProductInWarehouse(productId, sourceWarehouseId);
-    const currentDestStock = getStockForProductInWarehouse(productId, destinationWarehouseId);
 
     if (transferQuantity > currentSourceStock) {
         toast({ title: "Transfer Error", description: "Transfer quantity exceeds available stock in source warehouse.", variant: "destructive" });
         return;
     }
 
+    const currentDestStock = getStockForProductInWarehouse(productId, destinationWarehouseId);
     const newSourceStock = currentSourceStock - transferQuantity;
     const newDestStock = currentDestStock + transferQuantity;
 
@@ -243,12 +205,12 @@ export default function InventoryPage() {
       productId,
       warehouseId: sourceWarehouseId,
       stockLevel: newSourceStock,
-    }, 'Transfer Out', `To WH: ${destinationWarehouseId}`);
+    }, 'Transfer Out', `To WH: ${destinationWarehouseId} / Ref: ${data.reference || ''}`);
     upsertProductStockLocation({
       productId,
       warehouseId: destinationWarehouseId,
       stockLevel: newDestStock,
-    }, 'Transfer In', `From WH: ${sourceWarehouseId}`);
+    }, 'Transfer In', `From WH: ${sourceWarehouseId} / Ref: ${data.reference || ''}`);
     
     const productName = products.find(p => p.id === productId)?.name || 'Product';
     const sourceWhName = warehouses.find(w => w.id === sourceWarehouseId)?.name || 'Source';
@@ -379,7 +341,8 @@ export default function InventoryPage() {
         </Card>
       </div>
 
-       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+      {/* Warehouses Overview Table */}
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
         <CardHeader className="border-b">
           <CardTitle>Warehouses Overview</CardTitle>
           <CardDescription>List of all warehouses. Click to view detailed stock.</CardDescription>
@@ -421,8 +384,8 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {warehouses.map((warehouse, index) => (
-                    <TableRow 
-                        key={warehouse.id} 
+                    <TableRow
+                        key={warehouse.id}
                         className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10 cursor-pointer")}
                         onClick={() => router.push(`/inventory/${warehouse.id}`)}
                     >
@@ -431,9 +394,9 @@ export default function InventoryPage() {
                       <TableCell className="px-2">{warehouse.location}</TableCell>
                       <TableCell className="px-2">{warehouse.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
                       <TableCell className="text-center px-2">
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={(e) => {
                                 e.stopPropagation(); // Prevent row click
                                 router.push(`/inventory/${warehouse.id}`);
@@ -464,6 +427,90 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      {/* Stock Transaction Log Table */}
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+        <CardHeader className="border-b">
+          <CardTitle>Stock Transaction Log</CardTitle>
+          <CardDescription>Chronological record of all inventory movements.</CardDescription>
+        </CardHeader>
+        <div className="h-full overflow-y-auto">
+          {isLoading ? (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="px-2 min-w-[150px]">Date</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Product</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Warehouse</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Type</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">Qty Change</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">New Qty</TableHead>
+                  <TableHead className="px-2 min-w-[200px]">Reason/Reference</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={`skel-txn-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : stockTransactions.length > 0 ? (
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
+                <TableRow>
+                  <TableHead className="px-2 min-w-[150px]">Date</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Product</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Warehouse</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Type</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">Qty Change</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">New Qty</TableHead>
+                  <TableHead className="px-2 min-w-[200px]">Reason/Reference</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockTransactions.map((txn, index) => {
+                  const product = getProductById(txn.productId);
+                  const qtyChangeUnit = product ? getDisplayUnit(product, 'base') : 'units';
+                  const newQtyUnit = product ? getDisplayUnit(product, 'base') : 'units';
+                  return (
+                    <TableRow key={txn.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                      <TableCell className="px-2">{format(new Date(txn.date), "MMM dd, yyyy 'at' hh:mm a")}</TableCell>
+                      <TableCell className="px-2">{txn.productName || product?.name || txn.productId}</TableCell>
+                      <TableCell className="px-2">{txn.warehouseName || getWarehouseById(txn.warehouseId)?.name || txn.warehouseId}</TableCell>
+                      <TableCell className="px-2">{txn.type}</TableCell>
+                      <TableCell className={cn(
+                        "px-2 text-right font-semibold",
+                        txn.quantityChange > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                      )}>
+                        {txn.quantityChange > 0 ? '+' : ''}{txn.quantityChange} {qtyChangeUnit}
+                      </TableCell>
+                      <TableCell className="px-2 text-right">{txn.newStockLevelAfterTransaction} {newQtyUnit}</TableCell>
+                      <TableCell className="px-2">{txn.reason || txn.reference || '-'}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="h-full flex items-center justify-center p-6">
+              <DataPlaceholder
+                icon={BookOpen}
+                title="No Stock Transactions Yet"
+                message="Stock movements like adjustments, sales, and transfers will appear here."
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+
       <Dialog open={isProductDefineModalOpen} onOpenChange={setIsProductDefineModalOpen}>
         <DialogContent className="w-[90vw] sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -487,7 +534,7 @@ export default function InventoryPage() {
         <DialogContent className="w-[90vw] sm:max-w-lg md:max-w-xl">
           <DialogHeader>
             <DialogTitle>Adjust Stock Level</DialogTitle>
-            <DialogDescription>Select product, warehouse, adjustment type, and quantity.</DialogDescription>
+            <DialogDescription>Select product, warehouse, adjustment reason, quantity, and reference.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {isStockAdjustmentModalOpen && (
@@ -525,5 +572,4 @@ export default function InventoryPage() {
     </div>
   );
 }
-
     
