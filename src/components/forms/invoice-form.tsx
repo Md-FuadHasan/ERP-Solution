@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, ChevronsUpDown, Check } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea'; // Not used in current form, but kept for potential future use
+import { CalendarIcon, PlusCircle, Trash2, DollarSign, History, ChevronsUpDown, Check, PackageSearch, Warehouse as WarehouseIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod, Product } from '@/types';
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, PaymentProcessingStatus, PaymentRecord, CompanyProfile, PaymentMethod, Product, Warehouse } from '@/types';
 import { ALL_INVOICE_STATUSES, ALL_PAYMENT_PROCESSING_STATUSES, ALL_PAYMENT_METHODS } from '@/types';
 import type React from 'react';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -24,11 +24,12 @@ import { useData } from '@/context/DataContext';
 
 const invoiceItemSchema = z.object({
   id: z.string().optional(),
-  productId: z.string().optional(), 
+  productId: z.string().min(1, "Product is required."),
   description: z.string().min(1, "Description is required.").max(200),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive."),
-  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."), // Price = (Base Price + Excise Tax) for the chosen unit type (PCS or Carton)
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
   unitType: z.enum(['Cartons', 'PCS']).default('PCS'),
+  sourceWarehouseId: z.string().optional(), // Added for warehouse selection
 });
 
 export const invoiceFormSchema = z.object({
@@ -46,6 +47,15 @@ export const invoiceFormSchema = z.object({
   bankAccountNumber: z.string().max(50).optional().nullable(),
   onlineTransactionNumber: z.string().max(100).optional().nullable(),
 }).superRefine((data, ctx) => {
+  data.items.forEach((item, index) => {
+    if (item.productId && !item.sourceWarehouseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Source warehouse is required for each item.",
+        path: [`items.${index}.sourceWarehouseId`],
+      });
+    }
+  });
   if (data.paymentProcessingStatus === 'Partially Paid' && (data.partialAmountPaid === undefined || data.partialAmountPaid === null || data.partialAmountPaid <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -54,7 +64,7 @@ export const invoiceFormSchema = z.object({
     });
   }
   if ((data.paymentProcessingStatus === 'Partially Paid' || data.paymentProcessingStatus === 'Fully Paid') && !data.paymentMethod) {
-    ctx.addIssue({
+     ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Payment method is required when processing a payment.",
         path: ["paymentMethod"],
@@ -115,8 +125,9 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
         ...item,
         id: item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         unitType: item.unitType || 'PCS',
-        productId: item.productId || undefined, 
+        productId: item.productId || '',
         unitPrice: item.unitPrice, // unitPrice already includes (base + excise)
+        sourceWarehouseId: item.sourceWarehouseId || undefined,
       })),
       status: invoice.status,
       paymentProcessingStatus: 'Unpaid',
@@ -136,11 +147,12 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
     dueDate: defaultDueDate,
     items: [{
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      productId: '',
       description: '',
       quantity: 1,
-      unitPrice: 0, // This will be (base price + excise tax) for chosen unitType
+      unitPrice: 0,
       unitType: 'PCS',
-      productId: undefined
+      sourceWarehouseId: undefined,
     }],
     status: 'Pending',
     paymentProcessingStatus: 'Unpaid',
@@ -155,7 +167,7 @@ const getDefaultFormValues = (invoice?: Invoice | null, prefillCustomerId?: stri
 
 
 export function InvoiceForm({ initialData, customers, companyProfile, invoices, prefillData, onSubmit, onCancel, isSubmitting: parentIsSubmitting }: InvoiceFormProps) {
-  const { products } = useData(); 
+  const { products, warehouses, getStockForProductInWarehouse } = useData();
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: getDefaultFormValues(initialData, prefillData?.customerId, customers),
@@ -249,45 +261,50 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     }
   }, [watchedPaymentMethod, form]);
 
+
   const calculateUnitPriceForInvoiceItem = (product: Product, lineItemUnitType: 'PCS' | 'Cartons'): number => {
     const basePrice = product.basePrice;
     const exciseTax = product.exciseTax || 0;
 
     if (lineItemUnitType === 'PCS') {
-        const piecesInBase = product.piecesInBaseUnit || 1;
-        const basePricePerPiece = basePrice / piecesInBase;
-        const excisePerPiece = exciseTax / piecesInBase;
-        return basePricePerPiece + excisePerPiece;
+      // If selling by PCS, derive price from base unit, considering piecesInBaseUnit
+      const piecesInBase = product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 1); // Default to 1 if not specified or base unit is already PCS
+      const basePricePerPiece = basePrice / piecesInBase;
+      const excisePerPiece = exciseTax / piecesInBase;
+      return basePricePerPiece + excisePerPiece;
     } else { // Selling by 'Cartons' (or other product.unitType if it's a package)
-        // This assumes the lineItemUnitType 'Cartons' directly maps to product.unitType 'Cartons'
-        // OR it maps to product.packagingUnit if that's chosen
-        if (product.unitType.toLowerCase() === lineItemUnitType.toLowerCase()) {
-            // Selling one base unit, which is already a carton/package
-            return basePrice + exciseTax;
-        } else if (product.packagingUnit && product.itemsPerPackagingUnit && product.packagingUnit.toLowerCase() === lineItemUnitType.toLowerCase()) {
-            // Selling by the larger optional packaging unit
-            const totalBasePriceForPackage = basePrice * product.itemsPerPackagingUnit;
-            const totalExciseForPackage = exciseTax * product.itemsPerPackagingUnit;
-            return totalBasePriceForPackage + totalExciseForPackage;
-        }
-        // Fallback or error - this case should be handled based on more specific UI choices for unit selection
-        return basePrice + exciseTax; // Default to base unit price if no other match
+      // Check if the lineItemUnitType matches the product's main unitType (which might be a carton)
+      if (product.unitType.toLowerCase() === lineItemUnitType.toLowerCase()) {
+        return basePrice + exciseTax; // Price is for one base unit (which is a carton)
+      }
+      // Check if lineItemUnitType matches the product's larger optional packagingUnit
+      else if (product.packagingUnit && product.itemsPerPackagingUnit && product.packagingUnit.toLowerCase() === lineItemUnitType.toLowerCase()) {
+        const totalBasePriceForPackage = basePrice * product.itemsPerPackagingUnit;
+        const totalExciseForPackage = exciseTax * product.itemsPerPackagingUnit;
+        return totalBasePriceForPackage + totalExciseForPackage;
+      }
+      // Fallback or error: This should ideally not be reached if UI restricts unitType selection properly.
+      // For safety, return the price for one base unit.
+      console.warn(`Could not match lineItemUnitType "${lineItemUnitType}" to product ${product.id} units. Defaulting to base unit price + excise.`);
+      return basePrice + exciseTax;
     }
   };
 
 
   const handleProductSelect = (index: number, product: Product) => {
     const currentItem = form.getValues(`items.${index}`);
-    const lineItemUnitType = currentItem.unitType || 'PCS'; 
+    // Default to PCS if product is primarily PCS, otherwise default to product's base unit (e.g., Cartons)
+    const defaultLineItemUnitType = product.unitType.toLowerCase() === 'pcs' ? 'PCS' : (product.unitType as 'PCS' | 'Cartons');
 
-    const unitPriceWithExcise = calculateUnitPriceForInvoiceItem(product, lineItemUnitType);
+    const unitPriceWithExcise = calculateUnitPriceForInvoiceItem(product, defaultLineItemUnitType);
 
     update(index, {
       ...currentItem,
       productId: product.id,
       description: product.name,
       unitPrice: unitPriceWithExcise,
-      unitType: lineItemUnitType,
+      unitType: defaultLineItemUnitType,
+      sourceWarehouseId: currentItem.sourceWarehouseId || undefined, // Preserve if already set
     });
     setCurrentProductSearchInput(prev => ({ ...prev, [index]: product.name }));
     setIsProductPopoverOpen(prev => ({ ...prev, [index]: false }));
@@ -296,7 +313,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   const handleUnitTypeChange = (index: number, newLineItemUnitType: 'PCS' | 'Cartons') => {
     const currentItem = form.getValues(`items.${index}`);
     const productId = currentItem.productId;
-    if (!productId) { 
+    if (!productId) {
         update(index, {...currentItem, unitType: newLineItemUnitType});
         return;
     }
@@ -305,7 +322,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
     if (!product) return;
 
     const unitPriceWithExcise = calculateUnitPriceForInvoiceItem(product, newLineItemUnitType);
-    
+
     update(index, {
       ...currentItem,
       unitPrice: unitPriceWithExcise,
@@ -315,17 +332,11 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
 
   const itemsToCalc = watchedItems || [];
-  // Subtotal is sum of (quantity * (base product price + product excise tax))
   const subtotalDisplay = itemsToCalc.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
-
-  // General Tax is now 0, as VAT is the primary tax applied after excise.
-  const generalTaxAmountDisplay = 0; 
-  
-  // VAT is applied on the subtotal (which already includes product-specific excise taxes)
-  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0.15; // Default to 15% VAT if not set
-  const vatAmountDisplay = subtotalDisplay * vatRate; // VAT on (Base+Excise) subtotal
-
-  const totalAmountDisplay = subtotalDisplay + vatAmountDisplay; // Total = (Base+Excise) + VAT
+  const generalTaxAmountDisplay = 0; // Assuming general tax is 0 as per previous discussions
+  const vatRate = companyProfile.vatRate ? Number(companyProfile.vatRate)/100 : 0;
+  const vatAmountDisplay = subtotalDisplay * vatRate;
+  const totalAmountDisplay = subtotalDisplay + vatAmountDisplay;
 
 
   let displayAmountPaid = initialData?.amountPaid || 0;
@@ -368,7 +379,7 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-10">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-10">
           <FormField
             control={form.control}
             name="id"
@@ -547,130 +558,124 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
         <div className="space-y-4">
           <FormLabel>Invoice Items</FormLabel>
-          {fields.map((itemField, index) => (
-            <div key={itemField.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 rounded-md border p-3">
-              <FormField
-                control={form.control}
-                name={`items.${index}.productId`} 
-                render={({ field }) => (
-                  <FormItem className="flex-grow-[2] w-full md:w-auto"> 
-                    <FormLabel className="sr-only">Product</FormLabel>
-                     <Popover
+          {fields.map((itemField, index) => {
+            const selectedProductId = form.watch(`items.${index}.productId`);
+            const selectedWarehouseId = form.watch(`items.${index}.sourceWarehouseId`);
+            const availableStock = selectedProductId && selectedWarehouseId ? getStockForProductInWarehouse(selectedProductId, selectedWarehouseId) : undefined;
+            const selectedProduct = products.find(p => p.id === selectedProductId);
+            const stockUnit = selectedProduct ? selectedProduct.unitType : 'units';
+
+            return (
+              <div key={itemField.id} className="grid grid-cols-1 md:grid-cols-12 items-start gap-2 rounded-md border p-3">
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.productId`}
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-4">
+                      <FormLabel className="sr-only">Product</FormLabel>
+                      <Popover
                         open={isProductPopoverOpen[index] || false}
                         onOpenChange={(open) => setIsProductPopoverOpen(prev => ({ ...prev, [index]: open }))}
                       >
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
-                            >
-                              {field.value
-                                ? products.find(p => p.id === field.value)?.name ?? "Select product"
-                                : "Select product"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between text-sm", !field.value && "text-muted-foreground")}>
+                              {field.value ? (products.find(p => p.id === field.value)?.name ?? "Select product") : "Select product"}
+                              <PackageSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                          <Command>
-                            <CommandInput
-                              placeholder="Search product..."
-                              value={currentProductSearchInput[index] || ''}
-                              onValueChange={(search) => setCurrentProductSearchInput(prev => ({ ...prev, [index]: search }))}
-                            />
-                            <CommandList>
-                              <CommandEmpty>No product found.</CommandEmpty>
-                              <CommandGroup>
-                                {getFilteredProducts(index).map((product) => (
-                                  <CommandItem
-                                    value={product.name}
-                                    key={product.id}
-                                    onSelect={() => handleProductSelect(index, product)}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", product.id === field.value ? "opacity-100" : "opacity-0")} />
-                                    {product.name} (SKU: {product.sku})
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
+                          <Command><CommandInput placeholder="Search product..." value={currentProductSearchInput[index] || ''} onValueChange={(search) => setCurrentProductSearchInput(prev => ({ ...prev, [index]: search }))} />
+                            <CommandList><CommandEmpty>No product found.</CommandEmpty><CommandGroup>
+                              {getFilteredProducts(index).map((product) => (
+                                <CommandItem value={product.name} key={product.id} onSelect={() => handleProductSelect(index, product)}>
+                                  <Check className={cn("mr-2 h-4 w-4", product.id === field.value ? "opacity-100" : "opacity-0")} />
+                                  {product.name} (SKU: {product.sku})
+                                </CommandItem>
+                              ))}
+                            </CommandGroup></CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name={`items.${index}.quantity`}
-                render={({ field }) => (
-                  <FormItem className="w-full md:w-24">
-                    <FormLabel className="sr-only">Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="Qty" {...field} step="0.01" className="text-sm"/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name={`items.${index}.unitType`}
-                render={({ field }) => (
-                  <FormItem className="w-full md:w-32">
-                    <FormLabel className="sr-only">Unit Type</FormLabel>
-                    <Select
-                        onValueChange={(value) => {
-                            field.onChange(value);
-                            handleUnitTypeChange(index, value as 'PCS' | 'Cartons');
-                        }}
-                        value={field.value}
-                        defaultValue={field.value || 'PCS'}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Unit" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="PCS">PCS</SelectItem>
-                        <SelectItem value="Cartons">Cartons</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name={`items.${index}.unitPrice`}
-                render={({ field }) => (
-                  <FormItem className="w-full md:w-32">
-                    <FormLabel className="sr-only">Unit Price</FormLabel>
-                    <FormControl>
-                        <div className="relative">
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.sourceWarehouseId`}
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-3">
+                      <FormLabel className="sr-only">Source Warehouse</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""} disabled={!selectedProductId}>
+                        <FormControl>
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Select Warehouse" />
+                            <WarehouseIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {warehouses.map(wh => <SelectItem key={wh.id} value={wh.id}>{wh.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.quantity`}
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-1">
+                      <FormLabel className="sr-only">Quantity</FormLabel>
+                      <FormControl><Input type="number" placeholder="Qty" {...field} step="0.01" className="text-sm"/></FormControl>
+                      {availableStock !== undefined && <FormDescription className="text-xs pt-1">Avail: {availableStock} {stockUnit}</FormDescription>}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.unitType`}
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-1">
+                      <FormLabel className="sr-only">Unit Type</FormLabel>
+                      <Select onValueChange={(value) => { field.onChange(value); handleUnitTypeChange(index, value as 'PCS' | 'Cartons'); }} value={field.value} defaultValue={field.value || 'PCS'}>
+                        <FormControl><SelectTrigger className="text-sm"><SelectValue placeholder="Unit" /></SelectTrigger></FormControl>
+                        <SelectContent><SelectItem value="PCS">PCS</SelectItem><SelectItem value="Cartons">Cartons</SelectItem></SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.unitPrice`}
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-1">
+                      <FormLabel className="sr-only">Unit Price</FormLabel>
+                      <FormControl><div className="relative">
                         <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input type="number" placeholder="Price" {...field} step="0.01" className="pl-6 text-sm" readOnly={!!form.getValues(`items.${index}.productId`)} />
-                        </div>
-                    </FormControl>
-                     <FormDescription className="text-xs">Incl. Item Excise</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="text-right md:text-left w-full md:w-24 pt-1 md:pt-0 md:pl-2">
-                <span className="font-medium text-sm">
-                  ${((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0)).toFixed(2)}
-                </span>
+                      </div></FormControl>
+                      <FormDescription className="text-xs">Incl. Item Excise</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="md:col-span-1 text-right md:text-left self-center pt-1 md:pt-0 md:pl-2">
+                  <span className="font-medium text-sm">${((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0)).toFixed(2)}</span>
+                </div>
+                <div className="md:col-span-1 flex justify-end md:justify-center items-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:bg-destructive/10 self-center md:self-auto">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          <Button type="button" variant="outline" onClick={() => append({ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, productId: undefined, description: '', quantity: 1, unitPrice: 0, unitType: 'PCS' })}>
+            )
+          })}
+          <Button type="button" variant="outline" onClick={() => append({ id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, productId: '', description: '', quantity: 1, unitPrice: 0, unitType: 'PCS', sourceWarehouseId: undefined })}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Item
           </Button>
         </div>
@@ -817,25 +822,27 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
 
         <div className="mt-6 rounded-lg border bg-muted/50 p-6 space-y-2">
           <div className="flex justify-between">
-            <span>Subtotal (incl. Item Excise):</span>
-            <span>${subtotalDisplay.toFixed(2)}</span>
+            <span className="text-foreground">Subtotal (incl. Item Excise):</span>
+            <span className="text-foreground">${subtotalDisplay.toFixed(2)}</span>
           </div>
            <div className="flex justify-between">
-            <span>VAT ({ (vatRate * 100).toFixed(0) }% on Subtotal):</span>
-            <span>${vatAmountDisplay.toFixed(2)}</span>
+            <span className="text-foreground">VAT ({ (vatRate * 100).toFixed(0) }% on Subtotal):</span>
+            <span className="text-foreground">${vatAmountDisplay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-semibold">
-            <span>Total Amount:</span>
-            <span>${totalAmountDisplay.toFixed(2)}</span>
+            <span className="text-primary">Total Amount:</span>
+            <span className="text-primary">${totalAmountDisplay.toFixed(2)}</span>
           </div>
           <hr className="my-2 border-border" />
            <div className="flex justify-between text-md">
-            <span>Total Amount Paid (All Time):</span>
-            <span className={(displayAmountPaid) > 0 ? "text-green-600 dark:text-green-400" : ""}>${(displayAmountPaid).toFixed(2)}</span>
+            <span className="text-foreground">Total Amount Paid (All Time):</span>
+            <span className={(displayAmountPaid) > 0 ? "text-green-600 dark:text-green-400" : "text-foreground"}>${(displayAmountPaid).toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-md font-semibold text-primary">
-            <span>Overall Remaining Balance:</span>
-            <span>${displayRemainingBalance.toFixed(2)}</span>
+          <div className="flex justify-between text-md font-semibold">
+            <span className="text-foreground">Overall Remaining Balance:</span>
+            <span className={displayRemainingBalance > 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}>
+              ${displayRemainingBalance.toFixed(2)}
+            </span>
           </div>
         </div>
 
@@ -891,4 +898,3 @@ export function InvoiceForm({ initialData, customers, companyProfile, invoices, 
   );
 }
 
-    
