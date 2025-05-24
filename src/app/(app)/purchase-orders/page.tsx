@@ -116,6 +116,7 @@ export default function PurchaseOrdersPage() {
     if (statusFilter !== 'all') {
       filtered = filtered.filter(po => po.status === statusFilter);
     }
+    // Default sort by order date, most recent first
     return filtered.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
   }, [purchaseOrders, searchTerm, statusFilter, getSupplierById]);
 
@@ -182,7 +183,7 @@ export default function PurchaseOrdersPage() {
     }));
 
     const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = 0;
+    const taxAmount = 0; // Assuming no PO-level tax for now
     const totalAmount = subtotal + taxAmount;
     const supplier = getSupplierById(data.supplierId);
 
@@ -200,13 +201,14 @@ export default function PurchaseOrdersPage() {
 
     if (editingPO) {
       let updatedStatus = editingPO.status;
+      // Only transition from Draft to Sent automatically. Other statuses should be managed explicitly.
       if (editingPO.status === 'Draft' && itemsWithTotals.length > 0 && data.supplierId) {
           updatedStatus = 'Sent';
       }
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
-        status: updatedStatus, // Update status if moving from Draft
+        status: updatedStatus, 
       });
       toast({
         title: "Purchase Order Updated",
@@ -254,13 +256,12 @@ export default function PurchaseOrdersPage() {
         productId: item.productId,
         quantityNewlyReceived: Number(item.quantityReceivedNow)!,
         warehouseId: item.destinationWarehouseId!,
-        itemUnitType: item.itemUnitType,
+        itemUnitType: item.itemUnitType, // Pass the unit type from PO item
       }));
 
     if (itemsToProcess.length > 0) {
       processPOReceipt(data.poId, itemsToProcess);
       toast({ title: "Stock Received", description: `Stock has been updated for PO ${data.poId}.` });
-      // Refresh poToView if it's the one being updated
       if (poToView && poToView.id === data.poId) {
         const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId);
         if (updatedPOFromContext) {
@@ -286,43 +287,41 @@ export default function PurchaseOrdersPage() {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-            <SearchInput
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="Search by PO ID, Supplier, Date..."
-              className="w-full md:w-64"
-            />
-            <div className="relative w-full md:w-56">
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as POStatus | 'all')}
-              >
-                <SelectTrigger className="w-full pl-10">
-                  <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filter by status..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {ALL_PO_STATUSES.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-y-4"> {/* Removed gap-x-6 */}
+           {/* Group for filters - takes 50% width on sm screens and up */}
+           <div className="flex flex-col sm:flex-row w-full sm:w-1/2 gap-4"> {/* gap-4 for internal spacing */}
+              <SearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search by PO ID, Supplier..."
+                className="w-full sm:w-[45%]" // Takes 45% of its parent (the 50% group)
+              />
+              <div className="relative w-full sm:w-[40%]"> {/* Takes 40% of its parent */}
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as POStatus | 'all')}
+                >
+                  <SelectTrigger className="w-full pl-10">
+                    <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Filter by status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {ALL_PO_STATUSES.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()} className="shrink-0">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-          </Button>
+            <Button variant="outline" size="sm" onClick={() => router.back()} className="shrink-0">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
         </div>
       </div>
 
        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
-        <CardHeader className="border-b">
-            <CardTitle>Purchase Order List</CardTitle>
-            <CardDescription>Overview of all purchase orders.</CardDescription>
-        </CardHeader>
+        {/* CardHeader removed as per previous instruction */}
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -340,7 +339,17 @@ export default function PurchaseOrdersPage() {
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={`skel-po-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    {[...Array(7)].map((__, j) => <TableCell key={j} className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>)}
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs">
+                        <div className="flex justify-end items-center gap-1">
+                            <Skeleton className="h-8 w-8" /> <Skeleton className="h-8 w-8" /> <Skeleton className="h-8 w-8" /> <Skeleton className="h-8 w-8" /> <Skeleton className="h-8 w-8" />
+                        </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -374,12 +383,12 @@ export default function PurchaseOrdersPage() {
                             <Truck className="mr-1 h-3 w-3" /> Receive
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleViewPO(po)} className="hover:text-primary" title="View PO"><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditPO(po)} className="hover:text-primary" title="Edit PO" disabled={po.status !== 'Draft'}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleViewPO(po)} className="hover:text-primary p-1.5" title="View PO"><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEditPO(po)} className="hover:text-primary p-1.5" title="Edit PO" disabled={po.status !== 'Draft'}><Edit className="h-4 w-4" /></Button>
                         {(po.status === 'Draft' || po.status === 'Sent') && (
-                           <Button variant="ghost" size="icon" onClick={() => handleCancelPOConfirm(po)} className="hover:text-orange-500" title="Cancel PO"><XCircle className="h-4 w-4" /></Button>
+                           <Button variant="ghost" size="icon" onClick={() => handleCancelPOConfirm(po)} className="hover:text-orange-500 p-1.5" title="Cancel PO"><XCircle className="h-4 w-4" /></Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDeletePOConfirm(po)} className="hover:text-destructive" title="Delete PO"><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeletePOConfirm(po)} className="hover:text-destructive p-1.5" title="Delete PO"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -531,7 +540,7 @@ export default function PurchaseOrdersPage() {
                     <ReceiveStockForm
                         purchaseOrder={poToReceiveStock}
                         warehouses={warehouses}
-                        products={products}
+                        products={products} // Pass products for unit type info
                         onSubmit={handleReceiveStockSubmit}
                         onCancel={() => { setIsReceiveStockModalOpen(false); setPoToReceiveStock(null);}}
                         isSubmitting={isLoading}
