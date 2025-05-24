@@ -52,9 +52,9 @@ const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProp
   if (!status) return 'outline';
   switch (status) {
     case 'Draft': return 'poDraft';
-    case 'Confirmed': return 'default';
+    case 'Confirmed': return 'default'; // Using default for a neutral "confirmed"
     case 'Processing': return 'secondary';
-    case 'Ready for Dispatch': return 'outline';
+    case 'Ready for Dispatch': return 'outline'; // Could be a specific color
     case 'Dispatched': return 'poSent';
     case 'Partially Invoiced': return 'statusPartiallyPaid';
     case 'Fully Invoiced': return 'statusPaid';
@@ -81,11 +81,14 @@ export default function SalesPage() {
     addSalesOrder,
     updateSalesOrder,
     deleteSalesOrder,
+    getSalesOrderById,
     getCustomerById,
     getProductById,
     getTotalStockForProduct,
     getStockForProductInWarehouse,
     warehouses,
+    products,
+    customers, // Added customers here
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -102,6 +105,7 @@ export default function SalesPage() {
   const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
+
 
   const handleAddSalesOrder = () => {
     setEditingSalesOrder(null);
@@ -130,7 +134,7 @@ export default function SalesPage() {
     }
   };
 
-  const handleConfirmOrder = (order: SalesOrder) => {
+  const handleConfirmOrder = useCallback((order: SalesOrder) => {
     if (order.status === 'Draft') {
       updateSalesOrder({ ...order, status: 'Confirmed' });
       toast({ title: "Sales Order Confirmed", description: `Order ${order.id} status updated to Confirmed.`});
@@ -138,14 +142,14 @@ export default function SalesPage() {
         setSalesOrderToView({...order, status: 'Confirmed'});
       }
     }
-  };
+  }, [updateSalesOrder, toast, isViewModalOpen, salesOrderToView]);
 
-  const handleCancelOrderConfirm = (order: SalesOrder) => {
+  const handleCancelOrderConfirm = useCallback((order: SalesOrder) => {
     setSalesOrderToCancel(order);
     setIsCancelConfirmModalOpen(true);
-  };
+  }, []);
 
-  const confirmCancelSalesOrder = () => {
+  const confirmCancelSalesOrder = useCallback(() => {
     if (salesOrderToCancel) {
       updateSalesOrder({ ...salesOrderToCancel, status: 'Cancelled' });
       toast({ title: "Sales Order Cancelled", description: `Order ${salesOrderToCancel.id} has been cancelled.`});
@@ -155,22 +159,25 @@ export default function SalesPage() {
       setSalesOrderToCancel(null);
     }
     setIsCancelConfirmModalOpen(false);
-  };
+  }, [salesOrderToCancel, updateSalesOrder, toast, isViewModalOpen, salesOrderToView]);
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
-    const itemsWithDetails = data.items.map(item => {
-        const product = getProductById(item.productId);
+    const itemsWithDetailsAndTotals = data.items.map(item => {
+        const productDetails = getProductById(item.productId);
+        // Price is already (base + excise) based on selected unit from form logic
+        const unitPrice = item.unitPrice; 
         return {
             ...item,
             id: item.id || `so-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            productName: product?.name || item.productId,
-            total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+            productName: productDetails?.name || item.productId,
+            total: (Number(item.quantity) || 0) * unitPrice,
+            // sourceWarehouseId should be coming from the form data directly
         };
     });
 
-    const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; // For SO, total might be same as subtotal if no SO-level taxes/discounts
+    const subtotal = itemsWithDetailsAndTotals.reduce((sum, item) => sum + item.total, 0);
+    const totalAmount = subtotal; // Sales Order total is pre-invoice VAT
 
     if (editingSalesOrder) {
       const updatedSO: SalesOrder = {
@@ -178,16 +185,18 @@ export default function SalesPage() {
         customerId: data.customerId,
         customerName: customer?.name || data.customerId,
         salespersonId: data.salespersonId,
-        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined,
+        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined, // Placeholder
         routeId: data.routeId,
-        routeName: data.routeId ? `Route ${data.routeId}` : undefined,
+        routeName: data.routeId ? `Route ${data.routeId}` : undefined, // Placeholder
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
-        items: itemsWithDetails,
+        items: itemsWithDetailsAndTotals,
         subtotal,
         totalAmount,
         notes: data.notes,
-        status: editingSalesOrder.status, // Preserve original status during edit unless explicitly changed
+        shippingAddress: editingSalesOrder.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
+        billingAddress: editingSalesOrder.billingAddress || customer?.billingAddress,
+        // status is preserved during edit unless specifically changed by another action
       };
       updateSalesOrder(updatedSO);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
@@ -198,18 +207,12 @@ export default function SalesPage() {
         routeId: data.routeId,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
-        items: data.items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitType: item.unitType,
-          unitPrice: item.unitPrice,
-          sourceWarehouseId: item.sourceWarehouseId,
-        })),
+        items: itemsWithDetailsAndTotals, // items now include sourceWarehouseId from the form
         notes: data.notes,
-        shippingAddress: customer?.shippingAddress || customer?.billingAddress, // Use customer addresses as default
+        shippingAddress: customer?.shippingAddress || customer?.billingAddress,
         billingAddress: customer?.billingAddress,
       };
-      addSalesOrder(salesOrderDataForContext as any); // Cast as any to bypass strict type check for SalesOrder fields not in form
+      addSalesOrder(salesOrderDataForContext as any); // Cast to bypass strict type checks for fields generated by addSalesOrder
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -276,21 +279,25 @@ export default function SalesPage() {
 
     if (sortConfig.key) {
       _salesOrders.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof SalesOrder];
-        let bValue: any = b[sortConfig.key as keyof SalesOrder];
+        let aValue: any;
+        let bValue: any;
 
         if (sortConfig.key === 'customerName') {
           aValue = a.customerName || getCustomerById(a.customerId)?.name || '';
           bValue = b.customerName || getCustomerById(b.customerId)?.name || '';
+        } else if (sortConfig.key === 'orderDate') {
+            aValue = new Date(a.orderDate).getTime();
+            bValue = new Date(b.orderDate).getTime();
+        } else {
+            aValue = a[sortConfig.key as keyof SalesOrder];
+            bValue = b[sortConfig.key as keyof SalesOrder];
         }
-        if (sortConfig.key === 'orderDate') {
-            aValue = new Date(aValue).getTime();
-            bValue = new Date(bValue).getTime();
-        }
+        
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
+
         if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
         return 0;
@@ -320,7 +327,7 @@ export default function SalesPage() {
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
-            placeholder="Search SO by ID, Customer, Salesperson..."
+            placeholder="Search SO by ID, Customer..."
             className="w-full sm:w-auto md:w-64 lg:flex-none"
           />
           <div className="relative w-full sm:w-auto md:w-[200px] lg:flex-none">
@@ -396,7 +403,14 @@ export default function SalesPage() {
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={`skel-so-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    {[...Array(8)].map((_, j) => <TableCell key={j} className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>)}
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -489,7 +503,7 @@ export default function SalesPage() {
                 customers={customers}
                 products={products}
                 warehouses={warehouses}
-                getTotalStockForProduct={getTotalStockForProduct} // Still useful for general product info if needed
+                getTotalStockForProduct={getTotalStockForProduct} 
                 getStockForProductInWarehouse={getStockForProductInWarehouse}
                 getProductById={getProductById}
               />
@@ -517,6 +531,8 @@ export default function SalesPage() {
                 <div><strong>Route:</strong> {salesOrderForViewModal.routeName || salesOrderForViewModal.routeId || '-'}</div>
                 <div className="md:col-span-2"><strong>Status:</strong> <Badge variant={getSalesOrderStatusBadgeVariant(salesOrderForViewModal.status)}>{salesOrderForViewModal.status}</Badge></div>
               </div>
+              {salesOrderForViewModal.shippingAddress && <p><strong>Shipping Address:</strong> {salesOrderForViewModal.shippingAddress}</p>}
+              {salesOrderForViewModal.billingAddress && <p><strong>Billing Address:</strong> {salesOrderForViewModal.billingAddress}</p>}
               {salesOrderForViewModal.notes && (
                 <div>
                   <h4 className="font-semibold mb-1">Notes:</h4>
@@ -563,7 +579,7 @@ export default function SalesPage() {
              {salesOrderForViewModal?.status === 'Draft' && (
                 <Button
                     variant="default"
-                    onClick={() => { if(salesOrderToView) { handleConfirmOrder(salesOrderToView); setIsViewModalOpen(false); }}}
+                    onClick={() => { if(salesOrderToView) { handleConfirmOrder(salesOrderToView);}}}
                     className="w-full sm:w-auto"
                 >
                   <CheckCircle className="mr-2 h-4 w-4" /> Confirm Order
@@ -572,7 +588,7 @@ export default function SalesPage() {
             {(salesOrderForViewModal?.status === 'Draft' || salesOrderForViewModal?.status === 'Confirmed') && (
                 <Button
                     variant="destructive"
-                    onClick={() => { if(salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleCancelOrderConfirm(salesOrderToView),100); }}}
+                    onClick={() => { if(salesOrderToView) { handleCancelOrderConfirm(salesOrderToView); }}}
                     className="w-full sm:w-auto"
                 >
                   <XCircle className="mr-2 h-4 w-4" /> Cancel Order
@@ -621,3 +637,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
