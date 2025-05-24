@@ -1,10 +1,10 @@
 
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon } from 'lucide-react';
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, DollarSign, ListFilter, Hourglass } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -47,6 +47,7 @@ import { SearchInput } from '@/components/common/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProps<typeof badgeVariants>['variant'] => {
   if (!status) return 'outline';
@@ -76,7 +77,7 @@ interface DateRange {
 }
 
 
-export default function SalesPage() {
+export default function SalesManagementPage() {
   const {
     salesOrders,
     addSalesOrder,
@@ -84,14 +85,17 @@ export default function SalesPage() {
     deleteSalesOrder,
     getSalesOrderById,
     getCustomerById,
-    products, // For SalesOrderForm
-    warehouses, // For SalesOrderForm
-    getTotalStockForProduct, // For SalesOrderForm
-    getStockForProductInWarehouse, // For SalesOrderForm
-    getProductById, // For SalesOrderForm
+    products,
+    warehouses,
+    getTotalStockForProduct,
+    getStockForProductInWarehouse,
+    getProductById,
     isLoading
   } = useData();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const [isSalesOrderFormModalOpen, setIsSalesOrderFormModalOpen] = useState(false);
   const [editingSalesOrder, setEditingSalesOrder] = useState<SalesOrder | null>(null);
@@ -271,20 +275,72 @@ export default function SalesPage() {
     return _salesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
 
+  // Placeholder KPI data
+  const kpiData = useMemo(() => ({
+    totalSalesMTD: 125340.50,
+    newOrdersToday: 15,
+    openOrdersPending: 42,
+    avgOrderValue: 875.20,
+  }), []);
+
 
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
-          title="Sales Management"
-          description="Manage sales orders, track customer requests, and streamline fulfillment."
+          title="Sales Management Dashboard"
+          description="Overview of sales performance, key metrics, and sales order management."
           actions={
             <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
             </Button>
           }
         />
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
+        
+        {/* KPI Section */}
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-4"> {/* Adjusted for potentially 3 KPIs across */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Sales (Month to Date)</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-1">${kpiData.totalSalesMTD.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground flex items-center">
+                <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
+                <span className="text-green-600 mr-1">+5.2%</span> vs last month
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">New Orders (Today)</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-1">{kpiData.newOrdersToday} Orders</div>
+              <p className="text-xs text-muted-foreground flex items-center">
+                 <ArrowUp className="h-3 w-3 mr-1 text-green-600" />
+                 <span className="text-green-600 mr-1">+3</span> vs yesterday
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Open Orders (Pending)</CardTitle>
+              <Hourglass className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-1">{kpiData.openOrdersPending} Orders</div>
+               <p className="text-xs text-muted-foreground flex items-center">
+                 <ArrowDown className="h-3 w-3 mr-1 text-orange-500" />
+                 <span className="text-orange-500 mr-1">-2</span> from last week avg
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-4">
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
@@ -341,7 +397,7 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 lg:mt-8 mb-4 md:mb-6 lg:mb-8">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 lg:mb-4">
         <CardHeader className="border-b">
           <CardTitle>Sales Order List</CardTitle>
           <CardDescription>Overview of all sales orders.</CardDescription>
@@ -461,7 +517,7 @@ export default function SalesPage() {
                 onSubmit={handleSubmitSalesOrder}
                 onCancel={() => { setIsSalesOrderFormModalOpen(false); setEditingSalesOrder(null); }}
                 isSubmitting={isLoading}
-                customers={products.map(p => ({id: p.id, name: p.name, email: '', phone: '', billingAddress: '', createdAt: '', customerType: 'Cash'}))} // Pass dummy customer structure
+                customers={customers}
                 products={products}
                 warehouses={warehouses}
                 getTotalStockForProduct={getTotalStockForProduct} 
@@ -536,7 +592,7 @@ export default function SalesPage() {
               </div>
             </div>
           )}
-          <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row sm:justify-end gap-2">
+          <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row sm:justify-end gap-2">
              {salesOrderForViewModal?.status === 'Draft' && (
                 <Button
                     variant="default"
@@ -598,3 +654,6 @@ export default function SalesPage() {
     </div>
   );
 }
+
+
+    
