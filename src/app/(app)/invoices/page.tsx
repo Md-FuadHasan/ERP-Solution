@@ -18,7 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogDescription as FormDialogDescription, // Aliased to avoid conflict if another DialogDescription is used outside form context
   DialogFooter,
 } from '@/components/ui/dialog';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
@@ -46,7 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from '@/components/ui/calendar';
@@ -73,10 +73,10 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
-    products,
-    warehouses,
-    getStockForProductInWarehouse,
-    getProductById,
+    products, // Needed for InvoiceForm
+    warehouses, // Needed for InvoiceForm
+    getStockForProductInWarehouse, // Needed for InvoiceForm
+    getProductById, // Needed for InvoiceForm
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -156,14 +156,13 @@ export default function InvoicesPage() {
 
 
   const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+    setIsFormModalOpen(isOpen);
     if (!isOpen) {
-      setIsFormModalOpen(false);
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      setUrlParamsProcessedIntentKey(null); // Key: Clear the processed intent key
-      
       const currentAction = searchParams.get('action');
-      if (currentAction === 'new' || currentAction === 'edit') {
+      const currentId = searchParams.get('id');
+      if ((currentAction === 'new' || currentAction === 'edit') && (currentId || searchParams.get('customerId'))) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
@@ -171,17 +170,17 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
       }
-    } else {
-      setIsFormModalOpen(true);
+      // Ensure urlParamsProcessedIntentKey is cleared only when the URL is also cleared
+      if (!searchParams.get('action')) {
+        setUrlParamsProcessedIntentKey(null);
+      }
     }
   }, [searchParams, router, pathname]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
+    setIsViewModalOpen(isOpen);
     if (!isOpen) {
-        setIsViewModalOpen(false);
         setInvoiceToViewInModal(null);
-        setUrlParamsProcessedIntentKey(null); // Key: Clear the processed intent key
-
         const currentAction = searchParams.get('action');
         if (currentAction === 'view') {
             const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -189,8 +188,9 @@ export default function InvoicesPage() {
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
         }
-    } else {
-        setIsViewModalOpen(true);
+         if (!searchParams.get('action')) {
+            setUrlParamsProcessedIntentKey(null);
+        }
     }
   }, [searchParams, router, pathname]);
 
@@ -308,15 +308,15 @@ export default function InvoicesPage() {
   }, [searchParams, router, pathname]);
 
   useEffect(() => {
-    if (invoiceToViewInModal) {
+    if (invoiceToViewInModal && companyProfile) {
       const totalAmount = typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0;
       setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
     } else {
       setQrCodeValueForModal('');
     }
-  }, [invoiceToViewInModal]);
+  }, [invoiceToViewInModal, companyProfile]);
 
-  const handleDeleteInvoice = useCallback((invoice: Invoice) => { 
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => { 
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -334,10 +334,12 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    const calculatedGeneralTaxAmount = 0; // Assuming general tax is 0
+    // Assuming general tax (companyProfile.taxRate) is 0 if VAT is the primary consumption tax
+    const generalTaxAmount = 0; //  calculatedSubtotal * (companyProfile && companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0);
     const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
-    const calculatedVatAmount = calculatedSubtotal * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedGeneralTaxAmount + calculatedVatAmount;
+    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT applied on (subtotal which includes item excise)
+    const calculatedTotalAmount = calculatedSubtotal + generalTaxAmount + calculatedVatAmount;
+
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -362,23 +364,24 @@ export default function InvoicesPage() {
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
       const paymentAmount = calculatedTotalAmount - newAmountPaid;
-      if (paymentAmount > 0) {
-        newPaymentHistory.push({
-          id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
-          paymentDate: new Date().toISOString(),
-          amount: paymentAmount,
-          status: 'Full Payment',
-          paymentMethod: data.paymentMethod,
-          ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
-          ...(data.paymentMethod === 'Bank Transfer' && {
-            bankName: data.bankName,
-            bankAccountNumber: data.bankAccountNumber,
-            onlineTransactionNumber: data.onlineTransactionNumber,
-          }),
-        });
+      if (paymentAmount > 0 || (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount)) {
+        const effectivePayment = paymentAmount > 0 ? paymentAmount : (calculatedTotalAmount - newAmountPaid);
+         if (effectivePayment > 0) {
+            newPaymentHistory.push({
+            id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+            paymentDate: new Date().toISOString(),
+            amount: effectivePayment,
+            status: 'Full Payment',
+            paymentMethod: data.paymentMethod,
+            ...(data.paymentMethod === 'Cash' && { cashVoucherNumber: data.cashVoucherNumber }),
+            ...(data.paymentMethod === 'Bank Transfer' && {
+                bankName: data.bankName,
+                bankAccountNumber: data.bankAccountNumber,
+                onlineTransactionNumber: data.onlineTransactionNumber,
+            }),
+            });
+         }
          newAmountPaid = calculatedTotalAmount;
-      } else if (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount) {
-        newAmountPaid = calculatedTotalAmount;
       }
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
@@ -424,7 +427,7 @@ export default function InvoicesPage() {
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0), sourceWarehouseId: item.sourceWarehouseId })), 
       subtotal: calculatedSubtotal, 
-      taxAmount: calculatedGeneralTaxAmount, 
+      taxAmount: generalTaxAmount, 
       vatAmount: calculatedVatAmount, 
       totalAmount: calculatedTotalAmount, 
       status: finalStatus,
@@ -441,8 +444,14 @@ export default function InvoicesPage() {
       }),
     };
 
-    editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
-    toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
+    if (editingInvoice) {
+      updateInvoice(invoiceToSave);
+      toast({ title: "Invoice Updated", description: `Invoice ${data.id} has been updated.` });
+    } else {
+      addInvoice(invoiceToSave as Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId?: string }>});
+      toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
+    }
+    
 
     handleFormModalOpenChange(false); // This will now correctly clear URL params
     setIsSaving(false);
@@ -471,7 +480,7 @@ export default function InvoicesPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-64 lg:flex-none" />
             <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-[200px] lg:flex-none" />
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -599,9 +608,11 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                         <AlertDialogTrigger asChild>
+                           <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                              <Trash2 className="h-4 w-4" />
+                           </Button>
+                         </AlertDialogTrigger>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -630,16 +641,16 @@ export default function InvoicesPage() {
         <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               {editingInvoice ? `Update details for invoice ${editingInvoice.id}.` : 'Fill in the details to create a new invoice.'}
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
-            {isFormModalOpen && (
+            {isFormModalOpen && companyProfile && (
               <InvoiceForm
                 initialData={editingInvoice}
                 customers={customers}
-                companyProfile={companyProfile!}
+                companyProfile={companyProfile}
                 invoices={invoices}
                 products={products}
                 warehouses={warehouses}
@@ -674,13 +685,13 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
-          {(!isDataContextLoading && invoiceToViewInModal) && (
+          {(!isDataContextLoading && invoiceToViewInModal && companyProfile) && (
             <>
               <DialogHeader className="p-6 pb-4 border-b print:hidden">
                 <DialogTitle>TAX INVOICE</DialogTitle>
-                <DialogDescription className="print:hidden">
+                <FormDialogDescription className="print:hidden">
                   Viewing details for invoice #{invoiceToViewInModal.id}.
-                </DialogDescription>
+                </FormDialogDescription>
               </DialogHeader>
               <div className="flex-grow overflow-y-auto p-6 space-y-6 print:overflow-visible print:h-auto print:p-4 sm:print:p-6">
                 {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
@@ -861,12 +872,12 @@ export default function InvoicesPage() {
             </>
           )}
           {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( 
-             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><DialogDescription>No invoice selected or invoice data is unavailable.</DialogDescription></DialogHeader></div>
+             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><FormDialogDescription>No invoice selected or invoice data is unavailable.</FormDialogDescription></DialogHeader></div>
           )}
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
+       <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
             <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
