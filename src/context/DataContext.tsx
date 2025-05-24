@@ -32,18 +32,19 @@ import {
   MOCK_STOCK_TRANSACTIONS,
   MOCK_SUPPLIERS,
   MOCK_PURCHASE_ORDERS,
-  MOCK_SALES_ORDERS // Added
+  MOCK_SALES_ORDERS
 } from '@/types';
-import { toast } from '@/hooks/use-toast'; 
+import { toast } from '@/hooks/use-toast';
 
-// --- Plain Helper Finder Functions ---
+// --- Plain Helper Finder Functions (defined outside component) ---
 const findCustomerById = (customers: Customer[], customerId: string) => customers.find(c => c.id === customerId);
 const findInvoiceById = (invoices: Invoice[], invoiceId: string) => invoices.find(i => i.id === invoiceId);
 const findProductById = (products: Product[], productId: string) => products.find(p => p.id === productId);
 const findWarehouseById = (warehouses: Warehouse[], warehouseId: string) => warehouses.find(wh => wh.id === warehouseId);
 const findSupplierById = (suppliers: Supplier[], supplierId: string) => suppliers.find(s => s.id === supplierId);
 const findPurchaseOrderById = (purchaseOrders: PurchaseOrder[], poId: string) => purchaseOrders.find(po => po.id === poId);
-const findSalesOrderById = (salesOrders: SalesOrder[], soId: string) => salesOrders.find(so => so.id === soId); // Added
+const findSalesOrderById = (salesOrders: SalesOrder[], soId: string) => salesOrders.find(so => so.id === soId);
+
 
 interface DataContextType {
   customers: Customer[];
@@ -54,13 +55,13 @@ interface DataContextType {
   stockTransactions: StockTransaction[];
   suppliers: Supplier[];
   purchaseOrders: PurchaseOrder[];
-  salesOrders: SalesOrder[]; // Added
+  salesOrders: SalesOrder[];
   companyProfile: CompanyProfile | null;
   isLoading: boolean;
   addCustomer: (customer: Customer) => void;
   updateCustomer: (customer: Customer) => void;
   deleteCustomer: (customerId: string) => void;
-  addInvoice: (invoice: Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId: string }>}) => void;
+  addInvoice: (invoice: Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId?: string }>}) => void;
   updateInvoice: (invoice: Invoice) => void;
   deleteInvoice: (invoiceId: string) => void;
   updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
@@ -88,16 +89,16 @@ interface DataContextType {
   updateSupplier: (supplier: Supplier) => void;
   deleteSupplier: (supplierId: string) => void;
   getSupplierById: (supplierId: string) => Supplier | undefined;
-  addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'subtotal' | 'taxAmount' | 'totalAmount' | 'supplierName' | 'items'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'>> }) => void;
+  addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'>> }) => void;
   updatePurchaseOrder: (po: PurchaseOrder) => void;
   deletePurchaseOrder: (poId: string) => void;
   cancelPurchaseOrder: (poId: string) => void;
   getPurchaseOrderById: (poId: string) => PurchaseOrder | undefined;
   processPOReceipt: (poId: string, receivedItemsData: Array<{ poItemId: string; productId: string; quantityNewlyReceived: number; warehouseId: string; itemUnitType: ProductUnitType }>) => void;
-  addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'totalAmount' | 'customerName' | 'salespersonName' | 'routeName'>) => void; // Added
-  updateSalesOrder: (order: SalesOrder) => void; // Added
-  deleteSalesOrder: (orderId: string) => void; // Added
-  getSalesOrderById: (orderId: string) => SalesOrder | undefined; // Added
+  addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'salespersonName' | 'routeName'>) => void;
+  updateSalesOrder: (order: SalesOrder) => void;
+  deleteSalesOrder: (orderId: string) => void;
+  getSalesOrderById: (orderId: string) => SalesOrder | undefined;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -112,7 +113,7 @@ const LOCAL_STORAGE_KEYS = {
   STOCK_TRANSACTIONS: 'invoiceflow_stock_transactions',
   SUPPLIERS: 'invoiceflow_suppliers',
   PURCHASE_ORDERS: 'invoiceflow_purchase_orders',
-  SALES_ORDERS: 'invoiceflow_sales_orders', // Added
+  SALES_ORDERS: 'invoiceflow_sales_orders',
 };
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -124,7 +125,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]); // Added
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -134,21 +135,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const loadItem = <T,>(key: string, fallback: T[]): T[] => {
         const stored = localStorage.getItem(key);
-        try {
-          return stored ? JSON.parse(stored) : fallback;
-        } catch (parseError) {
-          console.warn(`DataContext: Failed to parse item ${key} from localStorage, using fallback:`, parseError);
-          return fallback;
-        }
+        try { return stored ? JSON.parse(stored) : fallback; }
+        catch (parseError) { console.warn(`DataContext: Failed to parse item ${key}, using fallback:`, parseError); return fallback; }
       };
       const loadSingleItem = <T,>(key: string, fallback: T): T => {
         const stored = localStorage.getItem(key);
-         try {
-          return stored ? JSON.parse(stored) : fallback;
-        } catch (parseError) {
-          console.warn(`DataContext: Failed to parse single item ${key} from localStorage, using fallback:`, parseError);
-          return fallback;
-        }
+         try { return stored ? JSON.parse(stored) : fallback; }
+         catch (parseError) { console.warn(`DataContext: Failed to parse single item ${key}, using fallback:`, parseError); return fallback; }
       };
 
       setCustomers(loadItem(LOCAL_STORAGE_KEYS.CUSTOMERS, MOCK_CUSTOMERS));
@@ -160,10 +153,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStockTransactions(loadItem(LOCAL_STORAGE_KEYS.STOCK_TRANSACTIONS, MOCK_STOCK_TRANSACTIONS));
       setSuppliers(loadItem(LOCAL_STORAGE_KEYS.SUPPLIERS, MOCK_SUPPLIERS));
       setPurchaseOrders(loadItem(LOCAL_STORAGE_KEYS.PURCHASE_ORDERS, MOCK_PURCHASE_ORDERS));
-      setSalesOrders(loadItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, MOCK_SALES_ORDERS)); // Added
+      setSalesOrders(loadItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, MOCK_SALES_ORDERS));
 
     } catch (error) {
       console.error("DataContext: Failed to load data from localStorage, using mocks:", error);
+      // Fallback to mocks in case of any other error during load
       setCustomers(MOCK_CUSTOMERS);
       setInvoices(MOCK_INVOICES);
       setCompanyProfile(MOCK_COMPANY_PROFILE);
@@ -173,7 +167,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStockTransactions(MOCK_STOCK_TRANSACTIONS);
       setSuppliers(MOCK_SUPPLIERS);
       setPurchaseOrders(MOCK_PURCHASE_ORDERS);
-      setSalesOrders(MOCK_SALES_ORDERS); // Added
+      setSalesOrders(MOCK_SALES_ORDERS);
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +183,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.STOCK_TRANSACTIONS, JSON.stringify(stockTransactions)); }, [stockTransactions, isLoading]);
   useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers)); }, [suppliers, isLoading]);
   useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.PURCHASE_ORDERS, JSON.stringify(purchaseOrders)); }, [purchaseOrders, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, JSON.stringify(salesOrders)); }, [salesOrders, isLoading]); // Added
+  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, JSON.stringify(salesOrders)); }, [salesOrders, isLoading]);
+
 
   // --- Memoized Getter Functions ---
   const getCustomerById = useCallback((customerId: string) => findCustomerById(customers, customerId), [customers]);
@@ -198,22 +193,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getWarehouseById = useCallback((warehouseId: string) => findWarehouseById(warehouses, warehouseId), [warehouses]);
   const getSupplierById = useCallback((supplierId: string) => findSupplierById(suppliers, supplierId), [suppliers]);
   const getPurchaseOrderById = useCallback((poId: string) => findPurchaseOrderById(purchaseOrders, poId), [purchaseOrders]);
-  const getSalesOrderById = useCallback((soId: string) => findSalesOrderById(salesOrders, soId), [salesOrders]); // Added
+  const getSalesOrderById = useCallback((soId: string) => findSalesOrderById(salesOrders, soId), [salesOrders]);
 
   const getInvoicesByCustomerId = useCallback((customerId: string) => invoices.filter(invoice => invoice.customerId === customerId), [invoices]);
-
   const getOutstandingBalanceByCustomerId = useCallback((customerId: string) => {
     return invoices
       .filter(invoice => invoice.customerId === customerId && invoice.status !== 'Paid' && invoice.status !== 'Cancelled')
       .reduce((sum, invoice) => sum + invoice.remainingBalance, 0);
   }, [invoices]);
-
   const getTotalStockForProduct = useCallback((productId: string): number => {
     return productStockLocations
       .filter(psl => psl.productId === productId)
       .reduce((sum, psl) => sum + psl.stockLevel, 0);
   }, [productStockLocations]);
-
   const getStockForProductInWarehouse = useCallback((productId: string, warehouseId: string): number => {
     const stockLocation = productStockLocations.find(psl => psl.productId === productId && psl.warehouseId === warehouseId);
     return stockLocation ? stockLocation.stockLevel : 0;
@@ -253,23 +245,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (['Transfer Out', 'Transfer In', 'PO Receipt', 'Sale', 'Sale Return', 'Production Output', 'Production Input Consumption'].includes(reason)) {
           transactionTypeForLog = reason as StockTransactionType;
-        } else { 
+        } else {
             transactionTypeForLog = quantityChange > 0 ? 'Adjustment - Increase' : 'Adjustment - Decrease';
         }
-        
-        if (quantityChange !== 0) { 
+        if (quantityChange !== 0) {
           addStockTransaction({
             productId,
             warehouseId,
             type: transactionTypeForLog,
             quantityChange,
             newStockLevelAfterTransaction: newStockLevel,
-            reason: reason as StockAdjustmentReason, // This is fine, as reason for adjustment IS the reason
+            reason: reason as StockAdjustmentReason,
             reference,
           });
         }
         return updatedPsl.sort((a, b) => (a.productId + a.warehouseId).localeCompare(b.productId + b.warehouseId));
-      } else { 
+      } else {
         const newPsl: ProductStockLocation = {
           id: `PSL-${productId}-${warehouseId}-${Date.now()}`,
           productId,
@@ -277,17 +268,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           stockLevel: newStockLevel,
         };
         quantityChange = newStockLevel;
-
         if (['Transfer In', 'PO Receipt', 'Initial Stock Entry', 'Production Output'].includes(reason)) {
             transactionTypeForLog = reason as StockTransactionType;
-        } else if (reason === 'Sale') { // Should not typically happen for a new stock location via sale.
+        } else if (reason === 'Sale') {
              transactionTypeForLog = 'Sale';
-        }
-         else {
+        } else {
             transactionTypeForLog = quantityChange > 0 ? 'Adjustment - Increase' : 'Adjustment - Decrease';
         }
-        
-        if (quantityChange !== 0) { 
+        if (quantityChange !== 0) {
           addStockTransaction({
             productId,
             warehouseId,
@@ -303,17 +291,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [addStockTransaction]);
 
-
   // --- Stock Deduction/Return for Invoices ---
   const deductStockForInvoiceItem = useCallback((
     productId: string,
-    sourceWarehouseId: string, 
-    quantityToDeduct: number, // This quantity is already in product's base units
+    sourceWarehouseId: string,
+    quantityToDeductInBaseUnits: number,
     invoiceId: string
   ) => {
-    if (quantityToDeduct <= 0) return;
+    if (quantityToDeductInBaseUnits <= 0) return;
     const currentStock = getStockForProductInWarehouse(productId, sourceWarehouseId);
-    const newStockLevel = Math.max(0, currentStock - quantityToDeduct);
+    const newStockLevel = Math.max(0, currentStock - quantityToDeductInBaseUnits);
     const actualDeductedQuantity = currentStock - newStockLevel;
 
     if (actualDeductedQuantity > 0) {
@@ -322,25 +309,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Sale',
           `Invoice ${invoiceId}`
         );
-    } else if (quantityToDeduct > 0) {
-        console.warn(`Insufficient stock for product ${productId} in warehouse ${sourceWarehouseId} to fulfill invoice ${invoiceId}. Tried to deduct ${quantityToDeduct}, only ${actualDeductedQuantity} was possible.`);
+    } else if (quantityToDeductInBaseUnits > 0) {
+        const product = getProductById(productId);
+        const warehouse = getWarehouseById(sourceWarehouseId);
         toast({
             title: "Stock Alert",
-            description: `Insufficient stock for an item on invoice ${invoiceId}. Actual stock for product ${productId} in warehouse ${sourceWarehouseId} is ${currentStock}.`,
+            description: `Insufficient stock for ${product?.name || productId} in ${warehouse?.name || sourceWarehouseId} to fulfill invoice ${invoiceId}. Tried to deduct ${quantityToDeductInBaseUnits}, only ${actualDeductedQuantity} was possible.`,
             variant: "destructive"
         });
     }
-  }, [getStockForProductInWarehouse, upsertProductStockLocation]);
+  }, [getStockForProductInWarehouse, upsertProductStockLocation, getProductById, getWarehouseById]);
 
   const returnStockForInvoiceItem = useCallback((
     productId: string,
-    sourceWarehouseId: string, 
-    quantityToReturn: number, // This quantity is already in product's base units
+    sourceWarehouseId: string,
+    quantityToReturnInBaseUnits: number,
     invoiceId: string
   ) => {
-    if (quantityToReturn <= 0) return;
+    if (quantityToReturnInBaseUnits <= 0) return;
     const currentStock = getStockForProductInWarehouse(productId, sourceWarehouseId);
-    const newStockLevel = currentStock + quantityToReturn;
+    const newStockLevel = currentStock + quantityToReturnInBaseUnits;
     upsertProductStockLocation(
       { productId, warehouseId: sourceWarehouseId, stockLevel: newStockLevel },
       'Sale Return',
@@ -354,7 +342,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateCustomer = useCallback((updatedCustomer: Customer) => setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c).sort((a,b) => a.name.localeCompare(b.name))), []);
   const deleteCustomer = useCallback((customerId: string) => {
     setCustomers(prev => prev.filter(c => c.id !== customerId));
-    // Consider deleting associated invoices or reassigning - for now, just customer deletion
   }, []);
 
   const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt'>) => {
@@ -390,7 +377,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateSupplier = useCallback((updatedSupplier: Supplier) => setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? updatedSupplier : s).sort((a,b) => a.name.localeCompare(b.name))), []);
   const deleteSupplier = useCallback((supplierId: string) => setSuppliers(prev => prev.filter(s => s.id !== supplierId)), []);
 
-  const addInvoice = useCallback((invoiceData: Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId: string }>}) => {
+  const addInvoice = useCallback((invoiceData: Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId?: string }>}) => {
     const customer = getCustomerById(invoiceData.customerId);
     const newInvoice: Invoice = {
       ...invoiceData,
@@ -407,12 +394,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (productDetails && item.productId && item.sourceWarehouseId) {
           let quantityToDeductInBaseUnits = item.quantity;
           if (item.unitType.toLowerCase() !== productDetails.unitType.toLowerCase()) {
-            // Case 1: Invoice item is in a LARGER packaging unit than product's base unit (e.g., selling Cartons, product base unit is PCS)
-            if (productDetails.unitType.toLowerCase() === 'pcs' && productDetails.packagingUnit?.toLowerCase() === item.unitType.toLowerCase() && productDetails.itemsPerPackagingUnit && productDetails.itemsPerPackagingUnit > 0) {
+            if (item.unitType.toLowerCase() === productDetails.packagingUnit?.toLowerCase() && productDetails.itemsPerPackagingUnit) {
               quantityToDeductInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
-            }
-            // Case 2: Invoice item is in PCS, but product's base unit is a package (e.g., selling PCS, product base unit is Cartons)
-            else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit && productDetails.piecesInBaseUnit > 0) {
+            } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit) {
               quantityToDeductInBaseUnits = item.quantity / productDetails.piecesInBaseUnit;
             }
           }
@@ -420,7 +404,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             deductStockForInvoiceItem(item.productId, item.sourceWarehouseId, quantityToDeductInBaseUnits, newInvoice.id);
           }
         } else if (productDetails && item.productId && !item.sourceWarehouseId && newInvoice.items.length > 0) {
-            console.warn(`Invoice item ${item.description} for invoice ${newInvoice.id} is missing a source warehouse. Stock not deducted.`);
             toast({ title: "Stock Deduction Skipped", description: `Item "${item.description}" on invoice ${newInvoice.id} is missing source warehouse.`, variant: "default" });
         }
       });
@@ -428,7 +411,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [getCustomerById, getProductById, deductStockForInvoiceItem]);
 
   const updateInvoice = useCallback((updatedInvoice: Invoice) => {
-    const originalInvoice = invoices.find(inv => inv.id === updatedInvoice.id);
+    const originalInvoice = findInvoiceById(invoices, updatedInvoice.id); // Use local findInvoiceById
 
     if (originalInvoice && originalInvoice.status !== 'Cancelled') {
       originalInvoice.items.forEach(item => {
@@ -436,9 +419,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (productDetails && item.productId && item.sourceWarehouseId) {
            let quantityToReturnInBaseUnits = item.quantity;
            if (item.unitType.toLowerCase() !== productDetails.unitType.toLowerCase()) {
-             if (productDetails.unitType.toLowerCase() === 'pcs' && productDetails.packagingUnit?.toLowerCase() === item.unitType.toLowerCase() && productDetails.itemsPerPackagingUnit && productDetails.itemsPerPackagingUnit > 0) {
+             if (item.unitType.toLowerCase() === productDetails.packagingUnit?.toLowerCase() && productDetails.itemsPerPackagingUnit) {
                quantityToReturnInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
-             } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit && productDetails.piecesInBaseUnit > 0) {
+             } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit) {
                quantityToReturnInBaseUnits = item.quantity / productDetails.piecesInBaseUnit;
              }
            }
@@ -455,9 +438,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
          if (productDetails && item.productId && item.sourceWarehouseId) {
            let quantityToDeductInBaseUnits = item.quantity;
             if (item.unitType.toLowerCase() !== productDetails.unitType.toLowerCase()) {
-              if (productDetails.unitType.toLowerCase() === 'pcs' && productDetails.packagingUnit?.toLowerCase() === item.unitType.toLowerCase() && productDetails.itemsPerPackagingUnit && productDetails.itemsPerPackagingUnit > 0) {
+              if (item.unitType.toLowerCase() === productDetails.packagingUnit?.toLowerCase() && productDetails.itemsPerPackagingUnit) {
                 quantityToDeductInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
-              } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit && productDetails.piecesInBaseUnit > 0) {
+              } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit) {
                 quantityToDeductInBaseUnits = item.quantity / productDetails.piecesInBaseUnit;
               }
             }
@@ -465,7 +448,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
              deductStockForInvoiceItem(item.productId, item.sourceWarehouseId, quantityToDeductInBaseUnits, updatedInvoice.id);
            }
          } else if (productDetails && item.productId && !item.sourceWarehouseId && updatedInvoice.items.length > 0) {
-             console.warn(`Updated invoice item ${item.description} for invoice ${updatedInvoice.id} is missing a source warehouse. Stock not deducted.`);
              toast({ title: "Stock Deduction Skipped", description: `Item "${item.description}" on updated invoice ${updatedInvoice.id} is missing source warehouse.`, variant: "default" });
          }
       });
@@ -474,16 +456,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [invoices, getProductById, deductStockForInvoiceItem, returnStockForInvoiceItem]);
 
   const deleteInvoice = useCallback((invoiceId: string) => {
-    const invoiceToDelete = invoices.find(inv => inv.id === invoiceId);
+    const invoiceToDelete = findInvoiceById(invoices, invoiceId); // Use local findInvoiceById
     if (invoiceToDelete && invoiceToDelete.status !== 'Cancelled') {
         invoiceToDelete.items.forEach(item => {
             const productDetails = getProductById(item.productId || '');
             if (productDetails && item.productId && item.sourceWarehouseId) {
                 let quantityToReturnInBaseUnits = item.quantity;
                 if (item.unitType.toLowerCase() !== productDetails.unitType.toLowerCase()) {
-                  if (productDetails.unitType.toLowerCase() === 'pcs' && productDetails.packagingUnit?.toLowerCase() === item.unitType.toLowerCase() && productDetails.itemsPerPackagingUnit && productDetails.itemsPerPackagingUnit > 0) {
+                  if (item.unitType.toLowerCase() === productDetails.packagingUnit?.toLowerCase() && productDetails.itemsPerPackagingUnit) {
                     quantityToReturnInBaseUnits = item.quantity * productDetails.itemsPerPackagingUnit;
-                  } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit && productDetails.piecesInBaseUnit > 0) {
+                  } else if (item.unitType.toLowerCase() === 'pcs' && productDetails.unitType.toLowerCase() !== 'pcs' && productDetails.piecesInBaseUnit) {
                     quantityToReturnInBaseUnits = item.quantity / productDetails.piecesInBaseUnit;
                   }
                 }
@@ -500,58 +482,58 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCompanyProfile(prev => ({ ...(prev || MOCK_COMPANY_PROFILE), ...profileUpdate }));
   }, []);
 
-  const addPurchaseOrder = useCallback((poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'subtotal' | 'taxAmount' | 'totalAmount' | 'supplierName' | 'items'> & { items: Array<Omit<PurchaseOrderItem, 'id'| 'total' | 'quantityReceived'>> }) => {
+  const addPurchaseOrder = useCallback((poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'>> }) => {
     const supplier = getSupplierById(poData.supplierId);
-    const itemsWithTotalsAndReceived = poData.items.map(item => ({
+    const itemsWithDetails = poData.items.map(item => {
+      const product = getProductById(item.productId);
+      return {
         ...item,
         id: item.id || `poi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+        productName: product?.name || item.productId,
         total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
         quantityReceived: 0,
-    }));
-    const subtotal = itemsWithTotalsAndReceived.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = 0;
+      };
+    });
+    const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
+    const taxAmount = 0; // Assuming no PO-level specific taxes for now
     const totalAmount = subtotal + taxAmount;
+
     const newPO: PurchaseOrder = {
-      ...poData,
       id: `PO-${String(Date.now()).slice(-6)}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`,
+      supplierId: poData.supplierId,
       supplierName: supplier?.name || poData.supplierId,
-      createdAt: new Date().toISOString(),
-      status: 'Draft',
-      items: itemsWithTotalsAndReceived,
+      orderDate: poData.orderDate,
+      expectedDeliveryDate: poData.expectedDeliveryDate,
+      items: itemsWithDetails,
       subtotal,
       taxAmount,
       totalAmount,
+      status: 'Draft',
+      notes: poData.notes,
+      createdAt: new Date().toISOString(),
     };
     setPurchaseOrders(prev => [...prev, newPO].sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
-  }, [getSupplierById]);
+  }, [getSupplierById, getProductById]);
 
   const updatePurchaseOrder = useCallback((updatedPO: PurchaseOrder) => {
-    const itemsWithTotals = updatedPO.items.map(item => ({
-        ...item,
-        total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-    }));
-    const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = updatedPO.taxAmount || 0;
-    const totalAmount = subtotal + taxAmount;
-
-    let finalStatus = updatedPO.status;
-    if (updatedPO.status === 'Draft' && itemsWithTotals.length > 0 && updatedPO.supplierId) {
-        finalStatus = 'Sent';
-    }
-
     setPurchaseOrders(prev =>
-        prev.map(po =>
-            po.id === updatedPO.id
-            ? {
-                ...updatedPO,
-                items: itemsWithTotals,
-                subtotal,
-                totalAmount,
-                status: finalStatus,
-                updatedAt: new Date().toISOString()
-              }
-            : po
-        ).sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
+        prev.map(po => {
+            if (po.id === updatedPO.id) {
+                const itemsWithTotals = updatedPO.items.map(item => ({
+                    ...item,
+                    total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+                }));
+                const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
+                const taxAmount = updatedPO.taxAmount || 0; // Keep existing or default to 0
+                const totalAmount = subtotal + taxAmount;
+                let finalStatus = updatedPO.status;
+                if (updatedPO.status === 'Draft' && itemsWithTotals.length > 0 && updatedPO.supplierId) {
+                    finalStatus = 'Sent';
+                }
+                return { ...updatedPO, items: itemsWithTotals, subtotal, totalAmount, status: finalStatus, updatedAt: new Date().toISOString() };
+            }
+            return po;
+        }).sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
     );
   }, []);
 
@@ -571,27 +553,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const poIndex = prevPOs.findIndex(p => p.id === poId);
         if (poIndex === -1) return prevPOs;
 
-        const updatedPO = JSON.parse(JSON.stringify(prevPOs[poIndex])) as PurchaseOrder;
+        const updatedPO = JSON.parse(JSON.stringify(prevPOs[poIndex])) as PurchaseOrder; // Deep copy
         let anyStockUpdatedThisTime = false;
 
         updatedPO.items = updatedPO.items.map((item) => {
             const receivedInfo = receivedItemsData.find(ri => ri.poItemId === item.id);
             if (receivedInfo && receivedInfo.quantityNewlyReceived > 0) {
                 const product = getProductById(receivedInfo.productId);
-                if (!product) return item; 
+                if (!product) return item;
 
                 let quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived;
-                // Convert PO item unit to product's base unit for stock update
                 if (receivedInfo.itemUnitType.toLowerCase() !== product.unitType.toLowerCase()) {
-                    // Scenario 1: PO is in a larger package (e.g., Cartons), product base unit is PCS
-                    if (product.unitType.toLowerCase() === 'pcs' && product.packagingUnit?.toLowerCase() === receivedInfo.itemUnitType.toLowerCase() && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+                    if (receivedInfo.itemUnitType.toLowerCase() === product.packagingUnit?.toLowerCase() && product.itemsPerPackagingUnit) {
                         quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived * product.itemsPerPackagingUnit;
-                    }
-                    // Scenario 2: PO is in PCS, product base unit is a package (e.g., Cartons)
-                    else if (receivedInfo.itemUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
+                    } else if (receivedInfo.itemUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit) {
                          quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived / product.piecesInBaseUnit;
                     }
-                    // Add other conversion logic if needed
                 }
 
                 const currentStockInWarehouse = getStockForProductInWarehouse(item.productId, receivedInfo.warehouseId);
@@ -603,7 +580,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 anyStockUpdatedThisTime = true;
                 return {
                     ...item,
-                    quantityReceived: (item.quantityReceived || 0) + receivedInfo.quantityNewlyReceived,
+                    quantityReceived: (item.quantityReceived || 0) + receivedInfo.quantityNewlyReceived, // quantityReceived on PO item is in ordered unit type
                 };
             }
             return item;
@@ -614,53 +591,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (allItemsReceived) {
                 updatedPO.status = 'Fully Received';
             } else {
-                updatedPO.status = 'Partially Received';
+                updatedPO.status = 'Partially Received'; // Remains Sent if no prior partial receipt
             }
         }
-
         updatedPO.updatedAt = new Date().toISOString();
         const newPOs = [...prevPOs];
         newPOs[poIndex] = updatedPO;
         return newPOs.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     });
-  }, [getProductById, upsertProductStockLocation, getStockForProductInWarehouse]);
+  }, [getProductById, getStockForProductInWarehouse, upsertProductStockLocation]);
 
   // --- Sales Order CRUD Placeholders ---
-  const addSalesOrder = useCallback((orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'totalAmount' | 'customerName' | 'salespersonName' | 'routeName'>) => {
+  const addSalesOrder = useCallback((orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'salespersonName' | 'routeName'>) => {
     const customer = getCustomerById(orderData.customerId);
-    const itemsWithTotals = orderData.items.map(item => ({
-      ...item,
-      id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
-      total: (item.quantity || 0) * (item.unitPrice || 0),
-    }));
+    const itemsWithTotals = orderData.items.map(item => {
+        const product = getProductById(item.productId);
+        return {
+            ...item,
+            id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+            productName: product?.name || item.productId,
+            total: (item.quantity || 0) * (item.unitPrice || 0), // unitPrice from form already includes base+excise
+        };
+    });
     const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
 
     const newOrder: SalesOrder = {
-      ...orderData,
       id: `SO-${String(Date.now()).slice(-6)}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`,
+      customerId: orderData.customerId,
       customerName: customer?.name || orderData.customerId,
+      salespersonId: orderData.salespersonId,
       salespersonName: orderData.salespersonId ? `Salesperson ${orderData.salespersonId}` : 'N/A', // Placeholder
+      routeId: orderData.routeId,
       routeName: orderData.routeId ? `Route ${orderData.routeId}` : 'N/A', // Placeholder
-      createdAt: new Date().toISOString(),
-      status: 'Draft',
+      orderDate: orderData.orderDate,
+      expectedDeliveryDate: orderData.expectedDeliveryDate,
       items: itemsWithTotals,
       subtotal: subtotal,
-      totalAmount: subtotal, // Assuming no SO-specific taxes/discounts for now
+      totalAmount: subtotal, // Sales Order total is pre-invoice VAT
+      status: 'Draft',
+      shippingAddress: orderData.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
+      billingAddress: orderData.billingAddress || customer?.billingAddress,
+      notes: orderData.notes,
+      createdAt: new Date().toISOString(),
     };
     setSalesOrders(prev => [...prev, newOrder].sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
-  }, [getCustomerById]);
+  }, [getCustomerById, getProductById]);
 
   const updateSalesOrder = useCallback((updatedOrder: SalesOrder) => {
-     const itemsWithTotals = updatedOrder.items.map(item => ({
-      ...item,
-      total: (item.quantity || 0) * (item.unitPrice || 0),
-    }));
-    const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-
-    setSalesOrders(prev =>
+     setSalesOrders(prev =>
       prev.map(order =>
         order.id === updatedOrder.id
-          ? { ...updatedOrder, items: itemsWithTotals, subtotal: subtotal, totalAmount: subtotal, updatedAt: new Date().toISOString() }
+          ? { ...updatedOrder, updatedAt: new Date().toISOString() }
           : order
       ).sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
     );
@@ -686,7 +667,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addSupplier, updateSupplier, deleteSupplier,
         addPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, cancelPurchaseOrder,
         processPOReceipt,
-        addSalesOrder, updateSalesOrder, deleteSalesOrder, // Added
+        addSalesOrder, updateSalesOrder, deleteSalesOrder,
       }}
     >
       {children}
