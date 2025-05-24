@@ -1,10 +1,10 @@
 
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation'; // Corrected from usePathname
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, ArrowLeft } from 'lucide-react';
+import { PlusCircle, Eye, Edit, Trash2, CheckCircle, XCircle, ArrowLeft, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -34,34 +34,19 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useData } from '@/context/DataContext';
-import type { SalesOrder, SalesOrderStatus, SalesOrderItem, Customer, Product, Warehouse, ProductUnitType } from '@/types';
+import type { SalesOrder, SalesOrderStatus, SalesOrderItem, ProductUnitType } from '@/types';
 import { ALL_SALES_ORDER_STATUSES } from '@/types';
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
 import { format, isValid, parseISO, isWithinInterval, startOfDay } from 'date-fns';
-import { Badge, badgeVariants } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import type { VariantProps } from 'class-variance-authority';
 import { SearchInput } from '@/components/common/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-
-const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProps<typeof badgeVariants>['variant'] => {
-  if (!status) return 'outline';
-  switch (status) {
-    case 'Draft': return 'poDraft';
-    case 'Confirmed': return 'default'; // Using default for 'Confirmed'
-    case 'Processing': return 'secondary';
-    case 'Ready for Dispatch': return 'outline'; // Consider a specific color
-    case 'Dispatched': return 'poSent'; // Using 'poSent' (blue-ish)
-    case 'Partially Invoiced': return 'statusPartiallyPaid'; // Using 'statusPartiallyPaid' (orange-ish)
-    case 'Fully Invoiced': return 'statusPaid'; // Using 'statusPaid' (green)
-    case 'Cancelled': return 'poCancelled';
-    default: return 'outline';
-  }
-};
+import { getSalesOrderStatusBadgeVariant } from '@/lib/invoiceUtils'; // Assuming you have a similar util for SO
 
 type SortableSalesOrderKeys = keyof Pick<SalesOrder, 'id' | 'orderDate' | 'status' | 'totalAmount'> | 'customerName' | 'salespersonName' | 'routeName';
 
@@ -75,7 +60,6 @@ interface DateRange {
   to: Date | null;
 }
 
-
 export default function SalesOrdersPage() {
   const {
     salesOrders,
@@ -84,12 +68,12 @@ export default function SalesOrdersPage() {
     deleteSalesOrder,
     getSalesOrderById,
     getCustomerById,
-    customers, // Added missing destructure
-    products,  // Added missing destructure
-    warehouses, // Added missing destructure
-    getTotalStockForProduct, // Added missing destructure
-    getStockForProductInWarehouse, // Added missing destructure
-    getProductById, // Added missing destructure
+    customers,
+    products,
+    warehouses,
+    getTotalStockForProduct,
+    getStockForProductInWarehouse,
+    getProductById,
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -107,7 +91,6 @@ export default function SalesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
-
 
   const handleAddSalesOrder = useCallback(() => {
     setEditingSalesOrder(null);
@@ -165,32 +148,34 @@ export default function SalesOrdersPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
-    const itemsWithTotalsAndWarehouse = data.items.map(item => ({
-        ...item,
-        productName: getProductById(item.productId)?.name || item.productId, // Ensure productName is set
-        total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-        sourceWarehouseName: item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId)?.name : undefined,
-    }));
+    const itemsWithDetails = data.items.map(item => {
+        const product = getProductById(item.productId);
+        const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
+        return {
+            ...item,
+            id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+            productName: product?.name || item.productId,
+            sourceWarehouseName: warehouse?.name || item.sourceWarehouseId,
+            total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+        };
+    });
 
-    const subtotal = itemsWithTotalsAndWarehouse.reduce((sum, item) => sum + item.total, 0);
-    // For Sales Order, totalAmount is typically the subtotal before invoice-level VAT
+    const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
     const totalAmount = subtotal;
 
-    const salesOrderData = {
+    const salesOrderData: Partial<SalesOrder> = {
         ...data,
         customerName: customer?.name || data.customerId,
-        salespersonName: data.salespersonId, // Assuming salespersonId is their name for now
-        routeName: data.routeId, // Assuming routeId is the name/code
-        items: itemsWithTotalsAndWarehouse,
+        items: itemsWithDetails,
         subtotal,
         totalAmount,
-        status: editingSalesOrder?.status || 'Draft', // Retain status if editing, default to Draft if new
+        status: editingSalesOrder?.status || 'Draft',
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
     };
 
     if (editingSalesOrder) {
-      updateSalesOrder({ ...editingSalesOrder, ...salesOrderData });
+      updateSalesOrder({ ...editingSalesOrder, ...salesOrderData } as SalesOrder);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
       addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status'>);
@@ -199,7 +184,6 @@ export default function SalesOrdersPage() {
     setIsSalesOrderFormModalOpen(false);
     setEditingSalesOrder(null);
   };
-
 
   const salesOrderForViewModal = useMemo(() => {
     if (!salesOrderToView) return null;
@@ -289,10 +273,8 @@ export default function SalesOrdersPage() {
             bValue = b[sortConfig.key as keyof SalesOrder];
         }
         
-        // Handle undefined or null values to prevent crashes during sort
         if (aValue === undefined || aValue === null) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
         if (bValue === undefined || bValue === null) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
-
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
@@ -307,15 +289,9 @@ export default function SalesOrdersPage() {
     return _salesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
 
-
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <div className="mb-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()} className="w-auto">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
-        </div>
         <PageHeader
           title="Sales Orders"
           description="Manage all your sales orders and track their status."
@@ -325,64 +301,63 @@ export default function SalesOrdersPage() {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
-          <SearchInput
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Search SO by ID, Customer..."
-            className="w-full md:w-64 lg:flex-none"
-          />
-          <div className="relative w-full md:w-[200px] lg:flex-none">
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as SalesOrderStatus | 'all')}
-            >
-              <SelectTrigger className="w-full pl-10">
-                <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter by status..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {ALL_SALES_ORDER_STATUSES.map(status => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
+            <SearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search SO by ID, Customer..."
+              className="w-full md:w-64 lg:flex-none"
+            />
+            <div className="relative w-full md:w-[200px] lg:flex-none">
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as SalesOrderStatus | 'all')}
+              >
+                <SelectTrigger className="w-full pl-10">
+                  <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {ALL_SALES_ORDER_STATUSES.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? format(dateRange.from, "PPP") : <span>Order Date From</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.to ? format(dateRange.to, "PPP") : <span>Order Date To</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.from ? format(dateRange.from, "PPP") : <span>Order Date From</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
-              </PopoverContent>
-            </Popover>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.to ? format(dateRange.to, "PPP") : <span>Order Date To</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="w-full sm:w-auto lg:flex-none">
+            Back
+          </Button>
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -483,7 +458,6 @@ export default function SalesOrdersPage() {
         </div>
       </div>
 
-      {/* Create/Edit Sales Order Form Modal */}
       <Dialog open={isSalesOrderFormModalOpen} onOpenChange={(isOpen) => { setIsSalesOrderFormModalOpen(isOpen); if (!isOpen) setEditingSalesOrder(null); }}>
         <DialogContent className="w-[95vw] max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -511,7 +485,6 @@ export default function SalesOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* View Sales Order Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => { setIsViewModalOpen(isOpen); if(!isOpen) setSalesOrderToView(null);}}>
         <DialogContent className="w-[95vw] max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -636,5 +609,3 @@ export default function SalesOrdersPage() {
     </div>
   );
 }
-
-    
