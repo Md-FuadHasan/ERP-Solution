@@ -1,10 +1,10 @@
 
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added useRouter
+import { useRouter } from 'next/navigation'; // Corrected from usePathname
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, ArrowLeft } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -162,7 +162,7 @@ export default function SalesOrdersPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     if (editingSalesOrder) {
-      updateSalesOrder({ ...editingSalesOrder, ...data, items: data.items.map(item => ({...item, total: item.quantity * item.unitPrice})) });
+      updateSalesOrder({ ...editingSalesOrder, ...data, items: data.items.map(item => ({...item, total: (item.quantity || 0) * (item.unitPrice || 0)})) });
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
       addSalesOrder(data);
@@ -275,22 +275,18 @@ export default function SalesOrdersPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <div className="flex items-center gap-4">
-           <Button onClick={() => router.back()} variant="outline" size="icon" className="h-8 w-8 shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Button>
-          <PageHeader
-            title="Sales Orders"
-            description="Manage all your sales orders and track their status."
-            actions={
-              <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
-              </Button>
-            }
-          />
-        </div>
-
+        <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <PageHeader
+          title="Sales Orders"
+          description="Manage all your sales orders and track their status."
+          actions={
+            <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
+            </Button>
+          }
+        />
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
           <SearchInput
             value={searchTerm}
@@ -468,7 +464,7 @@ export default function SalesOrdersPage() {
                 customers={customers}
                 products={products}
                 warehouses={warehouses}
-                getTotalStockForProduct={getTotalStockForProduct}
+                getTotalStockForProduct={getTotalStockForProduct} 
                 getStockForProductInWarehouse={getStockForProductInWarehouse}
                 getProductById={getProductById}
               />
@@ -602,3 +598,5 @@ export default function SalesOrdersPage() {
     </div>
   );
 }
+
+    
