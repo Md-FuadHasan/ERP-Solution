@@ -18,7 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as FormDialogDescription, // Aliased to avoid conflict if another DialogDescription is used outside form context
+  DialogDescription as FormDialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
@@ -46,7 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from '@/components/ui/calendar';
@@ -73,10 +73,10 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
-    products, // Needed for InvoiceForm
-    warehouses, // Needed for InvoiceForm
-    getStockForProductInWarehouse, // Needed for InvoiceForm
-    getProductById, // Needed for InvoiceForm
+    products,
+    warehouses,
+    getStockForProductInWarehouse,
+    getProductById,
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,7 +103,6 @@ export default function InvoicesPage() {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'issueDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
 
-
   useEffect(() => {
     const action = searchParams.get('action');
     const invoiceIdParam = searchParams.get('id');
@@ -118,79 +117,72 @@ export default function InvoicesPage() {
     } else if (action === 'view' && invoiceIdParam) {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
-    
-    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
-        if (action === 'new' && !isFormModalOpen && !editingInvoice) {
-            setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
-            setEditingInvoice(null);
-            setIsFormModalOpen(true);
-            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
-            const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-            if (invoiceToEdit) {
-              setEditingInvoice(invoiceToEdit);
-              setCurrentPrefillValues(null);
-              setIsFormModalOpen(true);
-              setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-            } else {
-                const newSearchParams = new URLSearchParams(searchParams.toString());
-                newSearchParams.delete('action'); newSearchParams.delete('id');
-                router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-            }
-        } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
-             const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
-             if (invoiceToView) {
-               setInvoiceToViewInModal(invoiceToView);
-               setIsViewModalOpen(true);
-               setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-             } else {
-                const newSearchParams = new URLSearchParams(searchParams.toString());
-                newSearchParams.delete('action'); newSearchParams.delete('id');
-                router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-             }
-        }
-      } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
-         setUrlParamsProcessedIntentKey(null);
-      }
-  }, [searchParams, invoices, router, pathname, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
 
+    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+      if (action === 'new' && !isFormModalOpen && !editingInvoice) {
+        setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
+        setEditingInvoice(null);
+        setIsFormModalOpen(true);
+        setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+      } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
+        const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
+        if (invoiceToEdit) {
+          setEditingInvoice(invoiceToEdit);
+          setCurrentPrefillValues(null);
+          setIsFormModalOpen(true);
+          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+        } else {
+          const newSearchParams = new URLSearchParams(searchParams.toString());
+          newSearchParams.delete('action'); newSearchParams.delete('id');
+          router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        }
+      } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
+        const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
+        if (invoiceToView) {
+          setInvoiceToViewInModal(invoiceToView);
+          setIsViewModalOpen(true);
+          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+        } else {
+          const newSearchParams = new URLSearchParams(searchParams.toString());
+          newSearchParams.delete('action'); newSearchParams.delete('id');
+          router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        }
+      }
+    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
+      setUrlParamsProcessedIntentKey(null);
+    }
+  }, [searchParams, invoices, router, pathname, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
 
   const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
     setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
+      // Only clear URL params if the modal was opened by them
       const currentAction = searchParams.get('action');
-      const currentId = searchParams.get('id');
-      if ((currentAction === 'new' || currentAction === 'edit') && (currentId || searchParams.get('customerId'))) {
+      if (currentAction === 'new' || currentAction === 'edit') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-      }
-      // Ensure urlParamsProcessedIntentKey is cleared only when the URL is also cleared
-      if (!searchParams.get('action')) {
-        setUrlParamsProcessedIntentKey(null);
+        // It's safer to let the useEffect handle resetting urlParamsProcessedIntentKey when URL is clean
       }
     }
   }, [searchParams, router, pathname]);
-  
+
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
     setIsViewModalOpen(isOpen);
     if (!isOpen) {
-        setInvoiceToViewInModal(null);
-        const currentAction = searchParams.get('action');
-        if (currentAction === 'view') {
-            const newSearchParams = new URLSearchParams(searchParams.toString());
-            newSearchParams.delete('action');
-            newSearchParams.delete('id');
-            router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        }
-         if (!searchParams.get('action')) {
-            setUrlParamsProcessedIntentKey(null);
-        }
+      setInvoiceToViewInModal(null);
+      const currentAction = searchParams.get('action');
+      if (currentAction === 'view') {
+        const newSearchParams = new URLSearchParams(searchParams.toString());
+        newSearchParams.delete('action');
+        newSearchParams.delete('id');
+        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+      }
     }
   }, [searchParams, router, pathname]);
 
@@ -201,7 +193,6 @@ export default function InvoicesPage() {
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-    // The useEffect will handle opening the modal
   }, [searchParams, router, pathname]);
 
   const handleSort = useCallback((key: SortableInvoiceKeys) => {
@@ -241,24 +232,24 @@ export default function InvoicesPage() {
     }
     
     if (dateRange.from || dateRange.to) {
-        _filtered = _filtered.filter(invoice => {
-            const issueDate = parseISO(invoice.issueDate);
-            if (!isValid(issueDate)) return false;
-            
-            const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
-            const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
+      _filtered = _filtered.filter(invoice => {
+        const issueDate = parseISO(invoice.issueDate);
+        if (!isValid(issueDate)) return false;
+        
+        const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+        const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
 
-            if (fromDate && toDate) {
-                return isWithinInterval(issueDate, { start: fromDate, end: toDate });
-            }
-            if (fromDate) {
-                return issueDate >= fromDate;
-            }
-            if (toDate) {
-                return issueDate <= toDate;
-            }
-            return true;
-        });
+        if (fromDate && toDate) {
+          return isWithinInterval(issueDate, { start: fromDate, end: toDate });
+        }
+        if (fromDate) {
+          return issueDate >= fromDate;
+        }
+        if (toDate) {
+          return issueDate <= toDate;
+        }
+        return true;
+      });
     }
 
     if (sortConfig.key) {
@@ -272,8 +263,8 @@ export default function InvoicesPage() {
         }
         
         if (sortConfig.key === 'issueDate' || sortConfig.key === 'dueDate') {
-            aValue = new Date(aValue).getTime();
-            bValue = new Date(bValue).getTime();
+          aValue = new Date(aValue).getTime();
+          bValue = new Date(bValue).getTime();
         }
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
@@ -289,7 +280,6 @@ export default function InvoicesPage() {
 
     return _filtered;
   }, [invoices, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
-
 
   const handleEditInvoice = useCallback((invoice: Invoice) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -334,12 +324,10 @@ export default function InvoicesPage() {
 
     const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
     
-    // Assuming general tax (companyProfile.taxRate) is 0 if VAT is the primary consumption tax
-    const generalTaxAmount = 0; //  calculatedSubtotal * (companyProfile && companyProfile.taxRate ? Number(companyProfile.taxRate) / 100 : 0);
+    const generalTaxAmount = 0; // General tax rate is 0 as per updated logic
     const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
-    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT applied on (subtotal which includes item excise)
+    const calculatedVatAmount = calculatedSubtotal * vatRate;
     const calculatedTotalAmount = calculatedSubtotal + generalTaxAmount + calculatedVatAmount;
-
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -405,7 +393,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') {
+    if (data.status === 'Cancelled') { // Directly respect user choice for 'Cancelled'
       finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
@@ -452,8 +440,7 @@ export default function InvoicesPage() {
       toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
     }
     
-
-    handleFormModalOpenChange(false); // This will now correctly clear URL params
+    handleFormModalOpenChange(false);
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
@@ -608,11 +595,9 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                         <AlertDialogTrigger asChild>
-                           <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
-                              <Trash2 className="h-4 w-4" />
-                           </Button>
-                         </AlertDialogTrigger>
+                         <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                            <Trash2 className="h-4 w-4" />
+                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -750,6 +735,7 @@ export default function InvoicesPage() {
                               <TableHead className="min-w-[200px] pl-4 sm:pl-6 print:pl-2 print:min-w-[150px]">Item Description</TableHead>
                               <TableHead className="w-32 print:w-auto">Source Warehouse</TableHead>
                               <TableHead className="text-center w-24 print:w-auto">Qty</TableHead>
+                              <TableHead className="px-3 py-2">Unit</TableHead>
                               <TableHead className="text-right w-32 print:w-auto">Unit Price (incl. Excise)</TableHead>
                               <TableHead className="text-right w-32 pr-4 sm:pr-6 print:pr-2 print:w-auto">Amount (incl. Excise)</TableHead>
                             </TableRow>
@@ -761,7 +747,8 @@ export default function InvoicesPage() {
                                 <TableRow key={item.id || index} className="even:bg-muted/20">
                                   <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6 print:pl-2 print:py-1.5">{item.description}</TableCell>
                                   <TableCell className="text-muted-foreground py-3 print:py-1.5">{warehouseName}</TableCell>
-                                  <TableCell className="text-center text-muted-foreground py-3 print:py-1.5">{item.quantity} ({item.unitType})</TableCell>
+                                  <TableCell className="text-center text-muted-foreground py-3 print:py-1.5">{item.quantity}</TableCell>
+                                  <TableCell className="px-3 py-2 print:py-1.5">{item.unitType}</TableCell>
                                   <TableCell className="text-right text-muted-foreground py-3 print:py-1.5">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
                                   <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6 print:pr-2 print:py-1.5">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
                                 </TableRow>
