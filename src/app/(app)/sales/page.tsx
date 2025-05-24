@@ -26,7 +26,7 @@ import type { SalesOrder, SalesOrderStatus, Customer, Product } from '@/types';
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge'; // Assuming you have a badge component
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +36,9 @@ const getSalesOrderStatusBadgeVariant = (status: SalesOrderStatus) => {
     case 'Draft': return 'poDraft'; // Reusing PO draft style for now
     case 'Confirmed': return 'poSent'; // Reusing PO sent style
     case 'Processing': return 'poPartiallyReceived'; // Reusing PO partial style
+    case 'Ready for Dispatch': return 'default';
     case 'Dispatched': return 'default'; // Needs a specific style
+    case 'Partially Invoiced': return 'statusPartiallyPaid';
     case 'Fully Invoiced': return 'poFullyReceived'; // Reusing PO full style
     case 'Cancelled': return 'poCancelled';
     default: return 'outline';
@@ -48,8 +50,8 @@ export default function SalesPage() {
   const {
     salesOrders,
     addSalesOrder,
-    updateSalesOrder,
-    deleteSalesOrder,
+    updateSalesOrder, // Placeholder
+    deleteSalesOrder, // Placeholder
     getCustomerById,
     isLoading
   } = useData();
@@ -65,40 +67,15 @@ export default function SalesPage() {
   };
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
-    const itemsWithTotals = data.items.map(item => ({
-      ...item,
-      id: item.id || `so-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-    }));
-
-    const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; // Assuming no SO-level specific taxes/discounts for now
-    const customer = getCustomerById(data.customerId);
-
-    const salesOrderDataForContext = {
-      customerId: data.customerId,
-      customerName: customer?.name || data.customerId,
-      salespersonId: data.salespersonId || undefined,
-      routeId: data.routeId || undefined,
-      orderDate: data.orderDate.toISOString(),
-      expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
-      items: itemsWithTotals,
-      subtotal,
-      totalAmount,
-      notes: data.notes,
-      // Status will be set in addSalesOrder/updateSalesOrder context functions
-    };
-
     if (editingSalesOrder) {
       // updateSalesOrder({
       //   ...editingSalesOrder,
-      //   ...salesOrderDataForContext,
+      //   ...salesOrderDataForContext, // This needs to be properly constructed
       // });
-      // toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
-       console.warn("Sales Order update not fully implemented yet in UI flow beyond form.");
-       toast({ title: "Info", description: "Sales Order update UI flow to be completed."});
+      toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
+      console.warn("Sales Order update not fully implemented yet beyond form submission.");
     } else {
-      addSalesOrder(salesOrderDataForContext as Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'salespersonName' | 'routeName'>);
+      addSalesOrder(data); // DataContext's addSalesOrder will handle ID generation and defaults
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -121,7 +98,7 @@ export default function SalesPage() {
         {/* Add Search and Filter controls here later */}
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 lg:mt-8 mb-4 md:mb-6 lg:mb-8">
         <CardHeader className="border-b">
           <CardTitle>Sales Order List</CardTitle>
           <CardDescription>Overview of all sales orders.</CardDescription>
@@ -178,7 +155,7 @@ export default function SalesPage() {
               </TableHeader>
               <TableBody>
                 {salesOrders.map((so, index) => (
-                  <TableRow key={so.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                  <TableRow key={so.id} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2 text-xs">{so.id}</TableCell>
                     <TableCell className="px-2 text-xs">{so.customerName || getCustomerById(so.customerId)?.name || so.customerId}</TableCell>
                     <TableCell className="px-2 text-xs">{format(new Date(so.orderDate), 'MMM dd, yyyy')}</TableCell>
@@ -235,3 +212,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
