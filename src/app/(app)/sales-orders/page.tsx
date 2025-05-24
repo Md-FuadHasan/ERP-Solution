@@ -4,7 +4,21 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Eye, Edit, Trash2, CheckCircle, XCircle, ArrowLeft, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon } from 'lucide-react';
+import {
+  PlusCircle,
+  Eye,
+  Edit,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  ArrowLeft,
+  ChevronsUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter as FilterIcon,
+  CalendarIcon,
+  ShoppingCart, // Added ShoppingCart import
+} from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -67,13 +81,13 @@ export default function SalesOrdersPage() {
     updateSalesOrder,
     deleteSalesOrder,
     getSalesOrderById,
-    getCustomerById,
     customers,
     products,
     warehouses,
     getTotalStockForProduct,
     getStockForProductInWarehouse,
     getProductById,
+    getCustomerById,
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -148,6 +162,8 @@ export default function SalesOrdersPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
+    const salesperson = data.salespersonId ? salespeople.find(sp => sp.id === data.salespersonId) : null;
+
     const itemsWithDetails = data.items.map(item => {
         const product = getProductById(item.productId);
         const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
@@ -161,24 +177,25 @@ export default function SalesOrdersPage() {
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal;
+    const totalAmount = subtotal; // VAT applied at invoice stage
 
-    const salesOrderData: Partial<SalesOrder> = {
+    const salesOrderData = {
         ...data,
         customerName: customer?.name || data.customerId,
+        salespersonName: salesperson?.name || data.salespersonId,
+        // routeName: route?.name || data.routeId, // Assuming you might have routes in future
         items: itemsWithDetails,
         subtotal,
         totalAmount,
-        status: editingSalesOrder?.status || 'Draft',
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
     };
 
     if (editingSalesOrder) {
-      updateSalesOrder({ ...editingSalesOrder, ...salesOrderData } as SalesOrder);
+      updateSalesOrder({ ...editingSalesOrder, ...salesOrderData, status: editingSalesOrder.status } as SalesOrder);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
-      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount' | 'items'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName'>> });
+      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'routeName'>);
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -267,7 +284,7 @@ export default function SalesOrdersPage() {
             bValue = b.salespersonName || b.salespersonId || '';
         } else if (sortConfig.key === 'routeName') {
             aValue = a.routeName || a.routeId || '';
-            bValue = b.routeName || b.routeId || '';
+            bValue = b.routeName || a.routeId || '';
         } else {
             aValue = a[sortConfig.key as keyof SalesOrder];
             bValue = b[sortConfig.key as keyof SalesOrder];
@@ -292,6 +309,11 @@ export default function SalesOrdersPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
+        <div className="mb-4">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
+        </div>
         <PageHeader
           title="Sales Orders"
           description="Manage all your sales orders and track their status."
@@ -351,13 +373,15 @@ export default function SalesOrdersPage() {
               </Popover>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            Back
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>Back</Button>
         </div>
       </div>
 
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+        <CardHeader className="border-b">
+            <CardTitle>Sales Order List</CardTitle>
+            <CardDescription>Overview of all sales orders.</CardDescription>
+        </CardHeader>
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -476,8 +500,8 @@ export default function SalesOrdersPage() {
                 customers={customers}
                 products={products}
                 warehouses={warehouses}
-                getTotalStockForProduct={getTotalStockForProduct}
-                getStockForProductInWarehouse={getStockForProductInWarehouse}
+                getTotalStockForProduct={getTotalStockForProduct} 
+                getStockForProductInWarehouse={getStockForProductInWarehouse} 
                 getProductById={getProductById}
               />
             )}
@@ -609,3 +633,4 @@ export default function SalesOrdersPage() {
     </div>
   );
 }
+
