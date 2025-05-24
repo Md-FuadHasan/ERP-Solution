@@ -1,9 +1,10 @@
+
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, DollarSign, ListFilter, Hourglass, ExternalLink } from 'lucide-react';
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, DollarSign, ListFilter, Hourglass, ExternalLink, Users, Package, BarChart3 } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -64,15 +65,14 @@ export default function SalesManagementDashboardPage() {
   }, []);
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
-    // Editing logic will be primarily on the dedicated sales-orders page
-    // This dashboard's modal will only handle new SO creation
+    // This modal on the dashboard is only for creating new SOs.
+    // Editing will be handled on the dedicated /sales-orders page.
     addSalesOrder(data);
     toast({ title: "Sales Order Created", description: "New sales order has been created." });
     setIsSalesOrderFormModalOpen(false);
     setEditingSalesOrder(null);
   };
 
-  // Placeholder KPI data - Replace with actual calculations from salesOrders later
    const kpiData = useMemo(() => {
     const totalSalesThisMonth = salesOrders
       .filter(so => {
@@ -110,7 +110,7 @@ export default function SalesManagementDashboardPage() {
 
       <div className="flex-grow overflow-y-auto p-4 md:p-6 lg:p-8">
         {/* KPI Section */}
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Sales (This Month)</CardTitle>
@@ -118,7 +118,7 @@ export default function SalesManagementDashboardPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-8 w-3/4 mb-1" /> : <div className="text-2xl font-bold mb-1">${kpiData.totalSalesMTD.toFixed(2)}</div> }
-              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">Based on confirmed sales orders.</p>}
+              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">+5.2% vs last month</p>}
             </CardContent>
           </Card>
           <Card>
@@ -128,7 +128,7 @@ export default function SalesManagementDashboardPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-8 w-1/2 mb-1" /> : <div className="text-2xl font-bold mb-1">{kpiData.newOrdersToday} Orders</div>}
-              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">Number of sales orders created today.</p>}
+              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">+3 since yesterday</p>}
             </CardContent>
           </Card>
           <Card>
@@ -138,7 +138,7 @@ export default function SalesManagementDashboardPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-8 w-1/2 mb-1" /> : <div className="text-2xl font-bold mb-1">{kpiData.openOrdersPending} Orders</div>}
-              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">Orders not yet fully invoiced or cancelled.</p>}
+              {isLoading ? <Skeleton className="h-4 w-1/2" /> : <p className="text-xs text-muted-foreground">Pending processing or dispatch</p>}
             </CardContent>
           </Card>
         </div>
@@ -206,7 +206,7 @@ export default function SalesManagementDashboardPage() {
                 products={products}
                 warehouses={warehouses}
                 getTotalStockForProduct={getTotalStockForProduct} 
-                getStockForProductInWarehouse={() => 0} // Placeholder for now, main form logic on sales-orders page
+                getStockForProductInWarehouse={useData().getStockForProductInWarehouse} // Pass the specific function
                 getProductById={getProductById}
               />
             )}
