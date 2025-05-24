@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -36,20 +36,25 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useData } from '@/context/DataContext';
-import type { SalesOrder, SalesOrderStatus, Customer, Product, SalesOrderItem } from '@/types';
+import type { SalesOrder, SalesOrderStatus, Customer, Product, SalesOrderItem, Warehouse, ProductUnitType } from '@/types';
+import { ALL_SALES_ORDER_STATUSES } from '@/types';
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isValid, parseISO, isWithinInterval, startOfDay } from 'date-fns';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { VariantProps } from 'class-variance-authority';
+import { SearchInput } from '@/components/common/search-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProps<typeof badgeVariants>['variant'] => {
   if (!status) return 'outline';
   switch (status) {
     case 'Draft': return 'poDraft';
-    case 'Confirmed': return 'default'; 
+    case 'Confirmed': return 'default';
     case 'Processing': return 'secondary';
     case 'Ready for Dispatch': return 'outline';
     case 'Dispatched': return 'poSent';
@@ -60,6 +65,17 @@ const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProp
   }
 };
 
+type SortableSalesOrderKeys = keyof Pick<SalesOrder, 'id' | 'orderDate' | 'status' | 'totalAmount'> | 'customerName' | 'salespersonName' | 'routeName';
+
+interface SortConfig {
+  key: SortableSalesOrderKeys | null;
+  direction: 'ascending' | 'descending';
+}
+
+interface DateRange {
+  from: Date | null;
+  to: Date | null;
+}
 
 export default function SalesPage() {
   const {
@@ -69,6 +85,9 @@ export default function SalesPage() {
     deleteSalesOrder,
     getCustomerById,
     getProductById,
+    getTotalStockForProduct,
+    getStockForProductInWarehouse,
+    warehouses,
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -81,6 +100,10 @@ export default function SalesPage() {
   const [salesOrderToCancel, setSalesOrderToCancel] = useState<SalesOrder | null>(null);
   const [isCancelConfirmModalOpen, setIsCancelConfirmModalOpen] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
+  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
 
   const handleAddSalesOrder = () => {
     setEditingSalesOrder(null);
@@ -103,7 +126,7 @@ export default function SalesPage() {
 
   const confirmDeleteSalesOrder = () => {
     if (salesOrderToDelete) {
-      deleteSalesOrder(salesOrderToDelete.id); 
+      deleteSalesOrder(salesOrderToDelete.id);
       toast({ title: "Sales Order Deleted", description: `Sales Order ${salesOrderToDelete.id} has been removed.` });
       setSalesOrderToDelete(null);
     }
@@ -114,7 +137,7 @@ export default function SalesPage() {
       updateSalesOrder({ ...order, status: 'Confirmed' });
       toast({ title: "Sales Order Confirmed", description: `Order ${order.id} status updated to Confirmed.`});
       if(isViewModalOpen && salesOrderToView?.id === order.id) {
-        setSalesOrderToView({...order, status: 'Confirmed'}); // Update view modal state
+        setSalesOrderToView({...order, status: 'Confirmed'});
       }
     }
   };
@@ -129,29 +152,28 @@ export default function SalesPage() {
       updateSalesOrder({ ...salesOrderToCancel, status: 'Cancelled' });
       toast({ title: "Sales Order Cancelled", description: `Order ${salesOrderToCancel.id} has been cancelled.`});
       if(isViewModalOpen && salesOrderToView?.id === salesOrderToCancel.id) {
-         setSalesOrderToView({...salesOrderToCancel, status: 'Cancelled'}); // Update view modal state
+         setSalesOrderToView({...salesOrderToCancel, status: 'Cancelled'});
       }
       setSalesOrderToCancel(null);
     }
     setIsCancelConfirmModalOpen(false);
   };
 
-
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
-
     const itemsWithDetails = data.items.map(item => {
         const product = getProductById(item.productId);
         return {
-            ...item, 
+            ...item,
             id: item.id || `so-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             productName: product?.name || item.productId,
             total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+            sourceWarehouseId: item.sourceWarehouseId,
         };
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; 
+    const totalAmount = subtotal;
 
     if (editingSalesOrder) {
       const updatedSO: SalesOrder = {
@@ -159,16 +181,16 @@ export default function SalesPage() {
         customerId: data.customerId,
         customerName: customer?.name || data.customerId,
         salespersonId: data.salespersonId,
-        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined, 
+        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined,
         routeId: data.routeId,
-        routeName: data.routeId ? `Route ${data.routeId}` : undefined, 
+        routeName: data.routeId ? `Route ${data.routeId}` : undefined,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
         items: itemsWithDetails,
         subtotal,
         totalAmount,
         notes: data.notes,
-        status: editingSalesOrder.status, // Keep original status unless specifically changed by another action
+        status: editingSalesOrder.status,
       };
       updateSalesOrder(updatedSO);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
@@ -179,17 +201,18 @@ export default function SalesPage() {
         routeId: data.routeId,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
-        items: data.items.map(item => ({ // Ensure raw item data is passed for new SOs
+        items: data.items.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
           unitType: item.unitType,
           unitPrice: item.unitPrice,
+          sourceWarehouseId: item.sourceWarehouseId,
         })),
         notes: data.notes,
         shippingAddress: data.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
         billingAddress: data.billingAddress || customer?.billingAddress,
       };
-      addSalesOrder(salesOrderDataForContext as any); // Cast as any to match simplified addSalesOrder signature
+      addSalesOrder(salesOrderDataForContext as any);
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -199,26 +222,144 @@ export default function SalesPage() {
   const salesOrderForViewModal = useMemo(() => {
     if (!salesOrderToView) return null;
     const customer = getCustomerById(salesOrderToView.customerId);
-    const items = salesOrderToView.items.map(item => ({
-      ...item,
-      productName: getProductById(item.productId)?.name || item.productId,
-    }));
+    const items = salesOrderToView.items.map(item => {
+      const product = getProductById(item.productId);
+      const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
+      return {
+        ...item,
+        productName: product?.name || item.productId,
+        sourceWarehouseName: warehouse?.name || item.sourceWarehouseId || 'N/A',
+      };
+    });
     return { ...salesOrderToView, customerName: customer?.name, items };
-  }, [salesOrderToView, getCustomerById, getProductById]);
+  }, [salesOrderToView, getCustomerById, getProductById, warehouses]);
 
+  const handleSort = useCallback((key: SortableSalesOrderKeys) => {
+    setSortConfig(prevConfig => {
+      if (prevConfig.key === key && prevConfig.direction === 'ascending') {
+        return { key, direction: 'descending' };
+      }
+      return { key, direction: 'ascending' };
+    });
+  }, []);
+
+  const handleDateChange = useCallback((type: 'from' | 'to', date: Date | undefined) => {
+    setDateRange(prevRange => ({ ...prevRange, [type]: date || null }));
+  }, []);
+
+  const filteredSalesOrders = useMemo(() => {
+    let _salesOrders = [...salesOrders];
+
+    if (searchTerm) {
+      _salesOrders = _salesOrders.filter(so =>
+        so.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (so.customerName && so.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (so.salespersonName && so.salespersonName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (so.routeName && so.routeName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (getCustomerById(so.customerId)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      _salesOrders = _salesOrders.filter(so => so.status === statusFilter);
+    }
+
+    if (dateRange.from || dateRange.to) {
+      _salesOrders = _salesOrders.filter(so => {
+        const orderDate = parseISO(so.orderDate);
+        if (!isValid(orderDate)) return false;
+        const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+        const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
+        if (fromDate && toDate) return isWithinInterval(orderDate, { start: fromDate, end: toDate });
+        if (fromDate) return orderDate >= fromDate;
+        if (toDate) return orderDate <= toDate;
+        return true;
+      });
+    }
+
+    if (sortConfig.key) {
+      _salesOrders.sort((a, b) => {
+        let aValue: any = a[sortConfig.key as keyof SalesOrder];
+        let bValue: any = b[sortConfig.key as keyof SalesOrder];
+
+        if (sortConfig.key === 'customerName') {
+          aValue = a.customerName || getCustomerById(a.customerId)?.name || '';
+          bValue = b.customerName || getCustomerById(b.customerId)?.name || '';
+        }
+        if (sortConfig.key === 'orderDate') {
+            aValue = new Date(aValue).getTime();
+            bValue = new Date(bValue).getTime();
+        }
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+        if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
+    }
+    return _salesOrders;
+  }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
+
+  const renderSortIcon = (columnKey: SortableSalesOrderKeys) => {
+    if (sortConfig.key !== columnKey) return <ChevronsUpDown className="ml-2 h-3 w-3" />;
+    return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Sales Orders"
-          description="Manage your sales orders, track customer requests, and streamline fulfillment."
+          description="Manage sales orders, track customer requests, and streamline fulfillment."
           actions={
             <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
             </Button>
           }
         />
+        <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
+          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search SO by ID, Customer, Salesperson..." className="w-full sm:w-auto md:w-64" />
+          <div className="relative w-full sm:w-auto md:w-[200px]">
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SalesOrderStatus | 'all')}>
+              <SelectTrigger className="w-full pl-10">
+                <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter by status..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {ALL_SALES_ORDER_STATUSES.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.from ? format(dateRange.from, "PPP") : <span>Order Date From</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.to ? format(dateRange.to, "PPP") : <span>Order Date To</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
       </div>
 
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 lg:mt-8 mb-4 md:mb-6 lg:mb-8">
@@ -249,22 +390,36 @@ export default function SalesPage() {
                 ))}
               </TableBody>
             </Table>
-          ) : salesOrders.length > 0 ? (
+          ) : filteredSalesOrders.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2 text-sm">Order ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2 text-sm">Customer</TableHead>
-                  <TableHead className="min-w-[100px] px-2 text-sm">Order Date</TableHead>
-                  <TableHead className="min-w-[120px] px-2 text-sm">Salesperson</TableHead>
-                  <TableHead className="min-w-[100px] px-2 text-sm">Route</TableHead>
-                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
-                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                     <div className="flex items-center">Order ID {renderSortIcon('id')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerName')}>
+                    <div className="flex items-center">Customer {renderSortIcon('customerName')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('orderDate')}>
+                    <div className="flex items-center">Order Date {renderSortIcon('orderDate')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('salespersonName')}>
+                    <div className="flex items-center">Salesperson {renderSortIcon('salespersonName')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('routeName')}>
+                     <div className="flex items-center">Route {renderSortIcon('routeName')}</div>
+                  </TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('totalAmount')}>
+                    <div className="flex items-center justify-end">Total {renderSortIcon('totalAmount')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">Status {renderSortIcon('status')}</div>
+                  </TableHead>
                   <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {salesOrders.map((so, index) => (
+                {filteredSalesOrders.map((so, index) => (
                   <TableRow key={so.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2 text-xs">{so.id}</TableCell>
                     <TableCell className="px-2 text-xs">{so.customerName || getCustomerById(so.customerId)?.name || so.customerId}</TableCell>
@@ -294,9 +449,11 @@ export default function SalesPage() {
             <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
                 icon={ShoppingCart}
-                title="No Sales Orders Yet"
-                message="Start by creating your first sales order."
-                action={<Button onClick={handleAddSalesOrder}><PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order</Button>}
+                title="No Sales Orders Found"
+                message={searchTerm || statusFilter !== 'all' || dateRange.from || dateRange.to ? "Try adjusting your search or filter criteria." : "Start by creating your first sales order."}
+                action={!searchTerm && statusFilter === 'all' && !dateRange.from && !dateRange.to ? (
+                  <Button onClick={handleAddSalesOrder}><PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order</Button>
+                ) : undefined}
               />
             </div>
           )}
@@ -318,6 +475,12 @@ export default function SalesPage() {
                 onSubmit={handleSubmitSalesOrder}
                 onCancel={() => { setIsSalesOrderFormModalOpen(false); setEditingSalesOrder(null); }}
                 isSubmitting={isLoading}
+                customers={customers}
+                products={products}
+                warehouses={warehouses}
+                getTotalStockForProduct={getTotalStockForProduct}
+                getStockForProductInWarehouse={getStockForProductInWarehouse}
+                getProductById={getProductById}
               />
             )}
           </div>
@@ -356,6 +519,7 @@ export default function SalesPage() {
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead className="px-3 py-2">Product</TableHead>
+                        <TableHead className="px-3 py-2">Source Warehouse</TableHead>
                         <TableHead className="text-center px-3 py-2">Qty</TableHead>
                         <TableHead className="px-3 py-2">Unit</TableHead>
                         <TableHead className="text-right px-3 py-2">Unit Price</TableHead>
@@ -366,6 +530,7 @@ export default function SalesPage() {
                       {salesOrderForViewModal.items.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="px-3 py-2">{item.productName}</TableCell>
+                          <TableCell className="px-3 py-2">{item.sourceWarehouseName}</TableCell>
                           <TableCell className="text-center px-3 py-2">{item.quantity}</TableCell>
                           <TableCell className="px-3 py-2">{item.unitType}</TableCell>
                           <TableCell className="text-right px-3 py-2">${item.unitPrice.toFixed(2)}</TableCell>
@@ -385,18 +550,18 @@ export default function SalesPage() {
           )}
           <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row sm:justify-end gap-2">
              {salesOrderForViewModal?.status === 'Draft' && (
-                <Button 
-                    variant="default" 
-                    onClick={() => { if(salesOrderToView) { handleConfirmOrder(salesOrderToView); setIsViewModalOpen(false); }}} 
+                <Button
+                    variant="default"
+                    onClick={() => { if(salesOrderToView) { handleConfirmOrder(salesOrderToView); setIsViewModalOpen(false); }}}
                     className="w-full sm:w-auto"
                 >
                   <CheckCircle className="mr-2 h-4 w-4" /> Confirm Order
                 </Button>
             )}
             {(salesOrderForViewModal?.status === 'Draft' || salesOrderForViewModal?.status === 'Confirmed') && (
-                <Button 
-                    variant="destructive" 
-                    onClick={() => { if(salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleCancelOrderConfirm(salesOrderToView),100); }}} 
+                <Button
+                    variant="destructive"
+                    onClick={() => { if(salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleCancelOrderConfirm(salesOrderToView),100); }}}
                     className="w-full sm:w-auto"
                 >
                   <XCircle className="mr-2 h-4 w-4" /> Cancel Order
@@ -445,5 +610,6 @@ export default function SalesPage() {
     </div>
   );
 }
+
 
     
