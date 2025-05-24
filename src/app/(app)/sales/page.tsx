@@ -1,7 +1,5 @@
 
 'use client';
-
-import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -168,12 +166,11 @@ export default function SalesPage() {
             id: item.id || `so-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             productName: product?.name || item.productId,
             total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-            sourceWarehouseId: item.sourceWarehouseId,
         };
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal;
+    const totalAmount = subtotal; // For SO, total might be same as subtotal if no SO-level taxes/discounts
 
     if (editingSalesOrder) {
       const updatedSO: SalesOrder = {
@@ -190,7 +187,7 @@ export default function SalesPage() {
         subtotal,
         totalAmount,
         notes: data.notes,
-        status: editingSalesOrder.status,
+        status: editingSalesOrder.status, // Preserve original status during edit unless explicitly changed
       };
       updateSalesOrder(updatedSO);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
@@ -209,10 +206,10 @@ export default function SalesPage() {
           sourceWarehouseId: item.sourceWarehouseId,
         })),
         notes: data.notes,
-        shippingAddress: data.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
-        billingAddress: data.billingAddress || customer?.billingAddress,
+        shippingAddress: customer?.shippingAddress || customer?.billingAddress, // Use customer addresses as default
+        billingAddress: customer?.billingAddress,
       };
-      addSalesOrder(salesOrderDataForContext as any);
+      addSalesOrder(salesOrderDataForContext as any); // Cast as any to bypass strict type check for SalesOrder fields not in form
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -319,10 +316,18 @@ export default function SalesPage() {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search SO by ID, Customer, Salesperson..." className="w-full sm:w-auto md:w-64" />
-          <div className="relative w-full sm:w-auto md:w-[200px]">
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SalesOrderStatus | 'all')}>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search SO by ID, Customer, Salesperson..."
+            className="w-full sm:w-auto md:w-64 lg:flex-none"
+          />
+          <div className="relative w-full sm:w-auto md:w-[200px] lg:flex-none">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as SalesOrderStatus | 'all')}
+            >
               <SelectTrigger className="w-full pl-10">
                 <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="Filter by status..." />
@@ -338,7 +343,10 @@ export default function SalesPage() {
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange.from ? format(dateRange.from, "PPP") : <span>Order Date From</span>}
                 </Button>
@@ -349,7 +357,10 @@ export default function SalesPage() {
             </Popover>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange.to ? format(dateRange.to, "PPP") : <span>Order Date To</span>}
                 </Button>
@@ -452,7 +463,7 @@ export default function SalesPage() {
                 title="No Sales Orders Found"
                 message={searchTerm || statusFilter !== 'all' || dateRange.from || dateRange.to ? "Try adjusting your search or filter criteria." : "Start by creating your first sales order."}
                 action={!searchTerm && statusFilter === 'all' && !dateRange.from && !dateRange.to ? (
-                  <Button onClick={handleAddSalesOrder}><PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order</Button>
+                  <Button onClick={handleAddSalesOrder} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0"><PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order</Button>
                 ) : undefined}
               />
             </div>
@@ -478,7 +489,7 @@ export default function SalesPage() {
                 customers={customers}
                 products={products}
                 warehouses={warehouses}
-                getTotalStockForProduct={getTotalStockForProduct}
+                getTotalStockForProduct={getTotalStockForProduct} // Still useful for general product info if needed
                 getStockForProductInWarehouse={getStockForProductInWarehouse}
                 getProductById={getProductById}
               />
@@ -610,6 +621,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-
-    
