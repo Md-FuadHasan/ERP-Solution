@@ -2,16 +2,16 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle, ArrowLeft } from 'lucide-react';
+import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle, ArrowLeft, Filter as FilterIcon } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as FormDialogDescription, // Renamed to avoid conflict with CardDescription
+  DialogDescription as FormDialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -34,15 +34,18 @@ import {
 } from '@/components/ui/table';
 import { useData } from '@/context/DataContext';
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, Product, POStatus, Warehouse, ProductUnitType } from '@/types';
+import { ALL_PO_STATUSES } from '@/types'; // Import ALL_PO_STATUSES
 import { PurchaseOrderForm, type PurchaseOrderFormValues } from '@/components/forms/purchase-order-form';
 import { ReceiveStockForm, type ReceiveStockFormValues } from '@/components/forms/receive-stock-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
+import { SearchInput } from '@/components/common/search-input'; // Import SearchInput
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select components
 
 const getPOStatusBadgeVariant = (status: POStatus) => {
   switch (status) {
@@ -54,7 +57,6 @@ const getPOStatusBadgeVariant = (status: POStatus) => {
     default: return 'outline';
   }
 };
-
 
 export default function PurchaseOrdersPage() {
   const {
@@ -85,55 +87,83 @@ export default function PurchaseOrdersPage() {
   const [isReceiveStockModalOpen, setIsReceiveStockModalOpen] = useState(false);
   const [poToReceiveStock, setPoToReceiveStock] = useState<PurchaseOrder | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<POStatus | 'all'>('all');
 
-  const handleAddPO = () => {
+  const filteredPurchaseOrders = useMemo(() => {
+    let filtered = [...purchaseOrders];
+
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(po =>
+        po.id.toLowerCase().includes(lowerSearchTerm) ||
+        (po.supplierName && po.supplierName.toLowerCase().includes(lowerSearchTerm)) ||
+        (getSupplierById(po.supplierId)?.name.toLowerCase().includes(lowerSearchTerm))
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(po => po.status === statusFilter);
+    }
+    // Add sorting logic here in the future if needed
+    return filtered.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+  }, [purchaseOrders, searchTerm, statusFilter, getSupplierById]);
+
+
+  const handleAddPO = useCallback(() => {
     setEditingPO(null);
     setIsFormModalOpen(true);
-  };
+  }, []);
 
-  const handleEditPO = (po: PurchaseOrder) => {
+  const handleEditPO = useCallback((po: PurchaseOrder) => {
+    if (po.status !== 'Draft') {
+      toast({ title: "Cannot Edit", description: `Purchase Order ${po.id} is not in Draft status and cannot be edited.`, variant: "default" });
+      return;
+    }
     setEditingPO(po);
     setIsFormModalOpen(true);
-  };
+  }, [toast]);
 
-  const handleViewPO = (po: PurchaseOrder) => {
+  const handleViewPO = useCallback((po: PurchaseOrder) => {
     setPoToView(po);
     setIsViewModalOpen(true);
-  };
+  }, []);
 
-  const handleDeletePOConfirm = (po: PurchaseOrder) => {
+  const handleDeletePOConfirm = useCallback((po: PurchaseOrder) => {
     setPoToDelete(po);
-  };
+  }, []);
 
-  const confirmDeletePO = () => {
+  const confirmDeletePO = useCallback(() => {
     if (poToDelete) {
       deletePurchaseOrder(poToDelete.id);
       toast({ title: "Purchase Order Deleted", description: `PO ${poToDelete.id} has been removed.` });
       setPoToDelete(null);
     }
-  };
+  }, [poToDelete, deletePurchaseOrder, toast]);
 
-  const handleCancelPOConfirm = (po: PurchaseOrder) => {
+  const handleCancelPOConfirm = useCallback((po: PurchaseOrder) => {
+    if (po.status !== 'Draft' && po.status !== 'Sent') {
+      toast({ title: "Cannot Cancel", description: `PO ${po.id} status is ${po.status}. Only Draft or Sent POs can be cancelled.`, variant: "default" });
+      return;
+    }
     setPoToCancel(po);
     setIsCancelConfirmModalOpen(true);
-  };
+  }, [toast]);
 
-  const confirmCancelPO = () => {
+  const confirmCancelPO = useCallback(() => {
     if (poToCancel) {
       cancelPurchaseOrder(poToCancel.id);
       toast({ title: "Purchase Order Cancelled", description: `PO ${poToCancel.id} has been cancelled.` });
-      
-      // If the cancelled PO was being viewed, update its state in the view modal
       if (poToView && poToView.id === poToCancel.id) {
-        setPoToView({ ...poToView, status: 'Cancelled' });
+        setPoToView({ ...poToView, status: 'Cancelled', updatedAt: new Date().toISOString() });
       }
       setPoToCancel(null);
     }
     setIsCancelConfirmModalOpen(false);
-  };
+  }, [poToCancel, cancelPurchaseOrder, toast, poToView]);
 
 
-  const handleSubmitPO = (data: PurchaseOrderFormValues) => {
+  const handleSubmitPO = useCallback((data: PurchaseOrderFormValues) => {
     const itemsWithTotals = data.items.map(item => ({
       ...item,
       id: item.id || `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -162,8 +192,7 @@ export default function PurchaseOrdersPage() {
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
-        status: editingPO.status === 'Draft' && itemsWithTotals.length > 0 && poDataForContext.supplierId ? 'Sent' : editingPO.status,
-        createdAt: editingPO.createdAt, 
+        // Status transition handled by updatePurchaseOrder in context
       });
       toast({
         title: "Purchase Order Updated",
@@ -178,7 +207,7 @@ export default function PurchaseOrdersPage() {
     }
     setIsFormModalOpen(false);
     setEditingPO(null);
-  };
+  }, [editingPO, getSupplierById, updatePurchaseOrder, addPurchaseOrder, toast]);
 
   const poForViewModal = useMemo(() => {
     if (!poToView) return null;
@@ -191,15 +220,19 @@ export default function PurchaseOrdersPage() {
         quantityReceived: typeof item.quantityReceived === 'number' ? item.quantityReceived : 0,
       };
     });
-    return { ...poToView, supplierName: supplier?.name, items: itemsWithProductDetails };
+    return { ...poToView, supplierName: supplier?.name || poToView.supplierId, items: itemsWithProductDetails };
   }, [poToView, getSupplierById, getProductById]);
 
-  const handleOpenReceiveStockModal = (po: PurchaseOrder) => {
+  const handleOpenReceiveStockModal = useCallback((po: PurchaseOrder) => {
+    if (po.status !== 'Sent' && po.status !== 'Partially Received') {
+       toast({ title: "Cannot Receive Stock", description: `PO ${po.id} is in ${po.status} status. Only Sent or Partially Received POs can receive stock.`, variant: "default" });
+       return;
+    }
     setPoToReceiveStock(po);
     setIsReceiveStockModalOpen(true);
-  };
+  }, [toast]);
 
-  const handleReceiveStockSubmit = (data: ReceiveStockFormValues) => {
+  const handleReceiveStockSubmit = useCallback((data: ReceiveStockFormValues) => {
     const itemsToProcess = data.receivedItems
       .filter(item => (Number(item.quantityReceivedNow) || 0) > 0 && item.destinationWarehouseId)
       .map(item => ({
@@ -213,9 +246,8 @@ export default function PurchaseOrdersPage() {
     if (itemsToProcess.length > 0) {
       processPOReceipt(data.poId, itemsToProcess);
       toast({ title: "Stock Received", description: `Stock has been updated for PO ${data.poId}.` });
-       // Update poToView if it's the one being received
       if (poToView && poToView.id === data.poId) {
-        const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId);
+        const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId); // Re-fetch to get the latest state
         if (updatedPOFromContext) {
           setPoToView(updatedPOFromContext);
         }
@@ -225,8 +257,7 @@ export default function PurchaseOrdersPage() {
     }
     setIsReceiveStockModalOpen(false);
     setPoToReceiveStock(null);
-  };
-
+  }, [processPOReceipt, toast, poToView, purchaseOrders]);
 
   return (
     <div className="flex flex-col h-full">
@@ -240,17 +271,40 @@ export default function PurchaseOrdersPage() {
             </Button>
           }
         />
-         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-            {/* Placeholder for future filters */}
-            <div /> 
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+            <SearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search by PO ID, Supplier..."
+              className="w-full md:w-64 lg:flex-none"
+            />
+            <div className="relative w-full md:w-[200px] lg:flex-none">
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as POStatus | 'all')}
+              >
+                <SelectTrigger className="w-full pl-10">
+                  <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {ALL_PO_STATUSES.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Placeholder for future date filters */}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
         </div>
       </div>
 
        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
-        {/* Removed CardHeader for "Purchase Order List" */}
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -261,8 +315,8 @@ export default function PurchaseOrdersPage() {
                   <TableHead className="min-w-[100px] px-2 text-sm">Order Date</TableHead>
                   <TableHead className="min-w-[100px] px-2 text-sm">Exp. Delivery</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
-                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
-                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="text-right min-w-[220px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -273,7 +327,7 @@ export default function PurchaseOrdersPage() {
                 ))}
               </TableBody>
             </Table>
-          ) : purchaseOrders.length > 0 ? (
+          ) : filteredPurchaseOrders.length > 0 ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
@@ -282,12 +336,12 @@ export default function PurchaseOrdersPage() {
                   <TableHead className="min-w-[100px] px-2 text-sm">Order Date</TableHead>
                   <TableHead className="min-w-[100px] px-2 text-sm">Exp. Delivery</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
-                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
-                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="text-right min-w-[220px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchaseOrders.map((po, index) => (
+                {filteredPurchaseOrders.map((po, index) => (
                   <TableRow key={po.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2 text-xs">{po.id}</TableCell>
                     <TableCell className="px-2 text-xs">{po.supplierName || getSupplierById(po.supplierId)?.name || po.supplierId}</TableCell>
@@ -305,7 +359,7 @@ export default function PurchaseOrdersPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleViewPO(po)} className="hover:text-primary" title="View PO"><Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditPO(po)} className="hover:text-primary" title="Edit PO" disabled={po.status !== 'Draft'}><Edit className="h-4 w-4" /></Button>
                         {(po.status === 'Draft' || po.status === 'Sent') && (
-                           <Button variant="ghost" size="icon" onClick={() => handleCancelPOConfirm(po)} className="hover:text-destructive" title="Cancel PO"><XCircle className="h-4 w-4" /></Button>
+                           <Button variant="ghost" size="icon" onClick={() => handleCancelPOConfirm(po)} className="hover:text-orange-500" title="Cancel PO"><XCircle className="h-4 w-4" /></Button>
                         )}
                         <Button variant="ghost" size="icon" onClick={() => handleDeletePOConfirm(po)} className="hover:text-destructive" title="Delete PO"><Trash2 className="h-4 w-4" /></Button>
                       </div>
@@ -318,9 +372,9 @@ export default function PurchaseOrdersPage() {
             <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
                 icon={ShoppingBasket}
-                title="No Purchase Orders Yet"
-                message="Create your first purchase order to start managing your procurement."
-                action={<Button onClick={handleAddPO}><PlusCircle className="mr-2 h-4 w-4" /> Create New PO</Button>}
+                title="No Purchase Orders Found"
+                message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Create your first purchase order to start managing procurement."}
+                action={!searchTerm && statusFilter === 'all' ? <Button onClick={handleAddPO}><PlusCircle className="mr-2 h-4 w-4" /> Create New PO</Button> : undefined}
               />
             </div>
           )}
@@ -350,7 +404,7 @@ export default function PurchaseOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+      <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => { setIsViewModalOpen(isOpen); if(!isOpen) setPoToView(null);}}>
         <DialogContent className="w-[95vw] max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Purchase Order Details: {poForViewModal?.id}</DialogTitle>
@@ -441,7 +495,7 @@ export default function PurchaseOrdersPage() {
                 <Edit className="mr-2 h-4 w-4" /> Edit PO
               </Button>
             )}
-            <Button variant="outline" onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto">Close</Button>
+            <Button variant="outline" onClick={() => {setIsViewModalOpen(false); setPoToView(null);}} className="w-full sm:w-auto">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -484,7 +538,7 @@ export default function PurchaseOrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={setIsCancelConfirmModalOpen}>
+      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={(isOpen) => {if(!isOpen) {setIsCancelConfirmModalOpen(false); setPoToCancel(null);}}}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
             <AlertDialogTitleComponent>Confirm Cancellation</AlertDialogTitleComponent>
@@ -502,3 +556,4 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
+
