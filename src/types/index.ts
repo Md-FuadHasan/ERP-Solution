@@ -61,12 +61,12 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  // Subtotal = Sum of all (item.quantity * item.unitPrice), where item.unitPrice includes product base price + product excise tax.
+  // Subtotal = Sum of all (item.quantity * (product.basePrice + product.exciseTax for item's unit)).
   subtotal: number;
-  taxAmount: number; // General tax on subtotal - if VAT is the only primary consumption tax, this should be 0.
-  // vatAmount = VAT on subtotal (which already includes product-specific excise taxes if unitPrice is set correctly).
+  taxAmount: number; // General tax on subtotal - THIS SHOULD BE 0 if VAT is the main consumption tax.
+  // vatAmount = VAT on (subtotal).
   vatAmount: number;
-  totalAmount: number; // subtotal + taxAmount (if any) + vatAmount.
+  totalAmount: number; // subtotal + taxAmount (which is 0) + vatAmount.
   status: InvoiceStatus;
   paymentProcessingStatus: PaymentProcessingStatus;
   amountPaid: number;
@@ -84,7 +84,7 @@ export interface CompanyProfile {
   address: string;
   phone: string;
   email: string;
-  taxRate: number | string; // General tax rate. Set to 0 if VAT is the primary tax.
+  taxRate: number | string; // General tax rate. Should be 0 if VAT is the primary tax.
   vatRate: number | string; // VAT rate e.g. 15 for 15%
   excessTaxRate?: number | string;
 }
@@ -174,10 +174,10 @@ export type StockTransactionType =
   | 'Transfer Out'
   | 'Transfer In'
   | 'Sale'
-  | 'Sale Return'
+  | 'Sale Return' // For when an invoice is deleted/cancelled
   | 'PO Receipt'
-  | 'Production Output'
-  | 'Production Input Consumption';
+  | 'Production Output' // Future use
+  | 'Production Input Consumption'; // Future use
 
 
 export interface StockTransaction {
@@ -206,14 +206,14 @@ export interface Supplier {
 }
 
 export interface PurchaseOrderItem {
-  id: string;
+  id: string; // Unique ID for this PO item line
   productId: string;
-  productName?: string;
+  productName?: string; // For display convenience
   quantity: number;
-  unitType: ProductUnitType;
-  unitPrice: number;
-  total: number;
-  quantityReceived?: number;
+  unitType: ProductUnitType; // e.g., PCS or Cartons (this is the unit ordered from supplier)
+  unitPrice: number; // Cost price per ordered unit
+  total: number; // quantity * unitPrice
+  quantityReceived?: number; // Quantity of this item received so far, in ordered unit type
 }
 
 export type POStatus = 'Draft' | 'Sent' | 'Partially Received' | 'Fully Received' | 'Cancelled';
@@ -227,7 +227,7 @@ export interface PurchaseOrder {
   expectedDeliveryDate?: string;
   items: PurchaseOrderItem[];
   subtotal: number;
-  taxAmount?: number;
+  taxAmount?: number; // Placeholder for any PO-level taxes from supplier
   totalAmount: number;
   status: POStatus;
   notes?: string;
@@ -244,8 +244,8 @@ export interface SalesOrderItem {
   productId: string;
   productName?: string; // For display convenience
   quantity: number;
-  unitType: ProductUnitType; // e.g., PCS or Cartons
-  // Unit price is BEFORE invoice-level VAT, but includes product-level base price + product-level excise tax
+  unitType: ProductUnitType; // e.g., PCS or Cartons (the unit the customer is ordering)
+  // Unit price is BEFORE invoice-level VAT, but includes product.basePrice + product.exciseTax
   unitPrice: number;
   total: number; // quantity * unitPrice
   sourceWarehouseId?: string; // Warehouse fulfilling this item (important for multi-warehouse)
@@ -262,10 +262,8 @@ export interface SalesOrder {
   orderDate: string; // ISO Date
   expectedDeliveryDate?: string; // ISO Date
   items: SalesOrderItem[];
-  subtotal: number; // Sum of (item.total) which is (item.quantity * item.unitPrice)
-  // Invoice-level VAT and Total Amount will be calculated when converting to Invoice
-  // Or, we can store a pre-VAT total here if needed.
-  totalAmount: number; // For Sales Order itself, this is likely same as subtotal if no SO-specific taxes/discounts
+  subtotal: number; // Sum of (item.total) which is (item.quantity * item.unitPrice (base+excise))
+  totalAmount: number; // For Sales Order itself, this is likely same as subtotal (pre-VAT)
   status: SalesOrderStatus;
   shippingAddress?: string; // Can be copied from customer, or overridden
   billingAddress?: string; // Can be copied from customer, or overridden
@@ -282,23 +280,23 @@ export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   address: '123 App Dev Lane, Suite 404, Logic City, OS 12345',
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
-  taxRate: 0, // General tax set to 0 as VAT is primary
+  taxRate: 0,
   vatRate: 15,
   excessTaxRate: 0,
 };
 
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'PROD001', name: 'Ice Cream Cone - Blueberry 80ml', sku: 'ICCBLUE80', category: 'Frozen', unitType: 'Cartons', piecesInBaseUnit: 24, packagingUnit: 'Pallet', itemsPerPackagingUnit: 100, basePrice: 1.1667 * 24, costPrice: 20.00, exciseTax: 0.10 * 24, batchNo: 'B001A', productionDate: '2024-01-01T00:00:00.000Z', expiryDate: '2024-08-20T00:00:00.000Z', discountRate: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 10 },
+  { id: 'PROD001', name: 'Ice Cream Cone - Blueberry 80ml', sku: 'ICCBLUE80', category: 'Frozen', unitType: 'Cartons', piecesInBaseUnit: 24, packagingUnit: 'Pallet', itemsPerPackagingUnit: 100, basePrice: 28.00, costPrice: 20.00, exciseTax: 2.40, batchNo: 'B001A', productionDate: '2024-01-01T00:00:00.000Z', expiryDate: '2024-08-20T00:00:00.000Z', discountRate: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 10 },
   { id: 'PROD002', name: 'LABAN - 900 ML (Bottle)', sku: 'LBN90020', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, basePrice: 0.90, costPrice: 0.60, exciseTax: 0.10, discountRate: 5, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: '2024-09-05T00:00:00.000Z', globalReorderPoint: 240 },
   { id: 'PROD003', name: 'Cooking Cream 1080ml', sku: '330012', category: 'Dairy', unitType: 'Cartons', piecesInBaseUnit: 12, basePrice: 10.00, costPrice: 8.00, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), globalReorderPoint: 30 },
   { id: 'PROD004', name: 'Al Rabie Juice 125ml - Orange', sku: '25027-ORG', category: 'Beverages', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, basePrice: 0.55, costPrice: 0.35, exciseTax: 0.02, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 2)).toISOString(), globalReorderPoint: 900 },
   { id: 'PROD005', name: 'Ice Cream Tub 1.8L - Vanilla', sku: '80012-VAN', category: 'Frozen', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 6, basePrice: 10.50, costPrice: 8.00, exciseTax: 0.50, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: '2024-11-30T00:00:00.000Z', globalReorderPoint: 20 },
   { id: 'PROD006', name: 'UHT Milk 200ml', sku: '59012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, basePrice: 0.70, costPrice: 0.45, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(), globalReorderPoint: 1080 },
   { id: 'PROD007', name: 'Whipping Cream 1080ml', sku: '330011', category: 'Dairy', unitType: 'Cartons', piecesInBaseUnit: 12, basePrice: 11.50, costPrice: 9.50, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), globalReorderPoint: 25 },
-  { id: 'PROD008', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry', sku: '12024-VS', category: 'Frozen', unitType: 'Cartons', piecesInBaseUnit: 24, basePrice: 1.40 * 24, costPrice: 24.00, exciseTax: 0.10 * 24, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: '2024-12-30T00:00:00.000Z', globalReorderPoint: 20 },
-  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', piecesInBaseUnit: 1, basePrice: 0.90, costPrice: 0.70, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 200 },
-  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', piecesInBaseUnit: 1, basePrice: 0.20, costPrice: 0.15, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 1000 },
+  { id: 'PROD008', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry', sku: '12024-VS', category: 'Frozen', unitType: 'Cartons', piecesInBaseUnit: 24, basePrice: 33.60, costPrice: 24.00, exciseTax: 2.40, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: '2024-12-30T00:00:00.000Z', globalReorderPoint: 20 },
+  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', basePrice: 0.90, costPrice: 0.70, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 200 },
+  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', basePrice: 0.20, costPrice: 0.15, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 1000 },
 ];
 
 export const MOCK_WAREHOUSES: Warehouse[] = [
@@ -315,19 +313,19 @@ export const MOCK_WAREHOUSES: Warehouse[] = [
 ];
 
 export const MOCK_PRODUCT_STOCK_LOCATIONS: ProductStockLocation[] = [
-  { id: 'PSL001', productId: 'PROD001', warehouseId: 'WH-HO-ICE', stockLevel: 50 },
-  { id: 'PSL002', productId: 'PROD001', warehouseId: 'WH-JED-01', stockLevel: 20 },
-  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 8 },
-  { id: 'PSL004', productId: 'PROD002', warehouseId: 'WH-HO-LABAN', stockLevel: 1000 },
-  { id: 'PSL005', productId: 'PROD002', warehouseId: 'WH-JED-01', stockLevel: 120 },
-  { id: 'PSL006', productId: 'PROD004', warehouseId: 'WH-HO-TETRA', stockLevel: 2000 },
-  { id: 'PSL007', productId: 'PROD004', warehouseId: 'WH-RIY-01', stockLevel: 180 },
-  { id: 'PSL008', productId: 'PROD004', warehouseId: 'WH-DAM-01', stockLevel: 90 },
-  { id: 'PSL009', productId: 'PROD005', warehouseId: 'WH-HO-ICE', stockLevel: 100 },
-  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 15 },
-  { id: 'PSL011', productId: 'PROD009', warehouseId: 'WH-HO-ICE', stockLevel: 500 },
-  { id: 'PSL012', productId: 'PROD009', warehouseId: 'WH-HO-TETRA', stockLevel: 300 },
-  { id: 'PSL013', productId: 'PROD008', warehouseId: 'WH-HO-ICE', stockLevel: 10 },
+  { id: 'PSL001', productId: 'PROD001', warehouseId: 'WH-HO-ICE', stockLevel: 50 }, // 50 Cartons
+  { id: 'PSL002', productId: 'PROD001', warehouseId: 'WH-JED-01', stockLevel: 20 }, // 20 Cartons
+  { id: 'PSL003', productId: 'PROD001', warehouseId: 'WH-RIY-01', stockLevel: 8 },  // 8 Cartons
+  { id: 'PSL004', productId: 'PROD002', warehouseId: 'WH-HO-LABAN', stockLevel: 1000 }, // 1000 PCS
+  { id: 'PSL005', productId: 'PROD002', warehouseId: 'WH-JED-01', stockLevel: 120 },  // 120 PCS
+  { id: 'PSL006', productId: 'PROD004', warehouseId: 'WH-HO-TETRA', stockLevel: 2000 },// 2000 PCS
+  { id: 'PSL007', productId: 'PROD004', warehouseId: 'WH-RIY-01', stockLevel: 180 }, // 180 PCS
+  { id: 'PSL008', productId: 'PROD004', warehouseId: 'WH-DAM-01', stockLevel: 90 },  // 90 PCS
+  { id: 'PSL009', productId: 'PROD005', warehouseId: 'WH-HO-ICE', stockLevel: 100 }, // 100 PCS (Tubs)
+  { id: 'PSL010', productId: 'PROD005', warehouseId: 'WH-JED-01', stockLevel: 15 },  // 15 PCS (Tubs)
+  { id: 'PSL011', productId: 'PROD009', warehouseId: 'WH-HO-ICE', stockLevel: 500 }, // 500 Kgs
+  { id: 'PSL012', productId: 'PROD009', warehouseId: 'WH-HO-TETRA', stockLevel: 300 },// 300 Kgs
+  { id: 'PSL013', productId: 'PROD008', warehouseId: 'WH-HO-ICE', stockLevel: 10 },  // 10 Cartons
 ];
 
 export const MOCK_STOCK_TRANSACTIONS: StockTransaction[] = [];
@@ -338,32 +336,31 @@ export const MOCK_CUSTOMERS: Customer[] = [
   { id: 'CUST003', name: 'Gamma Services', email: 'support@gamma.io', phone: '555-0103', billingAddress: '789 Server Street, Cloud Town, WA', createdAt: new Date().toISOString(), customerType: 'Credit', creditLimit: 10000, invoiceAgingDays: 60, registrationNumber: 'CRNGAMMA00112', vatNumber: 'VATGAMMA003' },
 ];
 
-// Helper to get product's basePrice + exciseTax for invoice item unitPrice
 const getInvoiceItemUnitPrice = (productId: string, unitType: ProductUnitType, products: Product[]): number => {
   const product = products.find(p => p.id === productId);
   if (!product) return 0;
 
-  let price = product.basePrice;
-  let excise = product.exciseTax || 0;
+  let calculatedBasePrice = product.basePrice; // price per product.unitType
+  let calculatedExciseTax = product.exciseTax || 0; // excise per product.unitType
 
-  // If invoice item unitType is different from product's base unitType, and involves packaging
   if (unitType.toLowerCase() !== product.unitType.toLowerCase()) {
-    if (unitType.toLowerCase() === product.packagingUnit?.toLowerCase() && product.itemsPerPackagingUnit) {
-      // Selling in larger package unit
-      price = product.basePrice * product.itemsPerPackagingUnit;
-      excise = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
-    } else if (unitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit) {
-      // Selling in PCS, but product base unit is a package
-      price = product.basePrice / product.piecesInBaseUnit;
-      excise = (product.exciseTax || 0) / product.piecesInBaseUnit;
+    // Selling in a different unit than the product's base unit
+    if (product.packagingUnit && unitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
+      // Selling in the defined "larger package"
+      calculatedBasePrice = product.basePrice * product.itemsPerPackagingUnit;
+      calculatedExciseTax = (product.exciseTax || 0) * product.itemsPerPackagingUnit;
+    } else if (unitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
+      // Selling in PCS, but product's base unit is a package (e.g., Carton)
+      calculatedBasePrice = product.basePrice / product.piecesInBaseUnit;
+      calculatedExciseTax = (product.exciseTax || 0) / product.piecesInBaseUnit;
     }
   }
-  return price + excise;
+  return calculatedBasePrice + calculatedExciseTax;
 };
 
 
 const createInvoiceTotals = (items: InvoiceItem[], companyProfile: CompanyProfile) => {
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0); // item.total is quantity * (basePrice + exciseTax of item unit)
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const generalTaxAmount = 0; // companyProfile.taxRate is 0
   const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
   const vatAmount = subtotal * vatRate;
@@ -380,7 +377,8 @@ const inv2Totals = createInvoiceTotals([{ id: 'item1-inv2', productId: 'PROD002'
 const inv3Item1UnitPrice = getInvoiceItemUnitPrice('PROD003', 'Cartons', MOCK_PRODUCTS);
 const inv3Totals = createInvoiceTotals([{ id: 'item1-inv3', productId: 'PROD003', description: 'Cooking Cream 1080ml', quantity: 5, unitPrice: inv3Item1UnitPrice, unitType: 'Cartons', total: inv3Item1UnitPrice * 5, sourceWarehouseId: 'WH-HO-TETRA' }], MOCK_COMPANY_PROFILE);
 
-const inv4Item1UnitPrice = getInvoiceItemUnitPrice('PROD004', 'Cartons', MOCK_PRODUCTS); // Assuming PROD004 is sold by 'Carton' which contains 18 PCS
+// For PROD004, if ordered by Carton, use its itemsPerPackagingUnit to adjust unitPrice
+const inv4Item1UnitPrice = getInvoiceItemUnitPrice('PROD004', 'Cartons', MOCK_PRODUCTS);
 const inv4Totals = createInvoiceTotals([{ id: 'item1-inv4', productId: 'PROD004', description: 'Al Rabie Juice 125ml - Orange', quantity: 1, unitPrice: inv4Item1UnitPrice, unitType: 'Cartons', total: inv4Item1UnitPrice * 1, sourceWarehouseId: 'WH-RIY-01' }], MOCK_COMPANY_PROFILE);
 
 
@@ -437,24 +435,18 @@ export const MOCK_SUPPLIERS: Supplier[] = [
     { id: 'SUPP003', name: 'SweetnerPro Ltd.', email: 'contact@sweetner.pro', phone: '555-0203', address: '15 Sugar Mill Road, Factoria', contactPerson: 'Mr. Cane', createdAt: new Date().toISOString() },
 ];
 
-
-// Helper for MOCK_PURCHASE_ORDERS, assumes product.costPrice is per product.unitType
 const getPOCostPrice = (productId: string, orderedUnitType: ProductUnitType, products: Product[]): number => {
   const product = products.find(p => p.id === productId);
   if (!product) return 0;
 
   let cost = product.costPrice; // Cost of one base unit (product.unitType)
 
-  // If ordered unit is different from product's base unit, adjust cost
   if (orderedUnitType.toLowerCase() !== product.unitType.toLowerCase()) {
-    if (orderedUnitType.toLowerCase() === product.packagingUnit?.toLowerCase() && product.itemsPerPackagingUnit) {
-      // Ordering a LARGER package made of base units
+    if (product.packagingUnit && orderedUnitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
       cost = product.costPrice * product.itemsPerPackagingUnit;
-    } else if (orderedUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit) {
-      // Ordering PCS, but product base unit is a package.
+    } else if (orderedUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
       cost = product.costPrice / product.piecesInBaseUnit;
     }
-    // Add more conversion logic if needed for other unit mismatches
   }
   return cost;
 };
@@ -495,7 +487,7 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
   },
   {
     id: 'PO-003',
-    supplierId: 'SUPP003', // Assuming SUPP003 can supply PROD001 (Frozen item, SweetnerPro sounds odd but for mock data)
+    supplierId: 'SUPP003',
     supplierName: 'SweetnerPro Ltd.',
     orderDate: '2024-07-20T00:00:00.000Z',
     expectedDeliveryDate: '2024-07-30T00:00:00.000Z',
@@ -544,3 +536,5 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
 ];
 
 export const MOCK_SALES_ORDERS: SalesOrder[] = [];
+
+    
