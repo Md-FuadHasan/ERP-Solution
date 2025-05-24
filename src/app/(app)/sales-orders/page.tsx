@@ -1,9 +1,10 @@
+
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added useRouter
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon } from 'lucide-react';
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, CalendarIcon, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -99,7 +100,7 @@ export default function SalesOrdersPage() {
   const [salesOrderToDelete, setSalesOrderToDelete] = useState<SalesOrder | null>(null);
   const [salesOrderToCancel, setSalesOrderToCancel] = useState<SalesOrder | null>(null);
   const [isCancelConfirmModalOpen, setIsCancelConfirmModalOpen] = useState(false);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
@@ -185,7 +186,7 @@ export default function SalesOrdersPage() {
     });
     return { ...salesOrderToView, customerName: customer?.name || salesOrderToView.customerId, items };
   }, [salesOrderToView, getCustomerById, getProductById, warehouses]);
-  
+
   const handleSort = useCallback((key: SortableSalesOrderKeys) => {
     setSortConfig(prevConfig => {
       if (prevConfig.key === key && prevConfig.direction === 'ascending') {
@@ -198,7 +199,7 @@ export default function SalesOrdersPage() {
   const handleDateChange = useCallback((type: 'from' | 'to', date: Date | undefined) => {
     setDateRange(prevRange => ({ ...prevRange, [type]: date || null }));
   }, []);
-  
+
   const renderSortIcon = (columnKey: SortableSalesOrderKeys) => {
     if (sortConfig.key !== columnKey) {
       return <ChevronsUpDown className="ml-2 h-3 w-3" />;
@@ -252,12 +253,12 @@ export default function SalesOrdersPage() {
             bValue = b.salespersonName || b.salespersonId || '';
         } else if (sortConfig.key === 'routeName') {
             aValue = a.routeName || a.routeId || '';
-            bValue = b.routeName || b.routeId || '';
+            bValue = b.routeName || a.routeId || '';
         } else {
             aValue = a[sortConfig.key as keyof SalesOrder];
             bValue = b[sortConfig.key as keyof SalesOrder];
         }
-        
+
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
@@ -274,16 +275,22 @@ export default function SalesOrdersPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <PageHeader
-          title="Sales Orders"
-          description="Manage all your sales orders and track their status."
-          actions={
-            <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
-            </Button>
-          }
-        />
-        
+        <div className="flex items-center gap-4">
+           <Button onClick={() => router.back()} variant="outline" size="icon" className="h-8 w-8 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <PageHeader
+            title="Sales Orders"
+            description="Manage all your sales orders and track their status."
+            actions={
+              <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Sales Order
+              </Button>
+            }
+          />
+        </div>
+
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
           <SearchInput
             value={searchTerm}
@@ -341,7 +348,7 @@ export default function SalesOrdersPage() {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 lg:mb-4">
+      <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -592,7 +599,6 @@ export default function SalesOrdersPage() {
           </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
