@@ -67,6 +67,38 @@ export default function SalesPage() {
   };
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
+    const customer = getCustomerById(data.customerId);
+
+    const itemsWithTotalsAndNames = data.items.map(item => {
+        // Product name should ideally be fetched or pre-filled when product is selected in the form
+        // For now, assuming product details are somehow available or just using productId
+        const product = products.find(p => p.id === item.productId); // Assume products array is available via useData()
+        return {
+            ...item,
+            productName: product?.name || item.productId,
+            total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+        };
+    });
+
+    const subtotal = itemsWithTotalsAndNames.reduce((sum, item) => sum + item.total, 0);
+    // Sales Order total usually doesn't include final invoice VAT yet.
+    // It's a pre-VAT total unless specified otherwise.
+    const totalAmount = subtotal; 
+
+    const salesOrderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName'> = {
+        customerId: data.customerId,
+        salespersonId: data.salespersonId || undefined,
+        routeId: data.routeId || undefined,
+        orderDate: data.orderDate.toISOString(),
+        expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
+        items: itemsWithTotalsAndNames,
+        subtotal,
+        totalAmount,
+        notes: data.notes,
+        // status will be set to 'Draft' by default in addSalesOrder
+    };
+
+
     if (editingSalesOrder) {
       // updateSalesOrder({
       //   ...editingSalesOrder,
@@ -75,12 +107,15 @@ export default function SalesPage() {
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
       console.warn("Sales Order update not fully implemented yet beyond form submission.");
     } else {
-      addSalesOrder(data); // DataContext's addSalesOrder will handle ID generation and defaults
+      addSalesOrder(salesOrderData); 
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
     setEditingSalesOrder(null);
   };
+
+  // Temp products for SalesOrderForm, ideally from useData context
+  const { products } = useData();
 
 
   return (
@@ -155,7 +190,7 @@ export default function SalesPage() {
               </TableHeader>
               <TableBody>
                 {salesOrders.map((so, index) => (
-                  <TableRow key={so.id} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                  <TableRow key={so.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2 text-xs">{so.id}</TableCell>
                     <TableCell className="px-2 text-xs">{so.customerName || getCustomerById(so.customerId)?.name || so.customerId}</TableCell>
                     <TableCell className="px-2 text-xs">{format(new Date(so.orderDate), 'MMM dd, yyyy')}</TableCell>
@@ -201,7 +236,7 @@ export default function SalesPage() {
                 initialData={editingSalesOrder}
                 onSubmit={handleSubmitSalesOrder}
                 onCancel={() => { setIsSalesOrderFormModalOpen(false); setEditingSalesOrder(null); }}
-                isSubmitting={isLoading} // Or a specific submitting state for SO form
+                isSubmitting={isLoading} 
               />
             )}
           </div>
