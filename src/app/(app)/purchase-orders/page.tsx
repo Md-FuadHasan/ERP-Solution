@@ -4,14 +4,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle, ArrowLeft } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogDescription as FormDialogDescription, // Renamed to avoid conflict with CardDescription
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -42,7 +42,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useRouter } from 'next/navigation'; // Added useRouter
+import { useRouter } from 'next/navigation';
 
 const getPOStatusBadgeVariant = (status: POStatus) => {
   switch (status) {
@@ -72,7 +72,7 @@ export default function PurchaseOrdersPage() {
     isLoading
   } = useData();
   const { toast } = useToast();
-  const router = useRouter(); // Added router instance
+  const router = useRouter();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
@@ -122,6 +122,11 @@ export default function PurchaseOrdersPage() {
     if (poToCancel) {
       cancelPurchaseOrder(poToCancel.id);
       toast({ title: "Purchase Order Cancelled", description: `PO ${poToCancel.id} has been cancelled.` });
+      
+      // If the cancelled PO was being viewed, update its state in the view modal
+      if (poToView && poToView.id === poToCancel.id) {
+        setPoToView({ ...poToView, status: 'Cancelled' });
+      }
       setPoToCancel(null);
     }
     setIsCancelConfirmModalOpen(false);
@@ -131,7 +136,7 @@ export default function PurchaseOrdersPage() {
   const handleSubmitPO = (data: PurchaseOrderFormValues) => {
     const itemsWithTotals = data.items.map(item => ({
       ...item,
-      id: item.id || `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, // Ensure ID exists for new items too
+      id: item.id || `po-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
       quantityReceived: item.id && editingPO?.items.find(i => i.id === item.id)?.quantityReceived || 0,
     }));
@@ -157,16 +162,15 @@ export default function PurchaseOrdersPage() {
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
-        // Ensure existing fields not in poDataForContext are preserved if needed
-        status: editingPO.status, // Preserve status unless specifically changed by edit logic
-        createdAt: editingPO.createdAt, // Preserve original creation date
+        status: editingPO.status === 'Draft' && itemsWithTotals.length > 0 && poDataForContext.supplierId ? 'Sent' : editingPO.status,
+        createdAt: editingPO.createdAt, 
       });
       toast({
         title: "Purchase Order Updated",
         description: `Purchase Order ${editingPO.id} has been successfully updated.`,
       });
     } else {
-      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status'>);
+      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'supplierName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> });
       toast({
         title: "Purchase Order Created",
         description: "The new purchase order has been successfully added.",
@@ -209,6 +213,13 @@ export default function PurchaseOrdersPage() {
     if (itemsToProcess.length > 0) {
       processPOReceipt(data.poId, itemsToProcess);
       toast({ title: "Stock Received", description: `Stock has been updated for PO ${data.poId}.` });
+       // Update poToView if it's the one being received
+      if (poToView && poToView.id === data.poId) {
+        const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId);
+        if (updatedPOFromContext) {
+          setPoToView(updatedPOFromContext);
+        }
+      }
     } else {
       toast({ title: "No Stock Received", description: "No quantities were entered to receive.", variant: "default"});
     }
@@ -220,9 +231,6 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
         <PageHeader
           title="Purchase Orders"
           description="Manage your purchase orders with suppliers for raw materials and packaging."
@@ -232,34 +240,35 @@ export default function PurchaseOrdersPage() {
             </Button>
           }
         />
-         {/* Placeholder for future filters if needed */}
+         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+            {/* Placeholder for future filters */}
+            <div /> 
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
+        </div>
       </div>
 
-       <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
-        <CardHeader className="border-b">
-          <CardTitle>Purchase Order List</CardTitle>
-          <CardDescription>
-            Overview of all purchase orders.
-          </CardDescription>
-        </CardHeader>
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+        {/* Removed CardHeader for "Purchase Order List" */}
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">PO ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Supplier</TableHead>
-                  <TableHead className="min-w-[100px] px-2">Order Date</TableHead>
-                  <TableHead className="min-w-[100px] px-2">Exp. Delivery</TableHead>
-                  <TableHead className="text-right min-w-[90px] px-2">Total</TableHead>
-                  <TableHead className="min-w-[110px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[200px] px-2">Actions</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">PO ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm">Supplier</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">Order Date</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">Exp. Delivery</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={`skel-po-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    {[...Array(7)].map((_, j) => <TableCell key={j} className="px-2"><Skeleton className="h-5 w-full" /></TableCell>)}
+                    {[...Array(7)].map((__, j) => <TableCell key={j} className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>)}
                   </TableRow>
                 ))}
               </TableBody>
@@ -268,25 +277,25 @@ export default function PurchaseOrdersPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">PO ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Supplier</TableHead>
-                  <TableHead className="min-w-[100px] px-2">Order Date</TableHead>
-                  <TableHead className="min-w-[100px] px-2">Exp. Delivery</TableHead>
-                  <TableHead className="text-right min-w-[90px] px-2">Total</TableHead>
-                  <TableHead className="min-w-[110px] px-2">Status</TableHead>
-                  <TableHead className="text-right min-w-[200px] px-2">Actions</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">PO ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm">Supplier</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">Order Date</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm">Exp. Delivery</TableHead>
+                  <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {purchaseOrders.map((po, index) => (
                   <TableRow key={po.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="font-medium px-2">{po.id}</TableCell>
-                    <TableCell className="px-2">{po.supplierName || getSupplierById(po.supplierId)?.name || po.supplierId}</TableCell>
-                    <TableCell className="px-2">{format(new Date(po.orderDate), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell className="px-2">{po.expectedDeliveryDate ? format(new Date(po.expectedDeliveryDate), 'MMM dd, yyyy') : '-'}</TableCell>
-                    <TableCell className="text-right px-2">${po.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="px-2"><Badge variant={getPOStatusBadgeVariant(po.status)}>{po.status}</Badge></TableCell>
-                    <TableCell className="text-right px-2">
+                    <TableCell className="font-medium px-2 text-xs">{po.id}</TableCell>
+                    <TableCell className="px-2 text-xs">{po.supplierName || getSupplierById(po.supplierId)?.name || po.supplierId}</TableCell>
+                    <TableCell className="px-2 text-xs">{format(new Date(po.orderDate), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell className="px-2 text-xs">{po.expectedDeliveryDate ? format(new Date(po.expectedDeliveryDate), 'MMM dd, yyyy') : '-'}</TableCell>
+                    <TableCell className="text-right px-2 text-xs">${po.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="px-2 text-xs"><Badge variant={getPOStatusBadgeVariant(po.status)}>{po.status}</Badge></TableCell>
+                    <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
                         {(po.status === 'Sent' || po.status === 'Partially Received') && (
                           <Button variant="outline" size="sm" onClick={() => handleOpenReceiveStockModal(po)} className="h-7 px-2 py-1 text-xs hover:bg-green-500/10 hover:border-green-500 hover:text-green-600">
@@ -322,9 +331,9 @@ export default function PurchaseOrdersPage() {
         <DialogContent className="w-[95vw] max-w-3xl lg:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingPO ? `Edit Purchase Order: ${editingPO.id}` : 'Create New Purchase Order'}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               {editingPO ? 'Update the details for this purchase order.' : 'Fill in the details to create a new purchase order.'}
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
             {isFormModalOpen && (
@@ -345,9 +354,9 @@ export default function PurchaseOrdersPage() {
         <DialogContent className="w-[95vw] max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Purchase Order Details: {poForViewModal?.id}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               Viewing details for purchase order sent to {poForViewModal?.supplierName}.
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           {poForViewModal && (
             <div className="flex-grow overflow-y-auto p-6 space-y-4 text-sm">
@@ -370,23 +379,23 @@ export default function PurchaseOrdersPage() {
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow>
-                        <TableHead className="px-3 py-2">Product</TableHead>
-                        <TableHead className="text-center px-3 py-2">Ordered</TableHead>
-                        <TableHead className="text-center px-3 py-2">Received</TableHead>
-                        <TableHead className="px-3 py-2">Unit</TableHead>
-                        <TableHead className="text-right px-3 py-2">Unit Price</TableHead>
-                        <TableHead className="text-right px-3 py-2">Total</TableHead>
+                        <TableHead className="px-3 py-2 text-sm">Product</TableHead>
+                        <TableHead className="text-center px-3 py-2 text-sm">Ordered</TableHead>
+                        <TableHead className="text-center px-3 py-2 text-sm">Received</TableHead>
+                        <TableHead className="px-3 py-2 text-sm">Unit</TableHead>
+                        <TableHead className="text-right px-3 py-2 text-sm">Unit Price</TableHead>
+                        <TableHead className="text-right px-3 py-2 text-sm">Total</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {poForViewModal.items.map((item, index) => (
                         <TableRow key={item.id || index}>
-                          <TableCell className="px-3 py-2">{item.productName}</TableCell>
-                          <TableCell className="text-center px-3 py-2">{item.quantity}</TableCell>
-                          <TableCell className="text-center px-3 py-2">{item.quantityReceived || 0}</TableCell>
-                          <TableCell className="px-3 py-2">{item.unitType}</TableCell>
-                          <TableCell className="text-right px-3 py-2">${item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-right px-3 py-2">${item.total.toFixed(2)}</TableCell>
+                          <TableCell className="px-3 py-2 text-xs">{item.productName}</TableCell>
+                          <TableCell className="text-center px-3 py-2 text-xs">{item.quantity}</TableCell>
+                          <TableCell className="text-center px-3 py-2 text-xs">{item.quantityReceived || 0}</TableCell>
+                          <TableCell className="px-3 py-2 text-xs">{item.unitType}</TableCell>
+                          <TableCell className="text-right px-3 py-2 text-xs">${item.unitPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right px-3 py-2 text-xs">${item.total.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -441,9 +450,9 @@ export default function PurchaseOrdersPage() {
         <DialogContent className="w-[95vw] max-w-2xl lg:max-w-3xl max-h-[95vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>Receive Stock for PO: {poToReceiveStock?.id}</DialogTitle>
-                <DialogDescription>
+                <FormDialogDescription>
                 Enter quantities received and select destination warehouse for each item.
-                </DialogDescription>
+                </FormDialogDescription>
             </DialogHeader>
             <div className="flex-grow overflow-y-auto p-6">
                 {isReceiveStockModalOpen && poToReceiveStock && (
@@ -493,7 +502,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-
-    
-
-    
