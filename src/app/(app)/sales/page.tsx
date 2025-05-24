@@ -1,11 +1,12 @@
 
 'use client';
+
 import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, XCircle } from 'lucide-react';
+import { PlusCircle, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -39,18 +40,19 @@ import type { SalesOrder, SalesOrderStatus, Customer, Product, SalesOrderItem } 
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import type { VariantProps } from 'class-variance-authority';
 
-const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus) => {
+const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProps<typeof badgeVariants>['variant'] => {
   if (!status) return 'outline';
   switch (status) {
     case 'Draft': return 'poDraft';
-    case 'Confirmed': return 'default'; // Consider a specific 'confirmed' variant later
+    case 'Confirmed': return 'default'; 
     case 'Processing': return 'secondary';
     case 'Ready for Dispatch': return 'outline';
-    case 'Dispatched': return 'poSent'; // Using blue like PO 'Sent'
+    case 'Dispatched': return 'poSent';
     case 'Partially Invoiced': return 'statusPartiallyPaid';
     case 'Fully Invoiced': return 'statusPaid';
     case 'Cancelled': return 'poCancelled';
@@ -64,9 +66,9 @@ export default function SalesPage() {
     salesOrders,
     addSalesOrder,
     updateSalesOrder,
-    deleteSalesOrder, // Placeholder for now, but will be used
+    deleteSalesOrder,
     getCustomerById,
-    getProductById, // Needed for view modal
+    getProductById,
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -76,6 +78,8 @@ export default function SalesPage() {
   const [salesOrderToView, setSalesOrderToView] = useState<SalesOrder | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [salesOrderToDelete, setSalesOrderToDelete] = useState<SalesOrder | null>(null);
+  const [salesOrderToCancel, setSalesOrderToCancel] = useState<SalesOrder | null>(null);
+  const [isCancelConfirmModalOpen, setIsCancelConfirmModalOpen] = useState(false);
 
 
   const handleAddSalesOrder = () => {
@@ -99,10 +103,37 @@ export default function SalesPage() {
 
   const confirmDeleteSalesOrder = () => {
     if (salesOrderToDelete) {
-      deleteSalesOrder(salesOrderToDelete.id); // Assuming deleteSalesOrder exists and works
+      deleteSalesOrder(salesOrderToDelete.id); 
       toast({ title: "Sales Order Deleted", description: `Sales Order ${salesOrderToDelete.id} has been removed.` });
       setSalesOrderToDelete(null);
     }
+  };
+
+  const handleConfirmOrder = (order: SalesOrder) => {
+    if (order.status === 'Draft') {
+      updateSalesOrder({ ...order, status: 'Confirmed' });
+      toast({ title: "Sales Order Confirmed", description: `Order ${order.id} status updated to Confirmed.`});
+      if(isViewModalOpen && salesOrderToView?.id === order.id) {
+        setSalesOrderToView({...order, status: 'Confirmed'}); // Update view modal state
+      }
+    }
+  };
+
+  const handleCancelOrderConfirm = (order: SalesOrder) => {
+    setSalesOrderToCancel(order);
+    setIsCancelConfirmModalOpen(true);
+  };
+
+  const confirmCancelSalesOrder = () => {
+    if (salesOrderToCancel) {
+      updateSalesOrder({ ...salesOrderToCancel, status: 'Cancelled' });
+      toast({ title: "Sales Order Cancelled", description: `Order ${salesOrderToCancel.id} has been cancelled.`});
+      if(isViewModalOpen && salesOrderToView?.id === salesOrderToCancel.id) {
+         setSalesOrderToView({...salesOrderToCancel, status: 'Cancelled'}); // Update view modal state
+      }
+      setSalesOrderToCancel(null);
+    }
+    setIsCancelConfirmModalOpen(false);
   };
 
 
@@ -112,14 +143,15 @@ export default function SalesPage() {
     const itemsWithDetails = data.items.map(item => {
         const product = getProductById(item.productId);
         return {
-            ...item, // id, productId, quantity, unitType, unitPrice (from form)
+            ...item, 
+            id: item.id || `so-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             productName: product?.name || item.productId,
             total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
         };
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; // SO total is pre-VAT
+    const totalAmount = subtotal; 
 
     if (editingSalesOrder) {
       const updatedSO: SalesOrder = {
@@ -127,32 +159,37 @@ export default function SalesPage() {
         customerId: data.customerId,
         customerName: customer?.name || data.customerId,
         salespersonId: data.salespersonId,
-        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined, // Placeholder
+        salespersonName: data.salespersonId ? `Salesperson ${data.salespersonId}` : undefined, 
         routeId: data.routeId,
-        routeName: data.routeId ? `Route ${data.routeId}` : undefined, // Placeholder
+        routeName: data.routeId ? `Route ${data.routeId}` : undefined, 
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
         items: itemsWithDetails,
         subtotal,
         totalAmount,
         notes: data.notes,
-        // status remains unchanged by edit form, managed by other actions
+        status: editingSalesOrder.status, // Keep original status unless specifically changed by another action
       };
       updateSalesOrder(updatedSO);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
-      const salesOrderDataForContext: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total'>> } = {
+      const salesOrderDataForContext = {
         customerId: data.customerId,
         salespersonId: data.salespersonId,
         routeId: data.routeId,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate ? data.expectedDeliveryDate.toISOString() : undefined,
-        items: data.items, // Pass raw items, DataContext calculates totals/names
+        items: data.items.map(item => ({ // Ensure raw item data is passed for new SOs
+          productId: item.productId,
+          quantity: item.quantity,
+          unitType: item.unitType,
+          unitPrice: item.unitPrice,
+        })),
         notes: data.notes,
-        shippingAddress: data.shippingAddress || customer?.shippingAddress || customer?.billingAddress, // Assuming these fields exist in SalesOrderFormValues
-        billingAddress: data.billingAddress || customer?.billingAddress, // Assuming these fields exist in SalesOrderFormValues
+        shippingAddress: data.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
+        billingAddress: data.billingAddress || customer?.billingAddress,
       };
-      addSalesOrder(salesOrderDataForContext);
+      addSalesOrder(salesOrderDataForContext as any); // Cast as any to match simplified addSalesOrder signature
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -201,26 +238,13 @@ export default function SalesPage() {
                   <TableHead className="min-w-[100px] px-2 text-sm">Route</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
                   <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={`skel-so-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-right px-2 text-xs">
-                      <div className="flex justify-end items-center gap-1">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-8 w-8" />
-                      </div>
-                    </TableCell>
+                    {[...Array(8)].map((_, j) => <TableCell key={j} className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>)}
                   </TableRow>
                 ))}
               </TableBody>
@@ -236,7 +260,7 @@ export default function SalesPage() {
                   <TableHead className="min-w-[100px] px-2 text-sm">Route</TableHead>
                   <TableHead className="text-right min-w-[90px] px-2 text-sm">Total</TableHead>
                   <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="text-right min-w-[200px] px-2 text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -251,6 +275,12 @@ export default function SalesPage() {
                     <TableCell className="px-2 text-xs"><Badge variant={getSalesOrderStatusBadgeVariant(so.status)}>{so.status}</Badge></TableCell>
                     <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
+                        {so.status === 'Draft' && (
+                           <Button variant="ghost" size="icon" onClick={() => handleConfirmOrder(so)} className="hover:text-green-600" title="Confirm Order"><CheckCircle className="h-4 w-4" /></Button>
+                        )}
+                        {(so.status === 'Draft' || so.status === 'Confirmed') && (
+                            <Button variant="ghost" size="icon" onClick={() => handleCancelOrderConfirm(so)} className="hover:text-orange-500" title="Cancel Order"><XCircle className="h-4 w-4" /></Button>
+                        )}
                         <Button variant="ghost" size="icon" onClick={() => handleViewSalesOrder(so)} className="hover:text-primary" title="View Sales Order"><Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditSalesOrder(so)} className="hover:text-primary" title="Edit Sales Order" disabled={so.status !== 'Draft'}><Edit className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteSalesOrderConfirm(so)} className="hover:text-destructive" title="Delete Sales Order"><Trash2 className="h-4 w-4" /></Button>
@@ -348,7 +378,7 @@ export default function SalesPage() {
               </div>
               <Separator className="my-4" />
               <div className="space-y-1 text-right">
-                <div className="flex justify-end gap-2"><span>Subtotal:</span> <span className="font-medium">${salesOrderForViewModal.subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-end gap-2"><span>Subtotal (Base Price + Excise):</span> <span className="font-medium">${salesOrderForViewModal.subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-end gap-2 text-lg font-semibold"><span>Order Total (Pre-VAT):</span> <span>${salesOrderForViewModal.totalAmount.toFixed(2)}</span></div>
               </div>
             </div>
@@ -356,12 +386,26 @@ export default function SalesPage() {
           <DialogFooter className="p-6 pt-4 border-t flex-col sm:flex-row sm:justify-end gap-2">
              {salesOrderForViewModal?.status === 'Draft' && (
                 <Button 
-                    variant="outline" 
-                    onClick={() => { if(salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleEditSalesOrder(salesOrderToView), 100); }}} 
+                    variant="default" 
+                    onClick={() => { if(salesOrderToView) { handleConfirmOrder(salesOrderToView); setIsViewModalOpen(false); }}} 
                     className="w-full sm:w-auto"
                 >
-                  <Edit className="mr-2 h-4 w-4" /> Edit Order
+                  <CheckCircle className="mr-2 h-4 w-4" /> Confirm Order
                 </Button>
+            )}
+            {(salesOrderForViewModal?.status === 'Draft' || salesOrderForViewModal?.status === 'Confirmed') && (
+                <Button 
+                    variant="destructive" 
+                    onClick={() => { if(salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleCancelOrderConfirm(salesOrderToView),100); }}} 
+                    className="w-full sm:w-auto"
+                >
+                  <XCircle className="mr-2 h-4 w-4" /> Cancel Order
+                </Button>
+            )}
+            {salesOrderForViewModal?.status === 'Draft' && (
+              <Button variant="outline" onClick={() => { if (salesOrderToView) { setIsViewModalOpen(false); setTimeout(() => handleEditSalesOrder(salesOrderToView), 100); } }} className="w-full sm:w-auto">
+                <Edit className="mr-2 h-4 w-4" /> Edit Order
+              </Button>
             )}
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto">Close</Button>
           </DialogFooter>
@@ -382,6 +426,22 @@ export default function SalesPage() {
           </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={setIsCancelConfirmModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Confirm Cancellation</AlertDialogTitleComponent>
+            <AlertDialogDesc>
+              Are you sure you want to cancel Sales Order "{salesOrderToCancel?.id}"? This action cannot be undone and will set its status to 'Cancelled'.
+            </AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
+            <AlertDialogCancel onClick={() => { setIsCancelConfirmModalOpen(false); setSalesOrderToCancel(null); }}>Keep Order</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelSalesOrder} className="bg-destructive hover:bg-destructive/90">Cancel Order</AlertDialogAction>
+          </AlertDialogFooterComponent>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
