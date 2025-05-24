@@ -1,10 +1,10 @@
 
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign, Eye } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign, Eye, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -32,9 +32,9 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogFooter as AlertDialogFooterComponent,
+  AlertDialogHeader as AlertDialogHeaderComponent,
+  AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -43,6 +43,15 @@ import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CUSTOMER_TYPES } from '@/types';
+
+type SortableCustomerKeys = keyof Pick<Customer, 'id' | 'name' | 'registrationNumber' | 'vatNumber' | 'phone' | 'customerType'> | 'outstandingBalance';
+
+interface SortConfig {
+  key: SortableCustomerKeys | null;
+  direction: 'ascending' | 'descending';
+}
 
 export default function CustomersPage() {
   const {
@@ -64,19 +73,62 @@ export default function CustomersPage() {
   const [selectedCustomerForDetails, setSelectedCustomerForDetails] = useState<Customer | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'name', direction: 'ascending' });
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerType | 'all'>('all');
+
   const { toast } = useToast();
 
   const filteredCustomers = useMemo(() => {
-    if (!searchTerm) return customers;
-    return customers.filter(
-      (customer) =>
-        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (customer.registrationNumber && customer.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (customer.vatNumber && customer.vatNumber.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [customers, searchTerm]);
+    let _customers = [...customers];
+
+    if (searchTerm) {
+      _customers = _customers.filter(
+        (customer) =>
+          customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (customer.registrationNumber && customer.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (customer.vatNumber && customer.vatNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    if (customerTypeFilter !== 'all') {
+      _customers = _customers.filter(customer => customer.customerType === customerTypeFilter);
+    }
+
+    if (sortConfig.key) {
+      _customers.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        if (sortConfig.key === 'outstandingBalance') {
+          aValue = getOutstandingBalanceByCustomerId(a.id);
+          bValue = getOutstandingBalanceByCustomerId(b.id);
+        } else {
+          aValue = a[sortConfig.key as keyof Customer];
+          bValue = b[sortConfig.key as keyof Customer];
+        }
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+          // Numeric sort
+        } else {
+          // Fallback for mixed types or undefined - treat undefined as lowest
+          if (aValue === undefined || aValue === null) aValue = sortConfig.direction === 'ascending' ? -Infinity : Infinity;
+          if (bValue === undefined || bValue === null) bValue = sortConfig.direction === 'ascending' ? -Infinity : Infinity;
+        }
+
+
+        if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return _customers;
+  }, [customers, searchTerm, customerTypeFilter, sortConfig, getOutstandingBalanceByCustomerId]);
 
   const customerInvoices = useMemo(() => {
     if (!selectedCustomerForDetails) return [];
@@ -192,6 +244,23 @@ export default function CustomersPage() {
     setEditingCustomer(null);
   };
 
+  const handleSort = useCallback((key: SortableCustomerKeys) => {
+    setSortConfig(prevConfig => {
+      if (prevConfig.key === key && prevConfig.direction === 'ascending') {
+        return { key, direction: 'descending' };
+      }
+      return { key, direction: 'ascending' };
+    });
+  }, []);
+
+  const renderSortIcon = (columnKey: SortableCustomerKeys) => {
+    if (sortConfig.key !== columnKey) {
+      return <ChevronsUpDown className="ml-2 h-3 w-3" />;
+    }
+    return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
+  };
+
+
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0">
@@ -204,43 +273,62 @@ export default function CustomersPage() {
             </Button>
           }
         />
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Search by name, ID, CR, VAT..."
-            className="w-full md:w-80"
+            className="w-full sm:w-auto md:w-64"
           />
+          <div className="relative w-full sm:w-auto md:w-[200px]">
+            <Select
+              value={customerTypeFilter}
+              onValueChange={(value) => setCustomerTypeFilter(value as CustomerType | 'all')}
+            >
+              <SelectTrigger className="w-full pl-10">
+                <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter by type..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {CUSTOMER_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card overflow-hidden">
-        <div className="h-full"> {/* This div ensures Table component takes full height of its parent */}
+         <div className="overflow-y-auto h-full">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px]">Cust. ID</TableHead>
-                  <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">CR No.</TableHead>
-                  <TableHead className="min-w-[120px]">VAT No.</TableHead>
-                  <TableHead className="min-w-[140px]">Phone</TableHead>
-                  <TableHead className="min-w-[80px]">Type</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                  <TableHead className="min-w-[80px] px-2">Cust. ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2">Name</TableHead>
+                  <TableHead className="min-w-[100px] px-2">CR No.</TableHead>
+                  <TableHead className="min-w-[100px] px-2">VAT No.</TableHead>
+                  <TableHead className="min-w-[120px] px-2">Phone</TableHead>
+                  <TableHead className="min-w-[70px] px-2">Type</TableHead>
+                  <TableHead className="min-w-[110px] text-right px-2">Outstanding</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-8 w-28 mx-auto" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -249,14 +337,28 @@ export default function CustomersPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px]">Cust. ID</TableHead>
-                  <TableHead className="min-w-[180px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">CR No.</TableHead>
-                  <TableHead className="min-w-[120px]">VAT No.</TableHead>
-                  <TableHead className="min-w-[140px]">Phone</TableHead>
-                  <TableHead className="min-w-[80px]">Type</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Outstanding</TableHead>
-                  <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                  <TableHead className="min-w-[80px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                     <div className="flex items-center">ID {renderSortIcon('id')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[150px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
+                     <div className="flex items-center">Name {renderSortIcon('name')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('registrationNumber')}>
+                     <div className="flex items-center">CR No. {renderSortIcon('registrationNumber')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('vatNumber')}>
+                     <div className="flex items-center">VAT No. {renderSortIcon('vatNumber')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[120px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('phone')}>
+                     <div className="flex items-center">Phone {renderSortIcon('phone')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[70px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerType')}>
+                     <div className="flex items-center">Type {renderSortIcon('customerType')}</div>
+                  </TableHead>
+                  <TableHead className="min-w-[110px] text-right px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('outstandingBalance')}>
+                     <div className="flex items-center justify-end">Outstanding {renderSortIcon('outstandingBalance')}</div>
+                  </TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,17 +366,17 @@ export default function CustomersPage() {
                   const outstandingBalance = getOutstandingBalanceByCustomerId(customer.id);
                   return (
                     <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium">{customer.id}</TableCell>
+                      <TableCell className="font-medium px-2">{customer.id}</TableCell>
                       <TableCell
-                        className="cursor-pointer hover:text-primary hover:underline"
+                        className="cursor-pointer hover:text-primary hover:underline px-2"
                         onClick={() => handleViewCustomerDetails(customer)}
                       >
                         {customer.name}
                       </TableCell>
-                      <TableCell>{customer.registrationNumber || '-'}</TableCell>
-                      <TableCell>{customer.vatNumber || '-'}</TableCell>
-                      <TableCell>{customer.phone}</TableCell>
-                      <TableCell>
+                      <TableCell className="px-2">{customer.registrationNumber || '-'}</TableCell>
+                      <TableCell className="px-2">{customer.vatNumber || '-'}</TableCell>
+                      <TableCell className="px-2">{customer.phone}</TableCell>
+                      <TableCell className="px-2">
                         <Badge
                           variant={customer.customerType === 'Credit' ? 'creditCustomer' : 'cashCustomer'}
                           className="text-xs"
@@ -283,20 +385,20 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className={cn(
-                        "text-right font-semibold",
+                        "text-right font-semibold px-2",
                         outstandingBalance > 0 ? "text-destructive" : "text-foreground"
                       )}>
                         ${outstandingBalance.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary" title="View Customer">
+                      <TableCell className="text-center px-2">
+                        <div className="flex justify-center items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary p-1.5" title="View Customer">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary" title="Edit Customer">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary p-1.5" title="Edit Customer">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Customer" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerConfirm(customer);}}>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive p-1.5" title="Delete Customer" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerConfirm(customer);}}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -307,11 +409,11 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
                 title="No Customers Found"
-                message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first customer."}
-                action={!searchTerm ? (
+                message={searchTerm || customerTypeFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Get started by adding your first customer."}
+                action={!searchTerm && customerTypeFilter === 'all' ? (
                   <Button onClick={handleAddCustomer} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
                   </Button>
@@ -435,21 +537,21 @@ export default function CustomersPage() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-primary text-primary-foreground z-10">
                           <TableRow>
-                            <TableHead className="min-w-[120px]">Invoice ID</TableHead>
-                            <TableHead className="min-w-[120px]">Issue Date</TableHead>
-                            <TableHead className="min-w-[120px]">Due Date</TableHead>
-                            <TableHead className="min-w-[100px] text-right">Total</TableHead>
-                            <TableHead className="min-w-[100px]">Status</TableHead>
+                            <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
+                            <TableHead className="min-w-[120px] px-2">Issue Date</TableHead>
+                            <TableHead className="min-w-[120px] px-2">Due Date</TableHead>
+                            <TableHead className="min-w-[100px] text-right px-2">Total</TableHead>
+                            <TableHead className="min-w-[100px] px-2">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {customerInvoices.map((invoice, index) => (
                             <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                              <TableCell className="font-medium">{invoice.id}</TableCell>
-                              <TableCell>{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
-                              <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                              <TableCell className="text-right">${invoice.totalAmount.toFixed(2)}</TableCell>
-                              <TableCell>
+                              <TableCell className="font-medium px-2">{invoice.id}</TableCell>
+                              <TableCell className="px-2">{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
+                              <TableCell className="px-2">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                              <TableCell className="text-right px-2">${invoice.totalAmount.toFixed(2)}</TableCell>
+                              <TableCell className="px-2">
                                 <Badge variant={getStatusBadgeVariant(invoice.status)} className="text-xs">{invoice.status}</Badge>
                               </TableCell>
                             </TableRow>
@@ -484,21 +586,23 @@ export default function CustomersPage() {
 
        <AlertDialog open={!!customerToDelete} onOpenChange={(isOpen) => !isOpen && setCustomerToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the customer
               "{customerToDelete?.name}" and all associated data (including invoices).
             </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
             <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
-          </AlertDialogFooter>
+          </AlertDialogFooterComponent>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
+    
