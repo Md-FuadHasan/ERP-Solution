@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useData } from '@/context/DataContext';
-import type { SalesOrder, SalesOrderStatus, SalesOrderItem, ProductUnitType } from '@/types';
+import type { SalesOrder, SalesOrderStatus, SalesOrderItem, ProductUnitType, Customer, Product, Warehouse } from '@/types'; // Added Customer, Product, Warehouse
 import { ALL_SALES_ORDER_STATUSES } from '@/types';
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
@@ -46,7 +46,7 @@ import { SearchInput } from '@/components/common/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { getSalesOrderStatusBadgeVariant } from '@/lib/invoiceUtils'; // Assuming you have a similar util for SO
+import { getSalesOrderStatusBadgeVariant } from '@/lib/invoiceUtils'; // Corrected import path and function name
 
 type SortableSalesOrderKeys = keyof Pick<SalesOrder, 'id' | 'orderDate' | 'status' | 'totalAmount'> | 'customerName' | 'salespersonName' | 'routeName';
 
@@ -178,7 +178,7 @@ export default function SalesOrdersPage() {
       updateSalesOrder({ ...editingSalesOrder, ...salesOrderData } as SalesOrder);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
-      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status'>);
+      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount' | 'items'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName'>> });
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -292,6 +292,11 @@ export default function SalesOrdersPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
+         <div className="mb-4">
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="w-auto">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
+        </div>
         <PageHeader
           title="Sales Orders"
           description="Manage all your sales orders and track their status."
@@ -302,7 +307,7 @@ export default function SalesOrdersPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
+           <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
             <SearchInput
               value={searchTerm}
               onChange={setSearchTerm}
@@ -351,9 +356,6 @@ export default function SalesOrdersPage() {
               </Popover>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()} className="w-full sm:w-auto lg:flex-none">
-            Back
-          </Button>
         </div>
       </div>
 
@@ -497,7 +499,7 @@ export default function SalesOrdersPage() {
             <div className="flex-grow overflow-y-auto p-6 space-y-4 text-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
                 <div><strong>Order ID:</strong> {salesOrderForViewModal.id}</div>
-                <div><strong>Customer:</strong> {salesOrderForViewModal.customerName || salesOrderForViewModal.customerId}</div>
+                <div><strong>Customer:</strong> {salesOrderForViewModal.customerName || getCustomerById(salesOrderForViewModal.customerId)?.name || salesOrderForViewModal.customerId}</div>
                 <div><strong>Order Date:</strong> {format(new Date(salesOrderForViewModal.orderDate), 'PPP')}</div>
                 <div><strong>Exp. Delivery:</strong> {salesOrderForViewModal.expectedDeliveryDate ? format(new Date(salesOrderForViewModal.expectedDeliveryDate), 'PPP') : 'N/A'}</div>
                 <div><strong>Salesperson:</strong> {salesOrderForViewModal.salespersonName || salesOrderForViewModal.salespersonId || '-'}</div>

@@ -80,6 +80,24 @@ body {
     --status-po-fully-received-fg: 120 70% 95%;
     --status-po-cancelled-bg: 0 0% 50%; /* Gray */
     --status-po-cancelled-fg: 0 0% 95%;
+
+    /* Sales Order Status Colors - using HSL for consistency */
+    --status-so-draft-bg: 45 90% 55%; /* Yellow */
+    --status-so-draft-fg: 45 90% 10%;
+    --status-so-confirmed-bg: 180 70% 45%; /* Teal */
+    --status-so-confirmed-fg: 180 70% 95%;
+    --status-so-processing-bg: 220 70% 55%; /* Indigo */
+    --status-so-processing-fg: 220 70% 95%;
+    --status-so-ready-dispatch-bg: 260 70% 60%; /* Purple */
+    --status-so-ready-dispatch-fg: 260 70% 95%;
+    --status-so-dispatched-bg: 210 90% 55%; /* Blue */
+    --status-so-dispatched-fg: 210 90% 95%;
+    --status-so-partially-invoiced-bg: 30 90% 55%; /* Orange */
+    --status-so-partially-invoiced-fg: 30 90% 10%;
+    --status-so-fully-invoiced-bg: 120 70% 40%; /* Green */
+    --status-so-fully-invoiced-fg: 120 70% 95%;
+    --status-so-cancelled-bg: 0 0% 50%; /* Gray */
+    --status-so-cancelled-fg: 0 0% 95%;
   }
   .dark {
     --background: 0 0% 10%; /* Dark Gray for dark mode background */
@@ -153,6 +171,24 @@ body {
     --status-po-fully-received-fg: 120 60% 90%;
     --status-po-cancelled-bg: 0 0% 40%;
     --status-po-cancelled-fg: 0 0% 90%;
+
+    /* Dark Sales Order Status Colors */
+    --status-so-draft-bg: 45 70% 45%;
+    --status-so-draft-fg: 45 70% 90%;
+    --status-so-confirmed-bg: 180 60% 35%;
+    --status-so-confirmed-fg: 180 60% 90%;
+    --status-so-processing-bg: 220 60% 45%;
+    --status-so-processing-fg: 220 60% 90%;
+    --status-so-ready-dispatch-bg: 260 60% 50%;
+    --status-so-ready-dispatch-fg: 260 60% 90%;
+    --status-so-dispatched-bg: 210 70% 45%;
+    --status-so-dispatched-fg: 210 70% 90%;
+    --status-so-partially-invoiced-bg: 30 70% 45%;
+    --status-so-partially-invoiced-fg: 30 70% 90%;
+    --status-so-fully-invoiced-bg: 120 60% 35%;
+    --status-so-fully-invoiced-fg: 120 60% 90%;
+    --status-so-cancelled-bg: 0 0% 40%;
+    --status-so-cancelled-fg: 0 0% 90%;
   }
 }
 

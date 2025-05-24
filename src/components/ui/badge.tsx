@@ -45,15 +45,32 @@ const badgeVariants = cva(
           "border-transparent bg-[hsl(var(--category-beverages-bg))] text-[hsl(var(--category-beverages-fg))] hover:bg-[hsl(var(--category-beverages-bg))]/80",
         // PO Status Colors
         poDraft:
-          "border-transparent bg-yellow-500 text-yellow-50 hover:bg-yellow-500/80", // Example: Yellow for Draft
+          "border-transparent bg-[hsl(var(--status-po-draft-bg))] text-[hsl(var(--status-po-draft-fg))] hover:bg-[hsl(var(--status-po-draft-bg))]/80",
         poSent:
-          "border-transparent bg-blue-500 text-blue-50 hover:bg-blue-500/80",    // Example: Blue for Sent
+          "border-transparent bg-[hsl(var(--status-po-sent-bg))] text-[hsl(var(--status-po-sent-fg))] hover:bg-[hsl(var(--status-po-sent-bg))]/80",
         poPartiallyReceived:
-          "border-transparent bg-orange-500 text-orange-50 hover:bg-orange-500/80", // Example: Orange for Partially Received
+          "border-transparent bg-[hsl(var(--status-po-partially-received-bg))] text-[hsl(var(--status-po-partially-received-fg))] hover:bg-[hsl(var(--status-po-partially-received-bg))]/80",
         poFullyReceived:
-          "border-transparent bg-green-600 text-green-50 hover:bg-green-600/80", // Example: Green for Fully Received
+          "border-transparent bg-[hsl(var(--status-po-fully-received-bg))] text-[hsl(var(--status-po-fully-received-fg))] hover:bg-[hsl(var(--status-po-fully-received-bg))]/80",
         poCancelled:
-          "border-transparent bg-gray-500 text-gray-50 hover:bg-gray-500/80",   // Example: Gray for Cancelled
+          "border-transparent bg-[hsl(var(--status-po-cancelled-bg))] text-[hsl(var(--status-po-cancelled-fg))] hover:bg-[hsl(var(--status-po-cancelled-bg))]/80",
+        // Sales Order Status Colors
+        soDraft:
+            "border-transparent bg-[hsl(var(--status-so-draft-bg))] text-[hsl(var(--status-so-draft-fg))] hover:bg-[hsl(var(--status-so-draft-bg))]/80",
+        soConfirmed:
+            "border-transparent bg-[hsl(var(--status-so-confirmed-bg))] text-[hsl(var(--status-so-confirmed-fg))] hover:bg-[hsl(var(--status-so-confirmed-bg))]/80",
+        soProcessing:
+            "border-transparent bg-[hsl(var(--status-so-processing-bg))] text-[hsl(var(--status-so-processing-fg))] hover:bg-[hsl(var(--status-so-processing-bg))]/80",
+        soReadyDispatch:
+            "border-transparent bg-[hsl(var(--status-so-ready-dispatch-bg))] text-[hsl(var(--status-so-ready-dispatch-fg))] hover:bg-[hsl(var(--status-so-ready-dispatch-bg))]/80",
+        soDispatched:
+            "border-transparent bg-[hsl(var(--status-so-dispatched-bg))] text-[hsl(var(--status-so-dispatched-fg))] hover:bg-[hsl(var(--status-so-dispatched-bg))]/80",
+        soPartiallyInvoiced:
+            "border-transparent bg-[hsl(var(--status-so-partially-invoiced-bg))] text-[hsl(var(--status-so-partially-invoiced-fg))] hover:bg-[hsl(var(--status-so-partially-invoiced-bg))]/80",
+        soFullyInvoiced:
+            "border-transparent bg-[hsl(var(--status-so-fully-invoiced-bg))] text-[hsl(var(--status-so-fully-invoiced-fg))] hover:bg-[hsl(var(--status-so-fully-invoiced-bg))]/80",
+        soCancelled:
+            "border-transparent bg-[hsl(var(--status-so-cancelled-bg))] text-[hsl(var(--status-so-cancelled-fg))] hover:bg-[hsl(var(--status-so-cancelled-bg))]/80",
       },
     },
     defaultVariants: {
