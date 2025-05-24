@@ -37,7 +37,7 @@ import {
   AlertDialogTitle as AlertDialogTitleComponent,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getStatusBadgeVariant } from '@/lib/invoiceUtils';
@@ -408,7 +408,7 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} className="hover:text-primary p-1.5" title="Edit Customer">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive p-1.5" title="Delete Customer" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerConfirm(customer);}}>
+                           <Button variant="ghost" size="icon" className="hover:text-destructive p-1.5" title="Delete Customer" onClick={(e) => { e.stopPropagation(); handleDeleteCustomerConfirm(customer);}}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -614,3 +614,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
