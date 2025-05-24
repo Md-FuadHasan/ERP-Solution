@@ -17,7 +17,7 @@ import {
   ArrowDown,
   Filter as FilterIcon,
   CalendarIcon,
-  ShoppingCart, // Added ShoppingCart import
+  ShoppingCart,
 } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useData } from '@/context/DataContext';
-import type { SalesOrder, SalesOrderStatus, SalesOrderItem, ProductUnitType, Customer, Product, Warehouse } from '@/types';
+import type { SalesOrder, SalesOrderStatus, SalesOrderItem, Customer, Product, Warehouse, ProductUnitType } from '@/types';
 import { ALL_SALES_ORDER_STATUSES } from '@/types';
 import { SalesOrderForm, type SalesOrderFormValues } from '@/components/forms/sales-order-form';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +61,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { getSalesOrderStatusBadgeVariant } from '@/lib/invoiceUtils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+
 
 type SortableSalesOrderKeys = keyof Pick<SalesOrder, 'id' | 'orderDate' | 'status' | 'totalAmount'> | 'customerName' | 'salespersonName' | 'routeName';
 
@@ -162,40 +164,61 @@ export default function SalesOrdersPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
-    const salesperson = data.salespersonId ? salespeople.find(sp => sp.id === data.salespersonId) : null;
+    // Placeholder for salesperson and route logic - will be text fields for now
+    const salespersonName = data.salespersonId || 'N/A';
+    const routeName = data.routeId || 'N/A';
+
 
     const itemsWithDetails = data.items.map(item => {
         const product = getProductById(item.productId);
         const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
+        let calculatedUnitPrice = 0;
+        if (product) {
+            const basePrice = product.basePrice;
+            const excise = product.exciseTax || 0;
+            if (item.unitType.toLowerCase() === product.unitType.toLowerCase()) {
+                calculatedUnitPrice = basePrice + excise;
+            } else if (product.packagingUnit && item.unitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
+                calculatedUnitPrice = (basePrice + excise) * product.itemsPerPackagingUnit;
+            } else if (item.unitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
+                calculatedUnitPrice = (basePrice / product.piecesInBaseUnit) + ((excise / product.piecesInBaseUnit));
+            }
+        }
+
         return {
             ...item,
             id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
             productName: product?.name || item.productId,
             sourceWarehouseName: warehouse?.name || item.sourceWarehouseId,
-            total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+            unitPrice: calculatedUnitPrice, // Unit price already includes base + excise for the chosen unit
+            total: (Number(item.quantity) || 0) * calculatedUnitPrice,
         };
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; // VAT applied at invoice stage
+    const totalAmount = subtotal; // VAT is applied at invoice stage
 
     const salesOrderData = {
-        ...data,
+        customerId: data.customerId,
         customerName: customer?.name || data.customerId,
-        salespersonName: salesperson?.name || data.salespersonId,
-        // routeName: route?.name || data.routeId, // Assuming you might have routes in future
+        salespersonId: data.salespersonId,
+        salespersonName: salespersonName,
+        routeId: data.routeId,
+        routeName: routeName,
         items: itemsWithDetails,
         subtotal,
         totalAmount,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
+        notes: data.notes,
+        // status: 'Draft', // Will be handled by addSalesOrder or updateSalesOrder
     };
 
     if (editingSalesOrder) {
       updateSalesOrder({ ...editingSalesOrder, ...salesOrderData, status: editingSalesOrder.status } as SalesOrder);
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
-      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'routeName'>);
+      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status'>);
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
@@ -324,7 +347,7 @@ export default function SalesOrdersPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned items */}
             <SearchInput
               value={searchTerm}
               onChange={setSearchTerm}
