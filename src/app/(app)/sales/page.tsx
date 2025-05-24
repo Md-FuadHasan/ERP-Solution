@@ -84,12 +84,11 @@ export default function SalesPage() {
     deleteSalesOrder,
     getSalesOrderById,
     getCustomerById,
-    getProductById,
-    getTotalStockForProduct,
-    getStockForProductInWarehouse,
-    warehouses,
-    products,
-    customers,
+    products, // For SalesOrderForm
+    warehouses, // For SalesOrderForm
+    getTotalStockForProduct, // For SalesOrderForm
+    getStockForProductInWarehouse, // For SalesOrderForm
+    getProductById, // For SalesOrderForm
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -277,7 +276,7 @@ export default function SalesPage() {
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
-          title="Sales Orders"
+          title="Sales Management"
           description="Manage sales orders, track customer requests, and streamline fulfillment."
           actions={
             <Button onClick={handleAddSalesOrder} className="w-full sm:w-auto" disabled={isLoading}>
@@ -462,7 +461,7 @@ export default function SalesPage() {
                 onSubmit={handleSubmitSalesOrder}
                 onCancel={() => { setIsSalesOrderFormModalOpen(false); setEditingSalesOrder(null); }}
                 isSubmitting={isLoading}
-                customers={customers}
+                customers={products.map(p => ({id: p.id, name: p.name, email: '', phone: '', billingAddress: '', createdAt: '', customerType: 'Cash'}))} // Pass dummy customer structure
                 products={products}
                 warehouses={warehouses}
                 getTotalStockForProduct={getTotalStockForProduct} 
@@ -599,4 +598,3 @@ export default function SalesPage() {
     </div>
   );
 }
-

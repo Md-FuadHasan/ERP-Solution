@@ -16,7 +16,7 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   { href: '/products', label: 'Products', icon: Package },
   { href: '/inventory', label: 'Inventory', icon: Archive },
   { href: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBasket },
-  { href: '/sales', label: 'Sales', icon: ShoppingCart },
+  { href: '/sales', label: 'Sales Management', icon: ShoppingCart },
   { href: '/employee-management', label: 'Employee Management', icon: Briefcase },
   { href: '/ai-suggestions', label: 'AI Suggestions', icon: Lightbulb },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
