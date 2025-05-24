@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon, Truck } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon, Truck, UserCheck } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,8 +19,9 @@ import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
 import { WarehouseForm, type WarehouseFormValues } from '@/components/forms/warehouse-form';
 import { SupplierForm, type SupplierFormValues } from '@/components/forms/supplier-form';
+import { SalespersonForm, type SalespersonFormValues } from '@/components/forms/salesperson-form'; // New Import
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { CompanyProfile, Manager, Warehouse, Supplier } from '@/types';
+import type { CompanyProfile, Manager, Warehouse, Supplier, Salesperson } from '@/types';
 import { MOCK_MANAGERS } from '@/types';
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +43,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -61,6 +62,10 @@ export default function SettingsPage() {
     addSupplier,
     updateSupplier,
     deleteSupplier,
+    salespeople, // New from DataContext
+    addSalesperson, // New from DataContext
+    updateSalesperson, // New from DataContext
+    deleteSalesperson, // New from DataContext
     isLoading: isDataLoading
   } = useData();
 
@@ -78,6 +83,10 @@ export default function SettingsPage() {
   const [isSupplierFormModalOpen, setIsSupplierFormModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+
+  const [isSalespersonFormModalOpen, setIsSalespersonFormModalOpen] = useState(false); // New state
+  const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null); // New state
+  const [salespersonToDelete, setSalespersonToDelete] = useState<Salesperson | null>(null); // New state
 
   const [localLoading, setLocalLoading] = useState(true);
   const { toast } = useToast();
@@ -110,8 +119,6 @@ export default function SettingsPage() {
 
   const handleTaxSettingsSubmit = (data: TaxSettingsFormValues) => {
     updateCompanyProfile({
-      // taxRate field has been removed from CompanyProfile type and form.
-      // Keep vatRate and excessTaxRate logic as is.
       vatRate: data.vatRate,
       excessTaxRate: data.excessTaxRate
     });
@@ -153,7 +160,6 @@ export default function SettingsPage() {
       updateWarehouse({ ...editingWarehouse, ...data });
       toast({ title: "Warehouse Updated", description: `${data.name} updated.` });
     } else {
-      // ID generation handled by DataContext's addWarehouse
       addWarehouse(data as Omit<Warehouse, 'id'>);
       toast({ title: "Warehouse Added", description: `${data.name} added.` });
     }
@@ -172,10 +178,10 @@ export default function SettingsPage() {
   const handleEditSupplier = (supplier: Supplier) => { setEditingSupplier(supplier); setIsSupplierFormModalOpen(true); };
   const handleSupplierFormSubmit = (data: SupplierFormValues) => {
     if (editingSupplier) {
-      updateSupplier({ ...editingSupplier, ...data, createdAt: editingSupplier.createdAt }); // Ensure createdAt is preserved
+      updateSupplier({ ...editingSupplier, ...data, createdAt: editingSupplier.createdAt });
       toast({ title: "Supplier Updated", description: `${data.name} updated.` });
     } else {
-      addSupplier(data as Omit<Supplier, 'id' | 'createdAt'>); // Let DataContext handle id and createdAt
+      addSupplier(data as Omit<Supplier, 'id' | 'createdAt'>);
       toast({ title: "Supplier Added", description: `${data.name} added.` });
     }
     setIsSupplierFormModalOpen(false); setEditingSupplier(null);
@@ -189,16 +195,39 @@ export default function SettingsPage() {
     }
   };
 
+  // New Salesperson Handlers
+  const handleAddSalesperson = () => { setEditingSalesperson(null); setIsSalespersonFormModalOpen(true); };
+  const handleEditSalesperson = (salesperson: Salesperson) => { setEditingSalesperson(salesperson); setIsSalespersonFormModalOpen(true); };
+  const handleSalespersonFormSubmit = (data: SalespersonFormValues) => {
+    if (editingSalesperson) {
+      updateSalesperson({ ...editingSalesperson, ...data, createdAt: editingSalesperson.createdAt });
+      toast({ title: "Salesperson Updated", description: `${data.name} updated.` });
+    } else {
+      addSalesperson(data as Omit<Salesperson, 'id' | 'createdAt'>);
+      toast({ title: "Salesperson Added", description: `${data.name} added.` });
+    }
+    setIsSalespersonFormModalOpen(false); setEditingSalesperson(null);
+  };
+  const handleDeleteSalespersonConfirm = (salesperson: Salesperson) => { setSalespersonToDelete(salesperson); };
+  const confirmDeleteSalesperson = () => {
+    if (salespersonToDelete) {
+      deleteSalesperson(salespersonToDelete.id);
+      toast({ title: "Salesperson Deleted", description: `${salespersonToDelete.name} removed.` });
+      setSalespersonToDelete(null);
+    }
+  };
+
+
   if (isDataLoading || localLoading) {
     return (
       <div className="flex flex-col h-full">
         <div className="shrink-0">
-          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, suppliers, and data storage." />
+          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, salespeople, warehouses, suppliers, and data storage." />
         </div>
         <Tabs defaultValue="company" className="w-full flex-grow min-h-0 flex flex-col">
-           <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar"> {/* Changed from grid to flex */}
+           <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar">
             {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5"> {/* Added flex-shrink-0 */}
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5">
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
@@ -214,14 +243,14 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0">
-        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, warehouses, suppliers, and data storage." />
+        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, salespeople, warehouses, suppliers, and data storage." />
       </div>
 
       <div className="flex-grow min-h-0">
         <Tabs defaultValue="company" className="w-full h-full flex flex-col">
-          <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar"> {/* Changed from grid to flex */}
+          <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar">
             {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5"> {/* Added flex-shrink-0 */}
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5">
                 <tab.icon className="h-4 w-4" /> {tab.label}
               </TabsTrigger>
             ))}
@@ -250,6 +279,65 @@ export default function SettingsPage() {
                   {managers.length > 0 ? (
                     <div className="rounded-lg border overflow-x-auto"><Table><TableHeader className="bg-muted"><TableRow><TableHead className="min-w-[150px] px-2">Name</TableHead><TableHead className="min-w-[200px] px-2">Email</TableHead><TableHead className="min-w-[120px] px-2">Role</TableHead><TableHead className="text-right min-w-[100px] px-2">Actions</TableHead></TableRow></TableHeader><TableBody>{managers.map((manager, index) => (<TableRow key={manager.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}><TableCell className="px-2">{manager.name}</TableCell><TableCell className="px-2">{manager.email}</TableCell><TableCell className="px-2">{manager.role}</TableCell><TableCell className="text-right px-2"><div className="flex justify-end items-center gap-1"><Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="hover:text-primary"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></div></TableCell></TableRow>))}</TableBody></Table></div>
                   ) : (<DataPlaceholder title="No Managers" message="Add managers to help manage your account." action={<Button onClick={handleAddManager} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0"><PlusCircle className="mr-2 h-4 w-4" /> Add Manager</Button>}/>)}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="salespeople" className="mt-0"> {/* New Tab Content */}
+              <Card>
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex-grow">
+                    <CardTitle>Salespeople Management</CardTitle>
+                    <CardDescription>Manage your sales team members.</CardDescription>
+                  </div>
+                  <Button onClick={handleAddSalesperson} className="w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Salesperson
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {salespeople.length > 0 ? (
+                    <div className="rounded-lg border overflow-x-auto">
+                      <Table>
+                        <TableHeader className="bg-muted">
+                          <TableRow>
+                            <TableHead className="min-w-[100px] px-2">ID</TableHead>
+                            <TableHead className="min-w-[150px] px-2">Name</TableHead>
+                            <TableHead className="min-w-[180px] px-2">Email</TableHead>
+                            <TableHead className="min-w-[120px] px-2">Route ID</TableHead>
+                            <TableHead className="min-w-[150px] px-2">Warehouse ID</TableHead>
+                            <TableHead className="text-right min-w-[100px] px-2">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {salespeople.map((sp, index) => (
+                            <TableRow key={sp.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
+                              <TableCell className="px-2">{sp.id}</TableCell>
+                              <TableCell className="px-2">{sp.name}</TableCell>
+                              <TableCell className="px-2">{sp.email || '-'}</TableCell>
+                              <TableCell className="px-2">{sp.assignedRouteId || '-'}</TableCell>
+                              <TableCell className="px-2">{sp.assignedWarehouseId || '-'}</TableCell>
+                              <TableCell className="text-right px-2">
+                                <div className="flex justify-end items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditSalesperson(sp)} className="hover:text-primary"><Edit className="h-4 w-4" /></Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteSalespersonConfirm(sp)} className="hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <DataPlaceholder
+                      title="No Salespeople Found"
+                      message="Get started by adding your first salesperson."
+                      icon={UserCheck}
+                      action={
+                        <Button onClick={handleAddSalesperson} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add Salesperson
+                        </Button>
+                      }
+                    />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -283,7 +371,7 @@ export default function SettingsPage() {
               <Card>
                 <CardHeader><CardTitle>Data Storage Configuration</CardTitle><CardDescription>Settings for connecting to local storage or SQL database systems.</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300"><Database className="h-6 w-6 text-green-500 dark:text-green-400" /><div><p className="font-medium">Using Local Storage</p><p className="text-sm">Currently, all application data (invoices, customers, products, warehouses, settings) is being stored in your browser's local storage. Changes are persisted across sessions on this device.</p></div></div>
+                  <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300"><Database className="h-6 w-6 text-green-500 dark:text-green-400" /><div><p className="font-medium">Using Local Storage</p><p className="text-sm">Currently, all application data is being stored in your browser's local storage. Changes are persisted across sessions on this device.</p></div></div>
                   <p className="text-muted-foreground">Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.</p>
                   <Button disabled className="w-full sm:w-auto">Configure Cloud Database (Coming Soon)</Button>
                 </CardContent>
@@ -308,6 +396,36 @@ export default function SettingsPage() {
       </Dialog>
       <AlertDialog open={!!supplierToDelete} onOpenChange={(isOpen) => !isOpen && setSupplierToDelete(null)}>
         <AlertDialogContent><AlertDialogHeaderComponent><AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent><AlertDialogDesc>This action cannot be undone. This will permanently delete the supplier "{supplierToDelete?.name}".</AlertDialogDesc></AlertDialogHeaderComponent><AlertDialogFooterComponent><AlertDialogCancel onClick={() => setSupplierToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSupplier} className="bg-destructive hover:bg-destructive/90">Delete Supplier</AlertDialogAction></AlertDialogFooterComponent></AlertDialogContent>
+      </AlertDialog>
+
+      {/* New Salesperson Modals */}
+      <Dialog open={isSalespersonFormModalOpen} onOpenChange={(isOpen) => { setIsSalespersonFormModalOpen(isOpen); if (!isOpen) setEditingSalesperson(null); }}>
+        <DialogContent className="w-[90vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingSalesperson ? 'Edit Salesperson' : 'Add New Salesperson'}</DialogTitle>
+            <DialogDescription>{editingSalesperson ? 'Update salesperson details.' : 'Enter details for the new salesperson.'}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <SalespersonForm
+              initialData={editingSalesperson}
+              warehouses={warehouses}
+              onSubmit={handleSalespersonFormSubmit}
+              onCancel={() => { setIsSalespersonFormModalOpen(false); setEditingSalesperson(null); }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={!!salespersonToDelete} onOpenChange={(isOpen) => !isOpen && setSalespersonToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent>
+            <AlertDialogDesc>This action cannot be undone. This will permanently delete salesperson "{salespersonToDelete?.name}".</AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
+            <AlertDialogCancel onClick={() => setSalespersonToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSalesperson} className="bg-destructive hover:bg-destructive/90">Delete Salesperson</AlertDialogAction>
+          </AlertDialogFooterComponent>
+        </AlertDialogContent>
       </AlertDialog>
     </div>
   );

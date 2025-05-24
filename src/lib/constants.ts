@@ -1,5 +1,5 @@
 
-import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse, ShoppingBasket, Truck, ExternalLink } from 'lucide-react';
+import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse as WarehouseIcon, ShoppingBasket, Truck, UserCheck, ExternalLink } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -32,11 +32,13 @@ export interface SettingsTab {
 export const SETTINGS_TABS: SettingsTab[] = [
   { value: 'company', label: 'Company Details', icon: Building },
   { value: 'tax', label: 'Tax Settings', icon: Percent },
-  { value: 'users', label: 'User Management', icon: UserCog },
-  { value: 'warehouses', label: 'Warehouses', icon: Warehouse },
-  { value: 'suppliers', label: 'Suppliers', icon: Truck }, 
+  { value: 'users', label: 'User Management', icon: UserCog }, // Manager specific
+  { value: 'salespeople', label: 'Salespeople', icon: UserCheck }, // Salesperson specific
+  { value: 'warehouses', label: 'Warehouses', icon: WarehouseIcon },
+  { value: 'suppliers', label: 'Suppliers', icon: Truck },
   { value: 'storage', label: 'Data Storage', icon: Database },
 ];
 
 export const APP_NAME = "InvoiceFlow";
 
+    

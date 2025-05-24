@@ -61,12 +61,12 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   items: InvoiceItem[];
-  // Subtotal = Sum of all (item.quantity * (product.basePrice + product.exciseTax for item's unit)).
+  // Subtotal = Sum of all (item.quantity * (item.unitPrice (which is product.basePrice + product.exciseTax)))
   subtotal: number;
   taxAmount: number; // General tax on subtotal - THIS SHOULD BE 0 if VAT is the main consumption tax.
   // vatAmount = VAT on (subtotal).
   vatAmount: number;
-  totalAmount: number; // subtotal + taxAmount (which is 0) + vatAmount.
+  totalAmount: number; // subtotal + taxAmount (0) + vatAmount.
   status: InvoiceStatus;
   paymentProcessingStatus: PaymentProcessingStatus;
   amountPaid: number;
@@ -127,7 +127,7 @@ export interface Product {
   piecesInBaseUnit?: number;      // If unitType is a package (e.g., Carton), how many individual pieces (e.g., PCS) does it contain?
   packagingUnit?: string;         // Optional LARGER sales package (e.g., Pallet, if unitType is Carton).
   itemsPerPackagingUnit?: number; // Number of 'unitType's in one 'packagingUnit' (e.g., 20 Cartons in 1 Pallet).
-  basePrice: number;              // Base selling price for one 'unitType' BEFORE any taxes.
+  basePrice: number;              // Price for one 'unitType' BEFORE any taxes.
   costPrice: number;              // Cost per 'unitType'.
   exciseTax?: number;             // Excise tax amount PER 'unitType'.
   batchNo?: string;
@@ -235,6 +235,17 @@ export interface PurchaseOrder {
   updatedAt?: string;
 }
 
+// Salesperson Type
+export interface Salesperson {
+  id: string; // e.g., SP-ROUTE-001
+  name: string;
+  email?: string;
+  assignedRouteId?: string; // Link to a Route/Territory entity (future)
+  assignedWarehouseId?: string; // Primary warehouse they operate from
+  // Add other relevant fields: phone, target, commissionRate (future)
+  createdAt: string;
+}
+
 // Sales Order Types
 export type SalesOrderStatus = 'Draft' | 'Confirmed' | 'Processing' | 'Ready for Dispatch' | 'Dispatched' | 'Partially Invoiced' | 'Fully Invoiced' | 'Cancelled';
 export const ALL_SALES_ORDER_STATUSES: SalesOrderStatus[] = ['Draft', 'Confirmed', 'Processing', 'Ready for Dispatch', 'Dispatched', 'Partially Invoiced', 'Fully Invoiced', 'Cancelled'];
@@ -248,14 +259,15 @@ export interface SalesOrderItem {
   // Unit price is BEFORE invoice-level VAT, but includes product.basePrice + product.exciseTax
   unitPrice: number;
   total: number; // quantity * unitPrice
-  sourceWarehouseId?: string; // Warehouse fulfilling this item (important for multi-warehouse)
+  sourceWarehouseId?: string; // Warehouse fulfilling this item
+  sourceWarehouseName?: string;
 }
 
 export interface SalesOrder {
   id: string;
   customerId: string;
   customerName?: string; // Denormalized for display
-  salespersonId?: string; // Placeholder for user ID
+  salespersonId?: string;
   salespersonName?: string; // Denormalized
   routeId?: string; // Placeholder
   routeName?: string; // Denormalized
@@ -280,7 +292,7 @@ export const MOCK_COMPANY_PROFILE: CompanyProfile = {
   address: '123 App Dev Lane, Suite 404, Logic City, OS 12345',
   phone: '(555) 123-4567',
   email: 'hello@invoiceflow.com',
-  taxRate: 0,
+  taxRate: 0, // General tax is 0, as VAT is primary
   vatRate: 15,
   excessTaxRate: 0,
 };
@@ -295,8 +307,8 @@ export const MOCK_PRODUCTS: Product[] = [
   { id: 'PROD006', name: 'UHT Milk 200ml', sku: '59012', category: 'Dairy', unitType: 'PCS', piecesInBaseUnit: 1, packagingUnit: 'Carton', itemsPerPackagingUnit: 18, basePrice: 0.70, costPrice: 0.45, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(), globalReorderPoint: 1080 },
   { id: 'PROD007', name: 'Whipping Cream 1080ml', sku: '330011', category: 'Dairy', unitType: 'Cartons', piecesInBaseUnit: 12, basePrice: 11.50, costPrice: 9.50, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), globalReorderPoint: 25 },
   { id: 'PROD008', name: 'Ice Cream Cone 120ml - Vanilla/Strawberry', sku: '12024-VS', category: 'Frozen', unitType: 'Cartons', piecesInBaseUnit: 24, basePrice: 33.60, costPrice: 24.00, exciseTax: 2.40, createdAt: '2024-01-01T00:00:00.000Z', expiryDate: '2024-12-30T00:00:00.000Z', globalReorderPoint: 20 },
-  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', basePrice: 0.90, costPrice: 0.70, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 200 },
-  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', basePrice: 0.20, costPrice: 0.15, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 1000 },
+  { id: 'PROD009', name: 'Sugar - Bulk', sku: 'SUG001', category: 'Raw Materials', unitType: 'Kgs', piecesInBaseUnit: 1, basePrice: 0.90, costPrice: 0.70, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 200 },
+  { id: 'PROD010', name: 'Carton Box - Medium', sku: 'BOXM001', category: 'Packaging', unitType: 'PCS', piecesInBaseUnit: 1, basePrice: 0.20, costPrice: 0.15, exciseTax: 0, createdAt: '2024-01-01T00:00:00.000Z', globalReorderPoint: 1000 },
 ];
 
 export const MOCK_WAREHOUSES: Warehouse[] = [
@@ -360,10 +372,11 @@ const getInvoiceItemUnitPrice = (productId: string, unitType: ProductUnitType, p
 
 
 const createInvoiceTotals = (items: InvoiceItem[], companyProfile: CompanyProfile) => {
+  // Subtotal already includes item-level base price + item-level excise tax
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const generalTaxAmount = 0; // companyProfile.taxRate is 0
+  const generalTaxAmount = 0; // Company-level general tax rate is 0
   const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
-  const vatAmount = subtotal * vatRate;
+  const vatAmount = subtotal * vatRate; // VAT is calculated on the subtotal (which includes excise)
   const totalAmount = subtotal + generalTaxAmount + vatAmount;
   return { subtotal, taxAmount: generalTaxAmount, vatAmount, totalAmount };
 };
@@ -378,7 +391,7 @@ const inv3Item1UnitPrice = getInvoiceItemUnitPrice('PROD003', 'Cartons', MOCK_PR
 const inv3Totals = createInvoiceTotals([{ id: 'item1-inv3', productId: 'PROD003', description: 'Cooking Cream 1080ml', quantity: 5, unitPrice: inv3Item1UnitPrice, unitType: 'Cartons', total: inv3Item1UnitPrice * 5, sourceWarehouseId: 'WH-HO-TETRA' }], MOCK_COMPANY_PROFILE);
 
 // For PROD004, if ordered by Carton, use its itemsPerPackagingUnit to adjust unitPrice
-const inv4Item1UnitPrice = getInvoiceItemUnitPrice('PROD004', 'Cartons', MOCK_PRODUCTS);
+const inv4Item1UnitPrice = getInvoiceItemUnitPrice('PROD004', 'Cartons', MOCK_PRODUCTS); // Assuming selling a "Carton" which is its packagingUnit
 const inv4Totals = createInvoiceTotals([{ id: 'item1-inv4', productId: 'PROD004', description: 'Al Rabie Juice 125ml - Orange', quantity: 1, unitPrice: inv4Item1UnitPrice, unitType: 'Cartons', total: inv4Item1UnitPrice * 1, sourceWarehouseId: 'WH-RIY-01' }], MOCK_COMPANY_PROFILE);
 
 
@@ -435,16 +448,18 @@ export const MOCK_SUPPLIERS: Supplier[] = [
     { id: 'SUPP003', name: 'SweetnerPro Ltd.', email: 'contact@sweetner.pro', phone: '555-0203', address: '15 Sugar Mill Road, Factoria', contactPerson: 'Mr. Cane', createdAt: new Date().toISOString() },
 ];
 
-const getPOCostPrice = (productId: string, orderedUnitType: ProductUnitType, products: Product[]): number => {
-  const product = products.find(p => p.id === productId);
+const getPOCostPrice = (productId: string, orderedUnitType: ProductUnitType, productsArray: Product[]): number => {
+  const product = productsArray.find(p => p.id === productId);
   if (!product) return 0;
 
   let cost = product.costPrice; // Cost of one base unit (product.unitType)
 
   if (orderedUnitType.toLowerCase() !== product.unitType.toLowerCase()) {
     if (product.packagingUnit && orderedUnitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
+      // Ordered in LARGER packaging unit, convert cost from base unit
       cost = product.costPrice * product.itemsPerPackagingUnit;
     } else if (orderedUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
+      // Ordered in PCS, but product's base unit is a package (e.g., Carton of PCS)
       cost = product.costPrice / product.piecesInBaseUnit;
     }
   }
@@ -487,8 +502,8 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
   },
   {
     id: 'PO-003',
-    supplierId: 'SUPP003',
-    supplierName: 'SweetnerPro Ltd.',
+    supplierId: 'SUPP002', // Changed from SUPP003 to ensure it exists
+    supplierName: 'FarmFresh Ingredients Co.', // Matched to SUPP002
     orderDate: '2024-07-20T00:00:00.000Z',
     expectedDeliveryDate: '2024-07-30T00:00:00.000Z',
     items: [
@@ -533,6 +548,12 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     notes: 'Juice packaging order.',
     createdAt: '2024-07-25T00:00:00.000Z',
   }
+];
+
+export const MOCK_SALESPEOPLE: Salesperson[] = [
+  { id: 'SP-JED-001', name: 'Ali Ahmed', email: 'ali.ahmed@example.com', assignedRouteId: 'JED-NORTH', assignedWarehouseId: 'WH-JED-01', createdAt: new Date().toISOString() },
+  { id: 'SP-RIY-001', name: 'Fatima Khan', email: 'fatima.khan@example.com', assignedRouteId: 'RIY-CENTRAL', assignedWarehouseId: 'WH-RIY-01', createdAt: new Date().toISOString() },
+  { id: 'SP-DAM-001', name: 'Omar Hassan', email: 'omar.hassan@example.com', assignedRouteId: 'DAM-EAST', assignedWarehouseId: 'WH-DAM-01', createdAt: new Date().toISOString() },
 ];
 
 export const MOCK_SALES_ORDERS: SalesOrder[] = [];
