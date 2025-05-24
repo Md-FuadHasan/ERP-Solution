@@ -35,6 +35,7 @@ import {
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -303,7 +304,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card overflow-hidden">
-         <div className="overflow-y-auto h-full">
+         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
@@ -604,5 +605,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    
