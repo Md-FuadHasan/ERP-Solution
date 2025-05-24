@@ -21,7 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Ensure CardDescription is imported
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
@@ -48,7 +48,7 @@ import { format, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 
-// --- Helper Functions (Exported for use in other modules) ---
+// --- Helper Functions (Moved outside component for clarity and potential reuse) ---
 export const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
   let unit: string | undefined;
   if (type === 'package' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
@@ -99,11 +99,10 @@ export const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfi
 export const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  
-  const piecesInPrimaryUnit = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
+  const piecesInBase = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
 
-  const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInPrimaryUnit;
-  const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInPrimaryUnit;
+  const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInBase;
+  const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInBase;
 
   const subtotalBeforeVATPerPiece = basePricePerConceptualPiece + exciseTaxPerConceptualPiece;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
@@ -122,23 +121,28 @@ export const calculateFinalPkgPriceWithVatAndExcise = (product: Product, company
 
   let itemsInTargetUnit = 1;
   let targetUnitDisplay = getDisplayUnit(product, 'base'); 
-  let usePackagingUnit = false;
+  let usePackagingUnitAsTarget = false;
 
+  // Scenario 1: Product has a defined larger "packagingUnit" (e.g., Pallet)
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     itemsInTargetUnit = product.itemsPerPackagingUnit;
     targetUnitDisplay = getDisplayUnit(product, 'package');
-    usePackagingUnit = true;
-  } else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 1) > 0) {
-    // Base unit itself is a package, price for one base unit
-    // itemsInTargetUnit remains 1
-  } else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    return { price: null, unit: '-' }; // No larger package defined for PCS base unit
+    usePackagingUnitAsTarget = true;
+  } 
+  // Scenario 2: Product's base "unitType" is itself a package (e.g., Carton), and not PCS
+  else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 1) > 0) {
+    // itemsInTargetUnit remains 1 (we are pricing one base unit package)
+    // targetUnitDisplay is already getDisplayUnit(product, 'base')
+  } 
+  // Scenario 3: Product's base "unitType" is PCS, and no larger package is defined
+  else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
+    return { price: null, unit: '-' }; // No larger package price to display
   } else {
-    return { price: null, unit: '-' }; // Fallback
+     return { price: null, unit: '-' }; // Fallback, should not happen with clear data
   }
 
-  const totalBasePriceForTargetUnit = basePricePerBaseUnit * (usePackagingUnit ? itemsInTargetUnit : 1);
-  const totalExciseTaxForTargetUnit = exciseTaxPerBaseUnit * (usePackagingUnit ? itemsInTargetUnit : 1);
+  const totalBasePriceForTargetUnit = basePricePerBaseUnit * (usePackagingUnitAsTarget ? itemsInTargetUnit : 1);
+  const totalExciseTaxForTargetUnit = exciseTaxPerBaseUnit * (usePackagingUnitAsTarget ? itemsInTargetUnit : 1);
 
   const subtotalBeforeVAT = totalBasePriceForTargetUnit + totalExciseTaxForTargetUnit;
   const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
@@ -150,6 +154,7 @@ export const calculateFinalPkgPriceWithVatAndExcise = (product: Product, company
   return { price: finalPrice, unit: targetUnitDisplay };
 };
 // --- End Helper Functions ---
+
 
 type SortableProductKeys = keyof Pick<Product, 'id' | 'name' | 'sku' | 'category' | 'basePrice'> | 'stockLevel' | 'totalPieces';
 
@@ -166,8 +171,10 @@ export default function ProductsPage() {
     updateProduct,
     deleteProduct,
     getTotalStockForProduct,
-    isLoading,
     companyProfile,
+    isLoading,
+    upsertProductStockLocation, // For ProductForm's stock addition
+    warehouses, // For ProductForm's stock addition warehouse selection
   } = useData();
   const { toast } = useToast();
   const router = useRouter();
@@ -181,7 +188,6 @@ export default function ProductsPage() {
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'name', direction: 'ascending' });
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | 'all'>('all');
-
 
   const filteredProducts = useMemo(() => {
     let _products = [...products];
@@ -261,19 +267,19 @@ export default function ProductsPage() {
     }
   }, [productToDelete, deleteProduct, toast]);
 
-  const handleSubmit = useCallback((data: ProductFormValues) => {
-    const productDataForStorage = {
+ const handleSubmit = useCallback((data: ProductFormValues) => {
+    let productDataForStorage: Partial<Product> & Pick<Product, 'name' | 'sku' | 'category' | 'unitType' | 'basePrice'> = {
       name: data.name,
-      sku: data.sku || '',
+      sku: data.sku,
       category: data.category,
       unitType: data.unitType,
-      piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
+      piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType === 'PCS' ? 1 : undefined),
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       globalReorderPoint: data.globalReorderPoint || 0,
-      basePrice: data.basePrice,
-      costPrice: data.costPrice || 0,
-      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
+      basePrice: data.basePrice, // Base price (per unitType) is taken directly
+      costPrice: data.costPrice || 0, // Cost price (per unitType) is taken directly
+      exciseTax: data.exciseTaxAmount || 0, // Excise tax (per unitType) is taken directly
       batchNo: data.batchNo || undefined,
       productionDate: data.productionDate ? data.productionDate.toISOString() : undefined,
       expiryDate: data.expiryDate ? data.expiryDate.toISOString() : undefined,
@@ -281,32 +287,29 @@ export default function ProductsPage() {
     };
 
     if (editingProduct) {
-        const currentStockLevel = getTotalStockForProduct(editingProduct.id);
-        const stockToAdd = data.addStockQuantity || 0;
-        const newStockLevel = currentStockLevel + stockToAdd;
+      const updatedProductData: Product = {
+        ...editingProduct,
+        ...productDataForStorage,
+        id: editingProduct.id, // Ensure ID is preserved
+        createdAt: editingProduct.createdAt || new Date().toISOString(), // Preserve original creation date
+      };
+      updateProduct(updatedProductData);
 
-        const updatedProductData: Product = {
-            ...editingProduct,
-            ...productDataForStorage,
-            stockLevel: newStockLevel, // This needs to be managed via ProductStockLocations now
-        };
-        updateProduct(updatedProductData); // This function now just updates product definition
-
-        if (stockToAdd > 0) {
-            // For simplicity, assume first warehouse for stock adjustment if not specified
-            // A more robust solution would require warehouse selection during stock addition
-            const defaultWarehouse = warehouses.length > 0 ? warehouses[0] : null;
-            if (defaultWarehouse) {
-                upsertProductStockLocation(
-                    { productId: editingProduct.id, warehouseId: defaultWarehouse.id, stockLevel: newStockLevel },
-                    'Adjustment - Increase', // Or a more specific reason if available
-                    `Manual stock addition via product edit: ${stockToAdd}`
-                );
-            } else {
-                toast({ title: "Stock Not Added", description: "No warehouse available to add stock.", variant: "destructive"});
-            }
+      if (data.addStockQuantity && data.addStockQuantity > 0) {
+        // For simplicity, assume first warehouse for stock adjustment if not specified.
+        // A more robust solution would require warehouse selection during stock addition in the product form.
+        const defaultWarehouse = warehouses.length > 0 ? warehouses[0] : null;
+        if (defaultWarehouse) {
+          const currentStockInWarehouse = getTotalStockForProduct(editingProduct.id); // This gets total, need warehouse specific
+          // This upsert call would be more complex if we were adding to a specific warehouse via this form
+          // For now, this simplified logic might not be what's intended if "addStockQuantity" is truly per-warehouse
+          // We need a warehouse selector in the ProductForm if adding stock directly here.
+          // Let's assume ProductForm is only for product definition now.
+          // Stock additions should happen via Inventory > Adjust Stock.
+          toast({ title: "Stock Not Added Here", description: "Please use Inventory > Adjust Stock to manage stock levels per warehouse.", variant:"default" });
         }
-        toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
+      }
+      toast({ title: "Product Updated", description: `${data.name} definition has been updated.` });
     } else { // Adding new product
       let finalProductId = data.id;
       if (finalProductId && finalProductId.trim() !== '') {
@@ -324,31 +327,17 @@ export default function ProductsPage() {
           finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
         }
       }
-      const newProductDefinition: Product = {
+      const newProduct: Product = {
         ...productDataForStorage,
         id: finalProductId,
         createdAt: new Date().toISOString(),
-        // stockLevel is no longer part of Product definition directly
-      };
-      addProduct(newProductDefinition);
-
-      if (data.stockLevel && data.stockLevel > 0) { // Initial stock level from form
-        const defaultWarehouse = warehouses.length > 0 ? warehouses[0] : null;
-        if (defaultWarehouse) {
-            upsertProductStockLocation(
-                { productId: finalProductId, warehouseId: defaultWarehouse.id, stockLevel: data.stockLevel },
-                'Initial Stock Entry',
-                `Initial stock for new product ${finalProductId}`
-            );
-        } else {
-            toast({ title: "Stock Not Added", description: "No warehouse available to add initial stock.", variant: "destructive"});
-        }
-      }
-      toast({ title: "Product Defined", description: `${newProductDefinition.name} definition created. Manage stock in Inventory.` });
+      } as Product; // Cast to Product
+      addProduct(newProduct);
+      toast({ title: "Product Defined", description: `${newProduct.name} definition created. Manage stock in Inventory > Adjust Stock.` });
     }
     setIsFormModalOpen(false);
     setEditingProduct(null);
-  }, [addProduct, updateProduct, products, toast, editingProduct, getTotalStockForProduct, warehouses, useData().upsertProductStockLocation]); // Added upsertProductStockLocation
+  }, [addProduct, updateProduct, products, toast, editingProduct, warehouses, getTotalStockForProduct, upsertProductStockLocation]);
 
   const handleSort = useCallback((key: SortableProductKeys) => {
     setSortConfig(prevConfig => {
@@ -366,7 +355,6 @@ export default function ProductsPage() {
     return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
   };
 
-  const { upsertProductStockLocation, warehouses } = useData(); // Destructure warehouses here
 
   return (
     <div className="flex flex-col h-full">
@@ -424,19 +412,19 @@ export default function ProductsPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
-                    <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">ID</TableHead>
-                    <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
-                    <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px]">SKU</TableHead>
-                    <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
-                    <TableHead colSpan={2} className="text-center align-middle text-sm px-2">Inventory Levels</TableHead>
-                    <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
-                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
-                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                    <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm">
+                    <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm font-semibold">ID</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm font-semibold">Name</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-xs font-semibold">SKU</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm font-semibold">Category</TableHead>
+                    <TableHead colSpan={2} className="text-center align-middle text-sm px-2 font-semibold">Inventory Levels</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">Base Price</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">Excise Tax</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[80px] px-2 align-middle text-sm font-semibold">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                    <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm font-semibold">
                         <div>Sale Price</div>
-                        <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
+                        <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
                     </TableHead>
-                    <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
+                    <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm font-semibold">Actions</TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">CTN</TableHead>
@@ -474,31 +462,31 @@ export default function ProductsPage() {
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
-                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
-                    <div className="flex items-center">ID {renderSortIcon('id')}</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
-                     <div className="flex items-center">Name {renderSortIcon('name')}</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px] font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
-                    <div className="flex items-center">SKU {renderSortIcon('sku')}</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('category')}>
-                     <div className="flex items-center">Category {renderSortIcon('category')}</div>
-                  </TableHead>
-                  <TableHead colSpan={2} className="text-center align-middle text-sm px-2 font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('stockLevel')}>
-                    <div className="flex items-center justify-center">Inventory Levels {renderSortIcon('stockLevel')}</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('basePrice')}>
-                     <div className="flex items-center justify-end">Base Price {renderSortIcon('basePrice')}</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm font-semibold">
-                     <div>Sale Price</div>
-                     <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm font-semibold">Actions</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                        <div className="flex items-center">ID {renderSortIcon('id')}</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
+                        <div className="flex items-center">Name {renderSortIcon('name')}</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-xs font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
+                        <div className="flex items-center">SKU {renderSortIcon('sku')}</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('category')}>
+                        <div className="flex items-center">Category {renderSortIcon('category')}</div>
+                    </TableHead>
+                    <TableHead colSpan={2} className="text-center align-middle text-sm px-2 font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('stockLevel')}>
+                        <div className="flex items-center justify-center">Inventory Levels {renderSortIcon('stockLevel')}</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('basePrice')}>
+                        <div className="flex items-center justify-end">Base Price {renderSortIcon('basePrice')}</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">Excise Tax</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                    <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm font-semibold">
+                        <div>Sale Price</div>
+                        <div className="text-xs font-normal opacity-75">(Inc VAT & Excise)</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm font-semibold">Actions</TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">CTN</TableHead>
@@ -509,22 +497,25 @@ export default function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                    const totalStockBaseUnits = getTotalStockForProduct(product.id);
-                    let ctnStockDisplay: string | number = "-";
-                    if (product.unitType.toLowerCase() === 'cartons') {
-                        ctnStockDisplay = totalStockBaseUnits.toFixed(0);
-                    } else if (product.unitType.toLowerCase() === 'pcs' && product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-                        ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
-                    } else if (product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0 && product.unitType.toLowerCase() !== product.packagingUnit.toLowerCase()) {
-                        // This case is for when base unit is NOT pcs, but packaging is carton (e.g. Kgs packed into Cartons)
-                         ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
-                    }
+                    const currentStockLevel = getTotalStockForProduct(product.id);
+                    let stockValueToDisplay: string | number;
+                    let stockUnitToDisplay: string;
 
-                    const totalPieces = totalStockBaseUnits * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
-                    let pcsStockDisplay: string | number = "-";
-                    if (totalPieces > 0 || product.unitType.toLowerCase() === 'pcs') {
-                        pcsStockDisplay = totalPieces.toFixed(0);
+                    if (product.unitType.toLowerCase() === 'cartons') {
+                        stockValueToDisplay = currentStockLevel.toFixed(0);
+                        stockUnitToDisplay = 'Ctn';
+                    } else if (product.unitType.toLowerCase() === 'pcs' && product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
+                        stockValueToDisplay = (currentStockLevel / product.itemsPerPackagingUnit).toFixed((currentStockLevel / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
+                        stockUnitToDisplay = 'Ctn';
+                    } else if (product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0 && product.unitType.toLowerCase() !== product.packagingUnit.toLowerCase()) {
+                        stockValueToDisplay = (currentStockLevel / product.itemsPerPackagingUnit).toFixed((currentStockLevel / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
+                        stockUnitToDisplay = 'Ctn';
+                    } else {
+                        stockValueToDisplay = currentStockLevel.toFixed((product.unitType === 'Kgs' || product.unitType === 'Liters') && currentStockLevel % 1 !== 0 ? 2 : 0);
+                        stockUnitToDisplay = getDisplayUnit(product, 'base');
                     }
+                    
+                    const totalPieces = currentStockLevel * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
 
                     const basePriceInfo = getDisplayBasePriceInfo(product);
                     const exciseTaxInfo = getDisplayExciseTaxInfo(product);
@@ -534,7 +525,7 @@ export default function ProductsPage() {
                   
                   return (
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="text-left px-2 font-medium text-xs">{product.id}</TableCell>
+                      <TableCell className="text-left font-medium px-2 text-xs">{product.id}</TableCell>
                       <TableCell className="text-left px-2 text-xs">{product.name}</TableCell>
                       <TableCell className="text-left text-[11px] px-2">{product.sku}</TableCell>
                       <TableCell className="text-left px-2 text-xs">
@@ -544,15 +535,12 @@ export default function ProductsPage() {
                       </TableCell>
                       <TableCell className={cn(
                         "text-center font-medium px-2 text-xs",
-                        product.globalReorderPoint !== undefined && totalStockBaseUnits <= product.globalReorderPoint && product.unitType.toLowerCase() === 'cartons' ? "text-destructive" : ""
+                        product.globalReorderPoint !== undefined && currentStockLevel <= product.globalReorderPoint ? "text-destructive" : ""
                       )}>
-                        {ctnStockDisplay}
+                        {stockValueToDisplay}
                       </TableCell>
-                      <TableCell className={cn(
-                        "text-center font-medium px-2 text-xs",
-                         product.globalReorderPoint !== undefined && product.unitType.toLowerCase() === 'pcs' && totalPieces <= product.globalReorderPoint ? "text-destructive" : ""
-                        )}>
-                        {pcsStockDisplay}
+                      <TableCell className="text-center px-2 text-xs">
+                        {totalPieces > 0 ? `${totalPieces.toFixed(0)}` : '-'}
                       </TableCell>
                       <TableCell className="text-right px-2 text-xs">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
                       <TableCell className="text-right px-2 text-xs">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
@@ -610,7 +598,7 @@ export default function ProductsPage() {
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{editingProduct ? 'Edit Product Definition' : 'Define New Product'}</DialogTitle>
             <DialogDescription>
-              {editingProduct ? `Update definition for ${editingProduct.name}. Stock is managed per warehouse.` : 'Enter product details. Stock is managed per warehouse via Stock Adjustments in the Inventory section.'}
+              {editingProduct ? `Update definition for ${editingProduct.name}. Manage stock in Inventory.` : 'Enter product details. Manage stock levels per warehouse via Inventory > Adjust Stock.'}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto p-6">
@@ -620,6 +608,7 @@ export default function ProductsPage() {
                   onSubmit={handleSubmit}
                   onCancel={() => { setIsFormModalOpen(false); setEditingProduct(null); }}
                   isSubmitting={isLoading}
+                  warehouses={warehouses} // Pass warehouses for stock adjustment within form if needed
                 />
              )}
           </div>
@@ -658,7 +647,7 @@ export default function ProductsPage() {
                   <div><strong>Primary Stocking Unit (Base Unit):</strong> <Badge variant="outline" className="ml-1">{getDisplayUnit(productToView, 'base')}</Badge></div>
                   
                   {productToView.piecesInBaseUnit && productToView.piecesInBaseUnit > 0 && (
-                    <div><strong>Individual Pieces in this Base Unit:</strong> {productToView.piecesInBaseUnit} PCS</div>
+                    <div><strong>Individual Pieces in Base Unit:</strong> {productToView.piecesInBaseUnit} PCS</div>
                   )}
                   
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
@@ -671,10 +660,10 @@ export default function ProductsPage() {
               </CardContent></Card>
               
               <Card><CardContent className="pt-4 grid grid-cols-1 gap-y-1">
-                  <div className="grid grid-cols-2 gap-x-2">
+                <div className="grid grid-cols-2 gap-x-2">
                     <div><strong>Total Stock (All Warehouses):</strong></div>
                     <div className={cn(productToView.globalReorderPoint !== undefined && getTotalStockForProduct(productToView.id) <= productToView.globalReorderPoint ? "text-destructive font-semibold" : "")}>
-                      {getTotalStockForProduct(productToView.id).toFixed((productToView.unitType === 'Kgs' || productToView.unitType === 'Liters') && getTotalStockForProduct(productToView.id) % 1 !== 0 ? 2 : 0)} {getDisplayUnit(productToView, 'base')}
+                    {getTotalStockForProduct(productToView.id).toFixed((productToView.unitType === 'Kgs' || productToView.unitType === 'Liters') && getTotalStockForProduct(productToView.id) % 1 !== 0 ? 2 : 0)} {getDisplayUnit(productToView, 'base')}
                     </div>
                     {(() => {
                         const totalPcsForDisplay = getTotalStockForProduct(productToView.id) * (productToView.piecesInBaseUnit || (productToView.unitType.toLowerCase() === 'pcs' ? 1 : 0));
@@ -696,7 +685,7 @@ export default function ProductsPage() {
                   {(() => {
                      const basePInfo = getDisplayBasePriceInfo(productToView);
                      const exciseTInfo = getDisplayExciseTaxInfo(productToView);
-                     const vatOnBaseAndExciseInfo = getDisplayVatInfo(productToView, companyProfile);
+                     const vatInfo = getDisplayVatInfo(productToView, companyProfile);
                      const finalPcsPriceInfoValue = calculateFinalPcsPriceWithVatAndExcise(productToView, companyProfile);
                      const finalPkgPriceInfoValue = calculateFinalPkgPriceWithVatAndExcise(productToView, companyProfile);
                      
@@ -704,7 +693,7 @@ export default function ProductsPage() {
                         <div><strong>Base Price (per {basePInfo.unit}):</strong> ${basePInfo.price.toFixed(2)}</div>
                         <div><strong>Excise Tax (per {exciseTInfo.unit}):</strong> ${(exciseTInfo.exciseAmount || 0).toFixed(2)}</div>
                         <Separator className="my-0.5" />
-                        <div><strong>VAT ({companyProfile?.vatRate || 0}%) on (Base Price + Excise Tax):</strong> ${vatOnBaseAndExciseInfo.vatAmount.toFixed(2)} / {vatOnBaseAndExciseInfo.unit}</div>
+                        <div><strong>VAT ({companyProfile?.vatRate || 0}%) on (Base Price + Excise):</strong> ${vatInfo.vatAmount.toFixed(2)} / {vatInfo.unit}</div>
                         {productToView.discountRate && productToView.discountRate > 0 &&
                           <div><strong>Product Discount Rate:</strong> {productToView.discountRate.toFixed(1)}%</div>
                         }
@@ -746,3 +735,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+
