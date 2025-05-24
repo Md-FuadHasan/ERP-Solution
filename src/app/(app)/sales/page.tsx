@@ -248,6 +248,12 @@ export default function SalesPage() {
         } else if (sortConfig.key === 'orderDate') {
             aValue = new Date(a.orderDate).getTime();
             bValue = new Date(b.orderDate).getTime();
+        } else if (sortConfig.key === 'salespersonName') {
+            aValue = a.salespersonName || a.salespersonId || '';
+            bValue = b.salespersonName || b.salespersonId || '';
+        } else if (sortConfig.key === 'routeName') {
+            aValue = a.routeName || a.routeId || '';
+            bValue = b.routeName || b.routeId || '';
         } else {
             aValue = a[sortConfig.key as keyof SalesOrder];
             bValue = b[sortConfig.key as keyof SalesOrder];
@@ -279,7 +285,7 @@ export default function SalesPage() {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-wrap items-center gap-4">
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
@@ -593,3 +599,4 @@ export default function SalesPage() {
     </div>
   );
 }
+
