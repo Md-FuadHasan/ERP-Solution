@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign, Eye, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ReceiptText, DollarSign, Coins, Scale, Briefcase, Clock3, CircleDollarSign, Eye, ChevronsUpDown, ArrowUp, ArrowDown, Filter as FilterIcon, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -264,7 +264,7 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0">
+      <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Customers"
           description="Manage your customer profiles and contact information."
@@ -274,62 +274,71 @@ export default function CustomersPage() {
             </Button>
           }
         />
-        <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
-          <SearchInput
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Search by name, ID, CR, VAT..."
-            className="w-full sm:w-auto md:w-64"
-          />
-          <div className="relative w-full sm:w-auto md:w-[200px]">
-            <Select
-              value={customerTypeFilter}
-              onValueChange={(value) => setCustomerTypeFilter(value as CustomerType | 'all')}
-            >
-              <SelectTrigger className="w-full pl-10">
-                <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter by type..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {CUSTOMER_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
+                <SearchInput
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Search by name, ID, CR, VAT..."
+                    className="w-full md:w-64 lg:flex-none"
+                />
+                <div className="relative w-full md:w-[200px] lg:flex-none">
+                    <Select
+                    value={customerTypeFilter}
+                    onValueChange={(value) => setCustomerTypeFilter(value as CustomerType | 'all')}
+                    >
+                    <SelectTrigger className="w-full pl-10">
+                        <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Filter by type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {CUSTOMER_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                            {type}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card overflow-hidden">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+         <CardHeader className="border-b">
+            <CardTitle>Customer List</CardTitle>
+            <CardDescription>Overview of all customers.</CardDescription>
+        </CardHeader>
          <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[80px] px-2">Cust. ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2">Name</TableHead>
-                  <TableHead className="min-w-[100px] px-2">CR No.</TableHead>
-                  <TableHead className="min-w-[100px] px-2">VAT No.</TableHead>
-                  <TableHead className="min-w-[120px] px-2">Phone</TableHead>
-                  <TableHead className="min-w-[70px] px-2">Type</TableHead>
-                  <TableHead className="min-w-[110px] text-right px-2">Outstanding</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
+                  <TableHead className="min-w-[80px] px-2 text-sm font-semibold">Cust. ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm font-semibold">Name</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold">CR No.</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold">VAT No.</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm font-semibold">Phone</TableHead>
+                  <TableHead className="min-w-[80px] px-2 text-sm font-semibold">Type</TableHead>
+                  <TableHead className="min-w-[130px] text-right px-2 text-sm font-semibold">Outstanding</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2 text-sm font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="px-2"><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
-                    <TableCell className="text-center px-2"><Skeleton className="h-8 w-28 mx-auto" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell className="text-right px-2 text-xs"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="text-center px-2 text-xs"><Skeleton className="h-8 w-28 mx-auto" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -338,28 +347,28 @@ export default function CustomersPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[80px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                  <TableHead className="min-w-[80px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
                      <div className="flex items-center">ID {renderSortIcon('id')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[150px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
+                  <TableHead className="min-w-[150px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
                      <div className="flex items-center">Name {renderSortIcon('name')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('registrationNumber')}>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('registrationNumber')}>
                      <div className="flex items-center">CR No. {renderSortIcon('registrationNumber')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('vatNumber')}>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('vatNumber')}>
                      <div className="flex items-center">VAT No. {renderSortIcon('vatNumber')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[120px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('phone')}>
+                  <TableHead className="min-w-[120px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('phone')}>
                      <div className="flex items-center">Phone {renderSortIcon('phone')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[70px] px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerType')}>
+                  <TableHead className="min-w-[80px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerType')}>
                      <div className="flex items-center">Type {renderSortIcon('customerType')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[110px] text-right px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('outstandingBalance')}>
+                  <TableHead className="min-w-[130px] text-right px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('outstandingBalance')}>
                      <div className="flex items-center justify-end">Outstanding {renderSortIcon('outstandingBalance')}</div>
                   </TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
+                  <TableHead className="text-center min-w-[100px] px-2 text-sm font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -367,17 +376,17 @@ export default function CustomersPage() {
                   const outstandingBalance = getOutstandingBalanceByCustomerId(customer.id);
                   return (
                     <TableRow key={customer.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                      <TableCell className="font-medium px-2">{customer.id}</TableCell>
+                      <TableCell className="font-medium px-2 text-xs">{customer.id}</TableCell>
                       <TableCell
-                        className="cursor-pointer hover:text-primary hover:underline px-2"
+                        className="cursor-pointer hover:text-primary hover:underline px-2 text-xs"
                         onClick={() => handleViewCustomerDetails(customer)}
                       >
                         {customer.name}
                       </TableCell>
-                      <TableCell className="px-2">{customer.registrationNumber || '-'}</TableCell>
-                      <TableCell className="px-2">{customer.vatNumber || '-'}</TableCell>
-                      <TableCell className="px-2">{customer.phone}</TableCell>
-                      <TableCell className="px-2">
+                      <TableCell className="px-2 text-xs">{customer.registrationNumber || '-'}</TableCell>
+                      <TableCell className="px-2 text-xs">{customer.vatNumber || '-'}</TableCell>
+                      <TableCell className="px-2 text-xs">{customer.phone}</TableCell>
+                      <TableCell className="px-2 text-xs">
                         <Badge
                           variant={customer.customerType === 'Credit' ? 'creditCustomer' : 'cashCustomer'}
                           className="text-xs"
@@ -386,12 +395,12 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className={cn(
-                        "text-right font-semibold px-2",
+                        "text-right font-semibold px-2 text-xs",
                         outstandingBalance > 0 ? "text-destructive" : "text-foreground"
                       )}>
                         ${outstandingBalance.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-center px-2">
+                      <TableCell className="text-center px-2 text-xs">
                         <div className="flex justify-center items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetails(customer)} className="hover:text-primary p-1.5" title="View Customer">
                             <Eye className="h-4 w-4" />
@@ -538,21 +547,21 @@ export default function CustomersPage() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-primary text-primary-foreground z-10">
                           <TableRow>
-                            <TableHead className="min-w-[120px] px-2">Invoice ID</TableHead>
-                            <TableHead className="min-w-[120px] px-2">Issue Date</TableHead>
-                            <TableHead className="min-w-[120px] px-2">Due Date</TableHead>
-                            <TableHead className="min-w-[100px] text-right px-2">Total</TableHead>
-                            <TableHead className="min-w-[100px] px-2">Status</TableHead>
+                            <TableHead className="min-w-[120px] px-2 text-sm font-semibold">Invoice ID</TableHead>
+                            <TableHead className="min-w-[120px] px-2 text-sm font-semibold">Issue Date</TableHead>
+                            <TableHead className="min-w-[120px] px-2 text-sm font-semibold">Due Date</TableHead>
+                            <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold">Total</TableHead>
+                            <TableHead className="min-w-[100px] px-2 text-sm font-semibold">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {customerInvoices.map((invoice, index) => (
                             <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
-                              <TableCell className="font-medium px-2">{invoice.id}</TableCell>
-                              <TableCell className="px-2">{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
-                              <TableCell className="px-2">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
-                              <TableCell className="text-right px-2">${invoice.totalAmount.toFixed(2)}</TableCell>
-                              <TableCell className="px-2">
+                              <TableCell className="font-medium px-2 text-xs">{invoice.id}</TableCell>
+                              <TableCell className="px-2 text-xs">{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
+                              <TableCell className="px-2 text-xs">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                              <TableCell className="text-right px-2 text-xs">${invoice.totalAmount.toFixed(2)}</TableCell>
+                              <TableCell className="px-2 text-xs">
                                 <Badge variant={getStatusBadgeVariant(invoice.status)} className="text-xs">{invoice.status}</Badge>
                               </TableCell>
                             </TableRow>

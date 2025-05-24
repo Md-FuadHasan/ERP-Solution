@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, ChevronsUpDown, ArrowUp, ArrowDown, ListFilter } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, ChevronsUpDown, ArrowUp, ArrowDown, ListFilter, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,7 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Ensure CardDescription is imported
 import { ProductForm, type ProductFormValues } from '@/components/forms/product-form';
 import { SearchInput } from '@/components/common/search-input';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
@@ -39,16 +39,16 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { format, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRouter } from 'next/navigation';
 
-// --- Helper Functions (Defined outside component for potential reusability if exported) ---
-
+// --- Helper Functions (Exported for use in other modules) ---
 export const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
   let unit: string | undefined;
   if (type === 'package' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
@@ -76,12 +76,14 @@ const getCategoryBadgeVariant = (category?: ProductCategory): VariantProps<typeo
 
 export const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
   const price = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
-  return { price, unit: getDisplayUnit(product, 'base') };
+  const unit = getDisplayUnit(product, 'base');
+  return { price, unit };
 };
 
 export const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
   const exciseAmount = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  return { exciseAmount, unit: getDisplayUnit(product, 'base') };
+  const unit = getDisplayUnit(product, 'base');
+  return { exciseAmount, unit };
 };
 
 export const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | null | undefined): { vatAmount: number; unit: string } => {
@@ -90,15 +92,14 @@ export const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfi
   const subtotalForVatPerUnit = basePricePerUnit + exciseTaxPerUnit;
   const vatRate = (companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0) / 100;
   const vatAmount = subtotalForVatPerUnit * vatRate;
-  return { vatAmount, unit: getDisplayUnit(product, 'base') };
+  const unit = getDisplayUnit(product, 'base');
+  return { vatAmount, unit };
 };
 
 export const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   
-  // piecesInBaseUnit helps determine the conceptual "piece" if the base unit itself is a package.
-  // If unitType is 'PCS', piecesInBaseUnit should ideally be 1 or undefined.
   const piecesInPrimaryUnit = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
 
   const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInPrimaryUnit;
@@ -109,7 +110,7 @@ export const calculateFinalPcsPriceWithVatAndExcise = (product: Product, company
   const vatAmountOnPcs = subtotalBeforeVATPerPiece * (vatRatePercent / 100);
   
   let finalPrice = subtotalBeforeVATPerPiece + vatAmountOnPcs;
-  const discountRate = product.discountRate ? product.discountRate / 100 : 0;
+  const discountRate = (typeof product.discountRate === 'number' ? product.discountRate : 0) / 100;
   finalPrice = finalPrice * (1 - discountRate);
   return { price: finalPrice, unit: 'PCS' };
 };
@@ -119,42 +120,36 @@ export const calculateFinalPkgPriceWithVatAndExcise = (product: Product, company
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
 
-  // Determine the target package and items for this calculation
   let itemsInTargetUnit = 1;
-  let targetUnitDisplay = getDisplayUnit(product, 'base'); // Default to base unit (e.g., a 'Carton' if unitType is 'Cartons')
+  let targetUnitDisplay = getDisplayUnit(product, 'base'); 
+  let usePackagingUnit = false;
 
-  // Scenario 1: There's an "Optional Larger Sales Package" defined
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     itemsInTargetUnit = product.itemsPerPackagingUnit;
-    targetUnitDisplay = getDisplayUnit(product, 'package'); // This will be the packagingUnit name
-  }
-  // Scenario 2: The Base Unit Type itself is a package (e.g., 'Cartons'), and no larger package is defined.
-  // In this case, we want the price for one Base Unit Type.
-  else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 1) > 0) {
-    // itemsInTargetUnit remains 1 (we are pricing one base unit)
-    // targetUnitDisplay is already getDisplayUnit(product, 'base')
-  }
-  // Scenario 3: Base Unit Type is 'PCS' and no larger package defined. This column is not applicable.
-  else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    return { price: null, unit: '-' };
-  }
-  // Fallback
-  else {
-    return { price: null, unit: '-' };
+    targetUnitDisplay = getDisplayUnit(product, 'package');
+    usePackagingUnit = true;
+  } else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 1) > 0) {
+    // Base unit itself is a package, price for one base unit
+    // itemsInTargetUnit remains 1
+  } else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
+    return { price: null, unit: '-' }; // No larger package defined for PCS base unit
+  } else {
+    return { price: null, unit: '-' }; // Fallback
   }
 
-  const totalBasePriceForTargetUnit = basePricePerBaseUnit * itemsInTargetUnit;
-  const totalExciseTaxForTargetUnit = exciseTaxPerBaseUnit * itemsInTargetUnit;
+  const totalBasePriceForTargetUnit = basePricePerBaseUnit * (usePackagingUnit ? itemsInTargetUnit : 1);
+  const totalExciseTaxForTargetUnit = exciseTaxPerBaseUnit * (usePackagingUnit ? itemsInTargetUnit : 1);
+
   const subtotalBeforeVAT = totalBasePriceForTargetUnit + totalExciseTaxForTargetUnit;
   const vatAmount = subtotalBeforeVAT * (vatRatePercent / 100);
   let finalPrice = subtotalBeforeVAT + vatAmount;
 
-  const discountRate = product.discountRate ? product.discountRate / 100 : 0;
+  const discountRate = (typeof product.discountRate === 'number' ? product.discountRate : 0) / 100;
   finalPrice = finalPrice * (1 - discountRate);
 
   return { price: finalPrice, unit: targetUnitDisplay };
 };
-
+// --- End Helper Functions ---
 
 type SortableProductKeys = keyof Pick<Product, 'id' | 'name' | 'sku' | 'category' | 'basePrice'> | 'stockLevel' | 'totalPieces';
 
@@ -175,6 +170,7 @@ export default function ProductsPage() {
     companyProfile,
   } = useData();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -275,9 +271,9 @@ export default function ProductsPage() {
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       globalReorderPoint: data.globalReorderPoint || 0,
-      basePrice: data.basePrice, // This is now for the base unit
-      costPrice: data.costPrice || 0, // From form
-      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount, // This is also for the base unit
+      basePrice: data.basePrice,
+      costPrice: data.costPrice || 0,
+      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
       batchNo: data.batchNo || undefined,
       productionDate: data.productionDate ? data.productionDate.toISOString() : undefined,
       expiryDate: data.expiryDate ? data.expiryDate.toISOString() : undefined,
@@ -285,18 +281,36 @@ export default function ProductsPage() {
     };
 
     if (editingProduct) {
-      const updatedProductData: Product = {
-        ...editingProduct,
-        ...productDataForStorage,
-        stockLevel: editingProduct.stockLevel, // Preserve existing stockLevel if not managed by form
-        reorderPoint: editingProduct.reorderPoint, // Preserve if not managed by form
-      };
-      updateProduct(updatedProductData);
-      toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
-    } else {
+        const currentStockLevel = getTotalStockForProduct(editingProduct.id);
+        const stockToAdd = data.addStockQuantity || 0;
+        const newStockLevel = currentStockLevel + stockToAdd;
+
+        const updatedProductData: Product = {
+            ...editingProduct,
+            ...productDataForStorage,
+            stockLevel: newStockLevel, // This needs to be managed via ProductStockLocations now
+        };
+        updateProduct(updatedProductData); // This function now just updates product definition
+
+        if (stockToAdd > 0) {
+            // For simplicity, assume first warehouse for stock adjustment if not specified
+            // A more robust solution would require warehouse selection during stock addition
+            const defaultWarehouse = warehouses.length > 0 ? warehouses[0] : null;
+            if (defaultWarehouse) {
+                upsertProductStockLocation(
+                    { productId: editingProduct.id, warehouseId: defaultWarehouse.id, stockLevel: newStockLevel },
+                    'Adjustment - Increase', // Or a more specific reason if available
+                    `Manual stock addition via product edit: ${stockToAdd}`
+                );
+            } else {
+                toast({ title: "Stock Not Added", description: "No warehouse available to add stock.", variant: "destructive"});
+            }
+        }
+        toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
+    } else { // Adding new product
       let finalProductId = data.id;
       if (finalProductId && finalProductId.trim() !== '') {
-        if (products.find(p => p.id === finalProductId && (!editingProduct || editingProduct.id !== finalProductId))) {
+        if (products.find(p => p.id === finalProductId)) {
           toast({
             title: "Error: Product ID exists",
             description: `Product ID ${finalProductId} is already in use. Leave blank for auto-gen.`,
@@ -310,19 +324,31 @@ export default function ProductsPage() {
           finalProductId = `PROD${String(Date.now()).slice(-5)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
         }
       }
-      const newProduct: Product = {
+      const newProductDefinition: Product = {
         ...productDataForStorage,
         id: finalProductId,
-        stockLevel: data.stockLevel, // Initial stock on creation
-        reorderPoint: data.reorderPoint || 0, // Use globalReorderPoint alias
         createdAt: new Date().toISOString(),
+        // stockLevel is no longer part of Product definition directly
       };
-      addProduct(newProduct);
-      toast({ title: "Product Defined", description: `${newProduct.name} definition created.` });
+      addProduct(newProductDefinition);
+
+      if (data.stockLevel && data.stockLevel > 0) { // Initial stock level from form
+        const defaultWarehouse = warehouses.length > 0 ? warehouses[0] : null;
+        if (defaultWarehouse) {
+            upsertProductStockLocation(
+                { productId: finalProductId, warehouseId: defaultWarehouse.id, stockLevel: data.stockLevel },
+                'Initial Stock Entry',
+                `Initial stock for new product ${finalProductId}`
+            );
+        } else {
+            toast({ title: "Stock Not Added", description: "No warehouse available to add initial stock.", variant: "destructive"});
+        }
+      }
+      toast({ title: "Product Defined", description: `${newProductDefinition.name} definition created. Manage stock in Inventory.` });
     }
     setIsFormModalOpen(false);
     setEditingProduct(null);
-  }, [addProduct, updateProduct, products, toast, editingProduct]);
+  }, [addProduct, updateProduct, products, toast, editingProduct, getTotalStockForProduct, warehouses, useData().upsertProductStockLocation]); // Added upsertProductStockLocation
 
   const handleSort = useCallback((key: SortableProductKeys) => {
     setSortConfig(prevConfig => {
@@ -340,53 +366,64 @@ export default function ProductsPage() {
     return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
   };
 
+  const { upsertProductStockLocation, warehouses } = useData(); // Destructure warehouses here
+
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Products"
-          description="Manage your product catalog, definitions, pricing, and stock levels."
+          description="Manage your product catalog, definitions, pricing, and global stock levels."
           actions={
             <Button onClick={handleAddProduct} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Define New Product
             </Button>
           }
         />
-        <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-          <SearchInput
-            value={searchTerm}
-            onChange={(value) => setSearchTerm(value)}
-            placeholder="Search by name, SKU, ID, category..."
-            className="w-full sm:w-auto md:w-64"
-          />
-          <div className="relative w-full sm:w-auto md:w-[200px]">
-            <Select
-              value={categoryFilter}
-              onValueChange={(value) => setCategoryFilter(value as ProductCategory | 'all')}
-            >
-              <SelectTrigger className="w-full pl-10">
-                 <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter by category..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {PRODUCT_CATEGORIES.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+                <SearchInput
+                    value={searchTerm}
+                    onChange={(value) => setSearchTerm(value)}
+                    placeholder="Search by name, SKU, ID, category..."
+                    className="w-full md:w-64 lg:flex-none"
+                />
+                <div className="relative w-full md:w-[200px] lg:flex-none">
+                    <Select
+                    value={categoryFilter}
+                    onValueChange={(value) => setCategoryFilter(value as ProductCategory | 'all')}
+                    >
+                    <SelectTrigger className="w-full pl-10">
+                        <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Filter by category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {PRODUCT_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                            {category}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+         <CardHeader className="border-b">
+            <CardTitle>Product List</CardTitle>
+            <CardDescription>Overview of all product definitions.</CardDescription>
+        </CardHeader>
          <div className="h-full overflow-y-auto">
-          {isLoading ? (
+          {isLoading && !companyProfile ? (
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
+                 <TableRow>
                     <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">ID</TableHead>
                     <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
                     <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px]">SKU</TableHead>
@@ -395,7 +432,7 @@ export default function ProductsPage() {
                     <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
                     <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
                     <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                    <TableHead colSpan={2} className="text-center align-middle px-2 text-sm">
+                    <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm">
                         <div>Sale Price</div>
                         <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
                     </TableHead>
@@ -413,7 +450,7 @@ export default function ProductsPage() {
                   <TableRow key={`skel-prod-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-[11px]"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-[11px] px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="text-center px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="text-center px-2"><Skeleton className="h-5 w-full" /></TableCell>
@@ -437,31 +474,31 @@ export default function ProductsPage() {
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
-                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
                     <div className="flex items-center">ID {renderSortIcon('id')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
                      <div className="flex items-center">Name {renderSortIcon('name')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px] cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px] font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
                     <div className="flex items-center">SKU {renderSortIcon('sku')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('category')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('category')}>
                      <div className="flex items-center">Category {renderSortIcon('category')}</div>
                   </TableHead>
-                  <TableHead colSpan={2} className="text-center align-middle text-sm px-2 cursor-pointer hover:bg-primary/80" onClick={() => handleSort('stockLevel')}>
+                  <TableHead colSpan={2} className="text-center align-middle text-sm px-2 font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('stockLevel')}>
                     <div className="flex items-center justify-center">Inventory Levels {renderSortIcon('stockLevel')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('basePrice')}>
+                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('basePrice')}>
                      <div className="flex items-center justify-end">Base Price {renderSortIcon('basePrice')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm">
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">Excise Tax</TableHead>
+                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm font-semibold">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                  <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm font-semibold">
                      <div>Sale Price</div>
                      <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
+                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm font-semibold">Actions</TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">CTN</TableHead>
@@ -478,16 +515,16 @@ export default function ProductsPage() {
                         ctnStockDisplay = totalStockBaseUnits.toFixed(0);
                     } else if (product.unitType.toLowerCase() === 'pcs' && product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
                         ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
-                    } else if (product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-                        ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
+                    } else if (product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0 && product.unitType.toLowerCase() !== product.packagingUnit.toLowerCase()) {
+                        // This case is for when base unit is NOT pcs, but packaging is carton (e.g. Kgs packed into Cartons)
+                         ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
                     }
 
-                    let pcsStockDisplay: string | number = "-";
                     const totalPieces = totalStockBaseUnits * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
-                     if (totalPieces > 0) {
+                    let pcsStockDisplay: string | number = "-";
+                    if (totalPieces > 0 || product.unitType.toLowerCase() === 'pcs') {
                         pcsStockDisplay = totalPieces.toFixed(0);
                     }
-
 
                     const basePriceInfo = getDisplayBasePriceInfo(product);
                     const exciseTaxInfo = getDisplayExciseTaxInfo(product);
@@ -499,7 +536,7 @@ export default function ProductsPage() {
                     <TableRow key={product.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                       <TableCell className="text-left px-2 font-medium text-xs">{product.id}</TableCell>
                       <TableCell className="text-left px-2 text-xs">{product.name}</TableCell>
-                      <TableCell className="text-left px-2 text-[11px]">{product.sku}</TableCell>
+                      <TableCell className="text-left text-[11px] px-2">{product.sku}</TableCell>
                       <TableCell className="text-left px-2 text-xs">
                         <Badge variant={getCategoryBadgeVariant(product.category)} className="text-xs">
                           {product.category}
@@ -507,11 +544,14 @@ export default function ProductsPage() {
                       </TableCell>
                       <TableCell className={cn(
                         "text-center font-medium px-2 text-xs",
-                        product.globalReorderPoint !== undefined && totalStockBaseUnits <= product.globalReorderPoint ? "text-destructive" : ""
+                        product.globalReorderPoint !== undefined && totalStockBaseUnits <= product.globalReorderPoint && product.unitType.toLowerCase() === 'cartons' ? "text-destructive" : ""
                       )}>
                         {ctnStockDisplay}
                       </TableCell>
-                      <TableCell className="text-center px-2 text-xs">
+                      <TableCell className={cn(
+                        "text-center font-medium px-2 text-xs",
+                         product.globalReorderPoint !== undefined && product.unitType.toLowerCase() === 'pcs' && totalPieces <= product.globalReorderPoint ? "text-destructive" : ""
+                        )}>
                         {pcsStockDisplay}
                       </TableCell>
                       <TableCell className="text-right px-2 text-xs">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
@@ -618,7 +658,7 @@ export default function ProductsPage() {
                   <div><strong>Primary Stocking Unit (Base Unit):</strong> <Badge variant="outline" className="ml-1">{getDisplayUnit(productToView, 'base')}</Badge></div>
                   
                   {productToView.piecesInBaseUnit && productToView.piecesInBaseUnit > 0 && (
-                    <div><strong>Individual Pieces in Base Unit:</strong> {productToView.piecesInBaseUnit} PCS</div>
+                    <div><strong>Individual Pieces in this Base Unit:</strong> {productToView.piecesInBaseUnit} PCS</div>
                   )}
                   
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
@@ -690,10 +730,10 @@ export default function ProductsPage() {
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
             <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent> 
-            <AlertDialogDescription>
+            <AlertDialogDesc>
               This action cannot be undone. This will permanently delete the product definition
               "{productToDelete?.name}". Associated stock records in warehouses will NOT be deleted automatically by this action, but this product definition will be gone.
-            </AlertDialogDescription>
+            </AlertDialogDesc>
           </AlertDialogHeaderComponent>
           <AlertDialogFooterComponent>
             <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
@@ -706,6 +746,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-// Export helper functions so they can be used by other pages if needed (e.g., warehouse detail page)
-// Already done in previous step

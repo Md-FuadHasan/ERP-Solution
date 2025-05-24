@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, ChevronsUpDown, Check, Filter, CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Printer, Download, QrCode, DollarSign, History, ChevronsUpDown, Check, Filter as FilterIcon, CalendarIcon, ArrowUp, ArrowDown, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -35,7 +35,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Renamed to avoid conflict
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
@@ -46,7 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from '@/components/ui/calendar';
@@ -73,9 +73,10 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
-    products, // For InvoiceForm
-    warehouses, // For InvoiceForm
-    getStockForProductInWarehouse, // For InvoiceForm
+    products,
+    warehouses,
+    getStockForProductInWarehouse,
+    getProductById,
   } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,11 +156,12 @@ export default function InvoicesPage() {
 
 
   const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsFormModalOpen(isOpen);
     if (!isOpen) {
+      setIsFormModalOpen(false);
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
-      // Only clear URL params if they were responsible for opening this specific (edit/new) modal
+      setUrlParamsProcessedIntentKey(null); // Key: Clear the processed intent key
+      
       const currentAction = searchParams.get('action');
       if (currentAction === 'new' || currentAction === 'edit') {
         const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -168,24 +170,27 @@ export default function InvoicesPage() {
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-         // This ensures the effect processing the URL sees a "clean" state.
-        setUrlParamsProcessedIntentKey(null);
       }
+    } else {
+      setIsFormModalOpen(true);
     }
   }, [searchParams, router, pathname]);
   
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsViewModalOpen(isOpen);
     if (!isOpen) {
+        setIsViewModalOpen(false);
         setInvoiceToViewInModal(null);
+        setUrlParamsProcessedIntentKey(null); // Key: Clear the processed intent key
+
         const currentAction = searchParams.get('action');
         if (currentAction === 'view') {
             const newSearchParams = new URLSearchParams(searchParams.toString());
             newSearchParams.delete('action');
             newSearchParams.delete('id');
             router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-            setUrlParamsProcessedIntentKey(null); 
         }
+    } else {
+        setIsViewModalOpen(true);
     }
   }, [searchParams, router, pathname]);
 
@@ -196,6 +201,7 @@ export default function InvoicesPage() {
     newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+    // The useEffect will handle opening the modal
   }, [searchParams, router, pathname]);
 
   const handleSort = useCallback((key: SortableInvoiceKeys) => {
@@ -212,9 +218,8 @@ export default function InvoicesPage() {
   }, []);
 
   const filteredInvoices = useMemo(() => {
-    let _filtered = [...invoices]; // Corrected variable name
+    let _filtered = [...invoices];
 
-    // Apply search term filter
     if (searchTerm) {
       _filtered = _filtered.filter(invoice => {
         const customer = getCustomerById(invoice.customerId);
@@ -225,7 +230,6 @@ export default function InvoicesPage() {
       });
     }
 
-    // Apply status filter
     if (statusFilter !== 'all') {
       _filtered = _filtered.filter(invoice => {
         if (statusFilter === 'paid') return invoice.status === 'Paid';
@@ -236,7 +240,6 @@ export default function InvoicesPage() {
       });
     }
     
-    // Apply date range filter (on issueDate)
     if (dateRange.from || dateRange.to) {
         _filtered = _filtered.filter(invoice => {
             const issueDate = parseISO(invoice.issueDate);
@@ -258,7 +261,6 @@ export default function InvoicesPage() {
         });
     }
 
-    // Apply sorting
     if (sortConfig.key) {
       _filtered.sort((a, b) => {
         let aValue: any = a[sortConfig.key as keyof Invoice];
@@ -314,7 +316,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal]);
 
-  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => { // Renamed from handleDeleteInvoice
+  const handleDeleteInvoice = useCallback((invoice: Invoice) => { 
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -422,7 +424,7 @@ export default function InvoicesPage() {
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0), sourceWarehouseId: item.sourceWarehouseId })), 
       subtotal: calculatedSubtotal, 
-      taxAmount: calculatedGeneralTaxAmount, // This is now 0 based on latest requirement
+      taxAmount: calculatedGeneralTaxAmount, 
       vatAmount: calculatedVatAmount, 
       totalAmount: calculatedTotalAmount, 
       status: finalStatus,
@@ -442,7 +444,7 @@ export default function InvoicesPage() {
     editingInvoice ? updateInvoice(invoiceToSave) : addInvoice(invoiceToSave);
     toast({ title: editingInvoice ? "Invoice Updated" : "Invoice Added", description: `Invoice ${data.id} has been ${editingInvoice ? 'updated' : 'created'}.` });
 
-    handleFormModalOpenChange(false);
+    handleFormModalOpenChange(false); // This will now correctly clear URL params
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
@@ -468,37 +470,46 @@ export default function InvoicesPage() {
             </Button>
           }
         />
-        <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-          <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full sm:w-auto md:w-64" />
-          <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full sm:w-auto md:w-[200px]" />
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.from ? format(dateRange.from, "PPP") : <span>Issue Date From</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
-              </PopoverContent>
-            </Popover>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.to ? format(dateRange.to, "PPP") : <span>Issue Date To</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
-              </PopoverContent>
-            </Popover>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4"> {/* Group for left-aligned filters */}
+            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-64 lg:flex-none" />
+            <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-[200px] lg:flex-none" />
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? format(dateRange.from, "PPP") : <span>Issue Date From</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateRange.from || undefined} onSelect={(date) => handleDateChange('from', date)} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal lg:flex-none">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.to ? format(dateRange.to, "PPP") : <span>Issue Date To</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateRange.to || undefined} onSelect={(date) => handleDateChange('to', date)} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+        <CardHeader className="border-b">
+            <CardTitle>Invoice List</CardTitle>
+            <CardDescription>Overview of all invoices.</CardDescription>
+        </CardHeader>
         <div className="h-full overflow-y-auto">
           {isDataContextLoading ? (
             <Table>
@@ -506,7 +517,6 @@ export default function InvoicesPage() {
                 <TableRow>
                   <TableHead className="min-w-[100px] px-2 text-sm">Invoice ID</TableHead>
                   <TableHead className="min-w-[150px] px-2 text-sm">Customer</TableHead>
-                  <TableHead className="min-w-[120px] px-2 text-sm">Issue Date</TableHead>
                   <TableHead className="min-w-[120px] px-2 text-sm">Due Date</TableHead>
                   <TableHead className="min-w-[100px] text-right px-2 text-sm">Amount</TableHead>
                   <TableHead className="min-w-[100px] text-right px-2 text-sm">Paid</TableHead>
@@ -518,7 +528,6 @@ export default function InvoicesPage() {
               <TableBody>
                 {[...Array(7)].map((_, i) => (
                   <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                    <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-full" /></TableCell>
@@ -541,31 +550,28 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
                     <div className="flex items-center">Invoice ID {renderSortIcon('id')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[150px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerName')}>
+                  <TableHead className="min-w-[150px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('customerName')}>
                      <div className="flex items-center">Customer {renderSortIcon('customerName')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[120px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('issueDate')}>
-                    <div className="flex items-center">Issue Date {renderSortIcon('issueDate')}</div>
-                  </TableHead>
-                  <TableHead className="min-w-[120px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('dueDate')}>
+                  <TableHead className="min-w-[120px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('dueDate')}>
                     <div className="flex items-center">Due Date {renderSortIcon('dueDate')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('totalAmount')}>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('totalAmount')}>
                     <div className="flex items-center justify-end">Amount {renderSortIcon('totalAmount')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('amountPaid')}>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('amountPaid')}>
                     <div className="flex items-center justify-end">Paid {renderSortIcon('amountPaid')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('remainingBalance')}>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('remainingBalance')}>
                     <div className="flex items-center justify-end">Balance {renderSortIcon('remainingBalance')}</div>
                   </TableHead>
-                  <TableHead className="min-w-[110px] px-2 text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('status')}>
+                  <TableHead className="min-w-[110px] px-2 text-sm font-semibold cursor-pointer hover:bg-primary/80" onClick={() => handleSort('status')}>
                     <div className="flex items-center">Status {renderSortIcon('status')}</div>
                   </TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2 text-sm font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -573,11 +579,13 @@ export default function InvoicesPage() {
                   <TableRow key={invoice.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="font-medium px-2 text-xs">{invoice.id}</TableCell>
                     <TableCell className="px-2 text-xs">{invoice.customerName || getCustomerById(invoice.customerId)?.name || 'N/A'}</TableCell>
-                    <TableCell className="px-2 text-xs">{format(new Date(invoice.issueDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell className="px-2 text-xs">{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell className="text-right px-2 text-xs">${invoice.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right px-2 text-xs">${invoice.amountPaid.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold px-2 text-xs">${invoice.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell className="text-right px-2 text-xs text-green-600 dark:text-green-400">${invoice.amountPaid.toFixed(2)}</TableCell>
+                    <TableCell className={cn(
+                        "text-right font-semibold px-2 text-xs",
+                        invoice.remainingBalance > 0 ? "text-destructive" : "text-green-600 dark:text-green-400"
+                      )}>${invoice.remainingBalance.toFixed(2)}</TableCell>
                     <TableCell className="px-2 text-xs">
                       <Badge variant={getStatusBadgeVariant(invoice.status)}>
                         {invoice.status}
@@ -591,28 +599,9 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeaderComponent>
-                              <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                              <AlertDialogDesc>
-                                This action cannot be undone. This will permanently delete the invoice
-                                "{invoiceToDelete?.id}".
-                              </AlertDialogDesc>
-                            </AlertDialogHeaderComponent>
-                            <AlertDialogFooterComponent>
-                              <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooterComponent>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -655,6 +644,7 @@ export default function InvoicesPage() {
                 products={products}
                 warehouses={warehouses}
                 getStockForProductInWarehouse={getStockForProductInWarehouse}
+                getProductById={getProductById}
                 onSubmit={handleSubmit}
                 prefillData={currentPrefillValues}
                 onCancel={() => handleFormModalOpenChange(false)}
@@ -687,8 +677,8 @@ export default function InvoicesPage() {
           {(!isDataContextLoading && invoiceToViewInModal) && (
             <>
               <DialogHeader className="p-6 pb-4 border-b print:hidden">
-                <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle>TAX INVOICE</DialogTitle>
+                <DialogDescription className="print:hidden">
                   Viewing details for invoice #{invoiceToViewInModal.id}.
                 </DialogDescription>
               </DialogHeader>
@@ -696,9 +686,9 @@ export default function InvoicesPage() {
                 {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
                 {customerForModal && companyProfile && (
                   <>
-                    <header className="mb-8">
+                    <header className="mb-8 print:mt-0">
                       <div className="flex justify-between items-center mb-2">
-                        <h1 className="text-3xl md:text-4xl font-bold text-foreground">TAX INVOICE</h1>
+                        <h1 className="text-3xl md:text-4xl font-bold text-foreground print:text-2xl">TAX INVOICE</h1>
                         <Badge variant={getStatusBadgeVariant(invoiceToViewInModal.status)} className="text-base px-4 py-1.5 print:hidden">
                           {invoiceToViewInModal.status}
                         </Badge>
@@ -721,9 +711,9 @@ export default function InvoicesPage() {
                       </div>
                     </section>
 
-                    <Separator className="my-8" />
+                    <Separator className="my-8 print:my-4" />
 
-                    <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40">
+                    <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40 print:p-3 print:mb-4">
                       <div className="grid grid-cols-3 gap-x-4 text-sm">
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
@@ -740,17 +730,17 @@ export default function InvoicesPage() {
                       </div>
                     </section>
 
-                    <section className="mb-8">
-                      <h2 className="text-xl font-semibold mb-4 text-foreground">Order Summary</h2>
+                    <section className="mb-8 print:mb-4">
+                      <h2 className="text-xl font-semibold mb-4 text-foreground print:text-lg print:mb-2">Order Summary</h2>
                       <div className="overflow-x-auto rounded-lg border">
                         <Table>
                           <TableHeader className="bg-muted/50">
                             <TableRow>
-                              <TableHead className="min-w-[200px] pl-4 sm:pl-6">Item Description</TableHead>
-                              <TableHead className="w-32">Source Warehouse</TableHead>
-                              <TableHead className="text-center w-24">Qty</TableHead>
-                              <TableHead className="text-right w-32">Unit Price (incl. Excise)</TableHead>
-                              <TableHead className="text-right w-32 pr-4 sm:pr-6">Amount (incl. Excise)</TableHead>
+                              <TableHead className="min-w-[200px] pl-4 sm:pl-6 print:pl-2 print:min-w-[150px]">Item Description</TableHead>
+                              <TableHead className="w-32 print:w-auto">Source Warehouse</TableHead>
+                              <TableHead className="text-center w-24 print:w-auto">Qty</TableHead>
+                              <TableHead className="text-right w-32 print:w-auto">Unit Price (incl. Excise)</TableHead>
+                              <TableHead className="text-right w-32 pr-4 sm:pr-6 print:pr-2 print:w-auto">Amount (incl. Excise)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -758,11 +748,11 @@ export default function InvoicesPage() {
                               const warehouseName = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId)?.name : 'N/A';
                               return (
                                 <TableRow key={item.id || index} className="even:bg-muted/20">
-                                  <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6">{item.description}</TableCell>
-                                  <TableCell className="text-muted-foreground py-3">{warehouseName}</TableCell>
-                                  <TableCell className="text-center text-muted-foreground py-3">{item.quantity} ({item.unitType})</TableCell>
-                                  <TableCell className="text-right text-muted-foreground py-3">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
-                                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
+                                  <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6 print:pl-2 print:py-1.5">{item.description}</TableCell>
+                                  <TableCell className="text-muted-foreground py-3 print:py-1.5">{warehouseName}</TableCell>
+                                  <TableCell className="text-center text-muted-foreground py-3 print:py-1.5">{item.quantity} ({item.unitType})</TableCell>
+                                  <TableCell className="text-right text-muted-foreground py-3 print:py-1.5">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
+                                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6 print:pr-2 print:py-1.5">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
                                 </TableRow>
                               );
                             })}
@@ -771,7 +761,7 @@ export default function InvoicesPage() {
                       </div>
                     </section>
 
-                    <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
+                    <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8 print:mb-4">
                       <div className="w-full md:w-auto flex flex-col items-center md:items-start print:hidden">
                         {qrCodeValueForModal && (
                           <>
@@ -782,7 +772,7 @@ export default function InvoicesPage() {
                           </>
                         )}
                       </div>
-                      <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40">
+                      <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40 print:p-3">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
                           <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.subtotal === 'number' ? invoiceToViewInModal.subtotal : 0).toFixed(2)}</span>
@@ -793,7 +783,7 @@ export default function InvoicesPage() {
                               <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.vatAmount === 'number' ? invoiceToViewInModal.vatAmount : 0).toFixed(2)}</span>
                           </div>
                         )}
-                        <Separator className="my-3 !bg-border" />
+                        <Separator className="my-3 !bg-border print:my-1.5" />
                         <div className="flex justify-between text-base font-semibold">
                           <span className="text-foreground">Total Amount:</span>
                           <span className="text-foreground">${(typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0).toFixed(2)}</span>
@@ -871,12 +861,27 @@ export default function InvoicesPage() {
             </>
           )}
           {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( 
-             <div className="p-6"><DialogTitle>Error</DialogTitle><DialogDescription>No invoice selected or invoice data is unavailable.</DialogDescription></div>
+             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><DialogDescription>No invoice selected or invoice data is unavailable.</DialogDescription></DialogHeader></div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog is now part of the table row mapping */}
+      <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeaderComponent>
+            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+            <AlertDialogDesc>
+              This action cannot be undone. This will permanently delete the invoice "{invoiceToDelete?.id}".
+            </AlertDialogDesc>
+          </AlertDialogHeaderComponent>
+          <AlertDialogFooterComponent>
+            <AlertDialogCancel onClick={() => setInvoiceToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooterComponent>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
         <AlertDialogContent>
@@ -892,4 +897,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
