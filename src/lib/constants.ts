@@ -1,5 +1,5 @@
 
-import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse, ShoppingBasket, Truck } from 'lucide-react';
+import { Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse, ShoppingBasket, Truck, ExternalLink } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -34,8 +34,9 @@ export const SETTINGS_TABS: SettingsTab[] = [
   { value: 'tax', label: 'Tax Settings', icon: Percent },
   { value: 'users', label: 'User Management', icon: UserCog },
   { value: 'warehouses', label: 'Warehouses', icon: Warehouse },
-  { value: 'suppliers', label: 'Suppliers', icon: Truck }, // Changed icon to Truck
+  { value: 'suppliers', label: 'Suppliers', icon: Truck }, 
   { value: 'storage', label: 'Data Storage', icon: Database },
 ];
 
 export const APP_NAME = "InvoiceFlow";
+
