@@ -77,7 +77,6 @@ export default function PurchaseOrdersPage() {
     addPurchaseOrder,
     updatePurchaseOrder,
     deletePurchaseOrder,
-    cancelPurchaseOrder,
     getSupplierById,
     getProductById,
     processPOReceipt,
@@ -100,6 +99,7 @@ export default function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<POStatus | 'all'>('all');
 
+
   const filteredPurchaseOrders = useMemo(() => {
     let filtered = [...purchaseOrders];
 
@@ -108,7 +108,8 @@ export default function PurchaseOrdersPage() {
       filtered = filtered.filter(po =>
         po.id.toLowerCase().includes(lowerSearchTerm) ||
         (po.supplierName && po.supplierName.toLowerCase().includes(lowerSearchTerm)) ||
-        (getSupplierById(po.supplierId)?.name.toLowerCase().includes(lowerSearchTerm))
+        (getSupplierById(po.supplierId)?.name.toLowerCase().includes(lowerSearchTerm)) ||
+        (po.orderDate && format(new Date(po.orderDate), 'MMM dd, yyyy').toLowerCase().includes(lowerSearchTerm))
       );
     }
 
@@ -198,19 +199,24 @@ export default function PurchaseOrdersPage() {
     };
 
     if (editingPO) {
+      let updatedStatus = editingPO.status;
+      if (editingPO.status === 'Draft' && itemsWithTotals.length > 0 && data.supplierId) {
+          updatedStatus = 'Sent';
+      }
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
+        status: updatedStatus, // Update status if moving from Draft
       });
       toast({
         title: "Purchase Order Updated",
-        description: `Purchase Order ${editingPO.id} has been successfully updated.`,
+        description: `Purchase Order ${editingPO.id} has been successfully updated. Status: ${updatedStatus}`,
       });
     } else {
       addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'supplierName' | 'subtotal' | 'totalAmount' | 'taxAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> });
       toast({
         title: "Purchase Order Created",
-        description: "The new purchase order has been successfully added.",
+        description: "The new purchase order has been successfully added as Draft.",
       });
     }
     setIsFormModalOpen(false);
@@ -254,6 +260,7 @@ export default function PurchaseOrdersPage() {
     if (itemsToProcess.length > 0) {
       processPOReceipt(data.poId, itemsToProcess);
       toast({ title: "Stock Received", description: `Stock has been updated for PO ${data.poId}.` });
+      // Refresh poToView if it's the one being updated
       if (poToView && poToView.id === data.poId) {
         const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId);
         if (updatedPOFromContext) {
@@ -280,14 +287,14 @@ export default function PurchaseOrdersPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 flex-1 min-w-0"> {/* Group for left-aligned filters, takes available space */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <SearchInput
               value={searchTerm}
               onChange={setSearchTerm}
-              placeholder="Search by PO ID, Supplier..."
-              className="w-full sm:w-auto md:w-64"
+              placeholder="Search by PO ID, Supplier, Date..."
+              className="w-full md:w-64"
             />
-            <div className="relative w-full sm:w-auto md:w-[200px]">
+            <div className="relative w-full md:w-56">
               <Select
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value as POStatus | 'all')}
