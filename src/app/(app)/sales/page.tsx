@@ -47,7 +47,7 @@ import { SearchInput } from '@/components/common/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardDescription
 
 const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProps<typeof badgeVariants>['variant'] => {
   if (!status) return 'outline';
@@ -167,7 +167,7 @@ export default function SalesManagementPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     if (editingSalesOrder) {
-      updateSalesOrder({ ...editingSalesOrder, ...data, items: data.items });
+      updateSalesOrder({ ...editingSalesOrder, ...data, items: data.items.map(item => ({...item, total: item.quantity * item.unitPrice})) });
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
       addSalesOrder(data);
@@ -206,7 +206,9 @@ export default function SalesManagementPage() {
   }, []);
   
   const renderSortIcon = (columnKey: SortableSalesOrderKeys) => {
-    if (sortConfig.key !== columnKey) return <ChevronsUpDown className="ml-2 h-3 w-3" />;
+    if (sortConfig.key !== columnKey) {
+      return <ChevronsUpDown className="ml-2 h-3 w-3" />;
+    }
     return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />;
   };
 
@@ -275,12 +277,12 @@ export default function SalesManagementPage() {
     return _salesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
 
-  // Placeholder KPI data
+  // Placeholder KPI data - Replace with actual calculations from salesOrders
   const kpiData = useMemo(() => ({
-    totalSalesMTD: 125340.50,
-    newOrdersToday: 15,
-    openOrdersPending: 42,
-    avgOrderValue: 875.20,
+    totalSalesMTD: 125340.50, // Placeholder
+    newOrdersToday: 15,       // Placeholder
+    openOrdersPending: 42,    // Placeholder
+    avgOrderValue: 875.20,    // Placeholder
   }), []);
 
 
@@ -297,8 +299,7 @@ export default function SalesManagementPage() {
           }
         />
         
-        {/* KPI Section */}
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-4"> {/* Adjusted for potentially 3 KPIs across */}
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Sales (Month to Date)</CardTitle>
@@ -340,7 +341,7 @@ export default function SalesManagementPage() {
           </Card>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
@@ -654,6 +655,3 @@ export default function SalesManagementPage() {
     </div>
   );
 }
-
-
-    
