@@ -18,6 +18,14 @@ import {
   Filter as FilterIcon,
   CalendarIcon,
   ShoppingCart,
+  DollarSign,
+  ListFilter,
+  Hourglass,
+  User,
+  MapPin,
+  ExternalLink,
+  Package,
+  BarChart3
 } from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
@@ -164,54 +172,38 @@ export default function SalesOrdersPage() {
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
     const customer = getCustomerById(data.customerId);
-    // Placeholder for salesperson and route logic - will be text fields for now
-    const salespersonName = data.salespersonId || 'N/A';
-    const routeName = data.routeId || 'N/A';
-
+    const salesperson = data.salespersonId ? getSalespersonById(data.salespersonId) : null;
+    const route = data.routeId ? { id: data.routeId, name: `Route ${data.routeId}` } : null; // Placeholder for route name
 
     const itemsWithDetails = data.items.map(item => {
-        const product = getProductById(item.productId);
-        const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
-        let calculatedUnitPrice = 0;
-        if (product) {
-            const basePrice = product.basePrice;
-            const excise = product.exciseTax || 0;
-            if (item.unitType.toLowerCase() === product.unitType.toLowerCase()) {
-                calculatedUnitPrice = basePrice + excise;
-            } else if (product.packagingUnit && item.unitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
-                calculatedUnitPrice = (basePrice + excise) * product.itemsPerPackagingUnit;
-            } else if (item.unitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
-                calculatedUnitPrice = (basePrice / product.piecesInBaseUnit) + ((excise / product.piecesInBaseUnit));
-            }
-        }
-
-        return {
-            ...item,
-            id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
-            productName: product?.name || item.productId,
-            sourceWarehouseName: warehouse?.name || item.sourceWarehouseId,
-            unitPrice: calculatedUnitPrice, // Unit price already includes base + excise for the chosen unit
-            total: (Number(item.quantity) || 0) * calculatedUnitPrice,
-        };
+      const product = getProductById(item.productId);
+      const warehouse = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId) : null;
+      return {
+        ...item,
+        id: item.id || `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+        productName: product?.name || item.productId,
+        sourceWarehouseName: warehouse?.name || item.sourceWarehouseId,
+        unitPrice: item.unitPrice, // unitPrice is already (base+excise) from form logic
+        total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+      };
     });
 
     const subtotal = itemsWithDetails.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = subtotal; // VAT is applied at invoice stage
+    const totalAmount = subtotal;
 
     const salesOrderData = {
-        customerId: data.customerId,
-        customerName: customer?.name || data.customerId,
-        salespersonId: data.salespersonId,
-        salespersonName: salespersonName,
-        routeId: data.routeId,
-        routeName: routeName,
-        items: itemsWithDetails,
-        subtotal,
-        totalAmount,
-        orderDate: data.orderDate.toISOString(),
-        expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
-        notes: data.notes,
-        // status: 'Draft', // Will be handled by addSalesOrder or updateSalesOrder
+      customerId: data.customerId,
+      customerName: customer?.name || data.customerId,
+      salespersonId: data.salespersonId || undefined,
+      salespersonName: salesperson?.name || data.salespersonId || undefined,
+      routeId: data.routeId || undefined,
+      routeName: route?.name || data.routeId || undefined,
+      items: itemsWithDetails,
+      subtotal,
+      totalAmount,
+      orderDate: data.orderDate.toISOString(),
+      expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
+      notes: data.notes,
     };
 
     if (editingSalesOrder) {
@@ -261,25 +253,25 @@ export default function SalesOrdersPage() {
   };
 
   const filteredSalesOrders = useMemo(() => {
-    let _salesOrders = [...salesOrders];
+    let _filteredSalesOrders = [...salesOrders];
 
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      _salesOrders = _salesOrders.filter(so =>
+      _filteredSalesOrders = _filteredSalesOrders.filter(so =>
         so.id.toLowerCase().includes(lowerSearchTerm) ||
         (so.customerName && so.customerName.toLowerCase().includes(lowerSearchTerm)) ||
         (getCustomerById(so.customerId)?.name.toLowerCase().includes(lowerSearchTerm)) ||
-        (so.salespersonId && so.salespersonId.toLowerCase().includes(lowerSearchTerm)) ||
+        (so.salespersonName && so.salespersonName.toLowerCase().includes(lowerSearchTerm)) ||
         (so.routeName && so.routeName.toLowerCase().includes(lowerSearchTerm))
       );
     }
 
     if (statusFilter !== 'all') {
-      _salesOrders = _salesOrders.filter(so => so.status === statusFilter);
+      _filteredSalesOrders = _filteredSalesOrders.filter(so => so.status === statusFilter);
     }
 
     if (dateRange.from || dateRange.to) {
-      _salesOrders = _salesOrders.filter(so => {
+      _filteredSalesOrders = _filteredSalesOrders.filter(so => {
         const orderDate = parseISO(so.orderDate);
         if (!isValid(orderDate)) return false;
         const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
@@ -292,7 +284,7 @@ export default function SalesOrdersPage() {
     }
 
     if (sortConfig.key) {
-      _salesOrders.sort((a, b) => {
+      _filteredSalesOrders.sort((a, b) => {
         let aValue: any;
         let bValue: any;
 
@@ -307,7 +299,7 @@ export default function SalesOrdersPage() {
             bValue = b.salespersonName || b.salespersonId || '';
         } else if (sortConfig.key === 'routeName') {
             aValue = a.routeName || a.routeId || '';
-            bValue = b.routeName || a.routeId || '';
+            bValue = b.routeName || b.routeId || '';
         } else {
             aValue = a[sortConfig.key as keyof SalesOrder];
             bValue = b[sortConfig.key as keyof SalesOrder];
@@ -326,17 +318,19 @@ export default function SalesOrdersPage() {
         return 0;
       });
     }
-    return _salesOrders;
+    return _filteredSalesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
+
+  const getSalespersonById = useCallback((id?: string) => {
+    if (!id) return undefined;
+    return salesOrders.find(so => so.salespersonId === id); // Placeholder, should use actual salespeople list
+  }, [salesOrders]);
+
 
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <div className="mb-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-          </Button>
-        </div>
+        {/* The top-most "Back" button previously here is removed */}
         <PageHeader
           title="Sales Orders"
           description="Manage all your sales orders and track their status."
@@ -396,7 +390,10 @@ export default function SalesOrdersPage() {
               </Popover>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()}>Back</Button>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
         </div>
       </div>
 
@@ -656,4 +653,3 @@ export default function SalesOrdersPage() {
     </div>
   );
 }
-
