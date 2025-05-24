@@ -47,9 +47,9 @@ import {
 import { format, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+// --- Helper Functions (Defined outside component for potential reusability if exported) ---
 
-// Helper functions for display and calculations (moved outside component for clarity)
-const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
+export const getDisplayUnit = (product: Product, type: 'base' | 'package'): string => {
   let unit: string | undefined;
   if (type === 'package' && product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     unit = product.packagingUnit;
@@ -74,32 +74,35 @@ const getCategoryBadgeVariant = (category?: ProductCategory): VariantProps<typeo
   }
 };
 
-const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
+export const getDisplayBasePriceInfo = (product: Product): { price: number; unit: string } => {
   const price = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   return { price, unit: getDisplayUnit(product, 'base') };
 };
 
-const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
+export const getDisplayExciseTaxInfo = (product: Product): { exciseAmount: number; unit: string } => {
   const exciseAmount = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   return { exciseAmount, unit: getDisplayUnit(product, 'base') };
 };
 
-const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | null | undefined): { vatAmount: number; unit: string } => {
-  const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
-  const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  const subtotalForVatPerBaseUnit = basePricePerBaseUnit + exciseTaxPerBaseUnit;
+export const getDisplayVatInfo = (product: Product, companyProfile: CompanyProfile | null | undefined): { vatAmount: number; unit: string } => {
+  const basePricePerUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
+  const exciseTaxPerUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
+  const subtotalForVatPerUnit = basePricePerUnit + exciseTaxPerUnit;
   const vatRate = (companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0) / 100;
-  const vatAmount = subtotalForVatPerBaseUnit * vatRate;
+  const vatAmount = subtotalForVatPerUnit * vatRate;
   return { vatAmount, unit: getDisplayUnit(product, 'base') };
 };
 
-const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number; unit: string } => {
+export const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
-  const piecesInBase = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
+  
+  // piecesInBaseUnit helps determine the conceptual "piece" if the base unit itself is a package.
+  // If unitType is 'PCS', piecesInBaseUnit should ideally be 1 or undefined.
+  const piecesInPrimaryUnit = product.piecesInBaseUnit && product.piecesInBaseUnit > 0 ? product.piecesInBaseUnit : 1;
 
-  const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInBase;
-  const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInBase;
+  const basePricePerConceptualPiece = basePricePerBaseUnit / piecesInPrimaryUnit;
+  const exciseTaxPerConceptualPiece = exciseTaxPerBaseUnit / piecesInPrimaryUnit;
 
   const subtotalBeforeVATPerPiece = basePricePerConceptualPiece + exciseTaxPerConceptualPiece;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
@@ -111,31 +114,31 @@ const calculateFinalPcsPriceWithVatAndExcise = (product: Product, companyProfile
   return { price: finalPrice, unit: 'PCS' };
 };
 
-const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number | null; unit: string } => {
+export const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile: CompanyProfile | null | undefined): { price: number | null; unit: string } => {
   const basePricePerBaseUnit = typeof product.basePrice === 'number' && !isNaN(product.basePrice) ? product.basePrice : 0;
   const exciseTaxPerBaseUnit = typeof product.exciseTax === 'number' && !isNaN(product.exciseTax) ? product.exciseTax : 0;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
 
+  // Determine the target package and items for this calculation
   let itemsInTargetUnit = 1;
-  let targetUnitDisplay = getDisplayUnit(product, 'base');
-  let isBaseUnitItselfPackage = false;
+  let targetUnitDisplay = getDisplayUnit(product, 'base'); // Default to base unit (e.g., a 'Carton' if unitType is 'Cartons')
 
-  // Scenario 1: Product has a defined larger packagingUnit
+  // Scenario 1: There's an "Optional Larger Sales Package" defined
   if (product.packagingUnit && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
     itemsInTargetUnit = product.itemsPerPackagingUnit;
-    targetUnitDisplay = getDisplayUnit(product, 'package');
-  } 
-  // Scenario 2: Product's base unitType is a package (e.g., 'Cartons') and it contains pieces
-  else if (product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
-    itemsInTargetUnit = 1; // We are pricing one base unit (which is a package)
-    targetUnitDisplay = getDisplayUnit(product, 'base');
-    isBaseUnitItselfPackage = true;
-  } 
-  // Scenario 3: Product's base unitType is PCS and there's no larger packaging unit
-  else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
-    return { price: null, unit: '-' }; // No package price to display
+    targetUnitDisplay = getDisplayUnit(product, 'package'); // This will be the packagingUnit name
   }
-  // Fallback / Error case: Should not happen with valid product data
+  // Scenario 2: The Base Unit Type itself is a package (e.g., 'Cartons'), and no larger package is defined.
+  // In this case, we want the price for one Base Unit Type.
+  else if (product.unitType.toLowerCase() !== 'pcs' && (product.piecesInBaseUnit || 1) > 0) {
+    // itemsInTargetUnit remains 1 (we are pricing one base unit)
+    // targetUnitDisplay is already getDisplayUnit(product, 'base')
+  }
+  // Scenario 3: Base Unit Type is 'PCS' and no larger package defined. This column is not applicable.
+  else if (product.unitType.toLowerCase() === 'pcs' && !product.packagingUnit) {
+    return { price: null, unit: '-' };
+  }
+  // Fallback
   else {
     return { price: null, unit: '-' };
   }
@@ -147,17 +150,19 @@ const calculateFinalPkgPriceWithVatAndExcise = (product: Product, companyProfile
   let finalPrice = subtotalBeforeVAT + vatAmount;
 
   const discountRate = product.discountRate ? product.discountRate / 100 : 0;
-  finalPrice = finalPrice * (1 - discountRate); 
+  finalPrice = finalPrice * (1 - discountRate);
 
   return { price: finalPrice, unit: targetUnitDisplay };
 };
 
-type SortableProductKeys = keyof Pick<Product, 'id' | 'name' | 'sku' | 'category' | 'basePrice'> | 'stockLevel';
+
+type SortableProductKeys = keyof Pick<Product, 'id' | 'name' | 'sku' | 'category' | 'basePrice'> | 'stockLevel' | 'totalPieces';
 
 interface SortConfig {
   key: SortableProductKeys | null;
   direction: 'ascending' | 'descending';
 }
+
 
 export default function ProductsPage() {
   const {
@@ -185,7 +190,6 @@ export default function ProductsPage() {
   const filteredProducts = useMemo(() => {
     let _products = [...products];
 
-    // Apply search term
     if (searchTerm) {
       _products = _products.filter(
         (product) =>
@@ -196,12 +200,10 @@ export default function ProductsPage() {
       );
     }
 
-    // Apply category filter
     if (categoryFilter !== 'all') {
       _products = _products.filter(product => product.category === categoryFilter);
     }
     
-    // Apply sorting
     if (sortConfig.key) {
       _products.sort((a, b) => {
         let aValue: any;
@@ -210,6 +212,9 @@ export default function ProductsPage() {
         if (sortConfig.key === 'stockLevel') {
           aValue = getTotalStockForProduct(a.id);
           bValue = getTotalStockForProduct(b.id);
+        } else if (sortConfig.key === 'totalPieces') {
+            aValue = getTotalStockForProduct(a.id) * (a.piecesInBaseUnit || (a.unitType.toLowerCase() === 'pcs' ? 1 : 0));
+            bValue = getTotalStockForProduct(b.id) * (b.piecesInBaseUnit || (b.unitType.toLowerCase() === 'pcs' ? 1 : 0));
         } else {
           aValue = a[sortConfig.key as keyof Product];
           bValue = b[sortConfig.key as keyof Product];
@@ -219,6 +224,10 @@ export default function ProductsPage() {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
+
+        if (aValue === undefined || aValue === null) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+        if (bValue === undefined || bValue === null) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+
 
         if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
@@ -266,9 +275,9 @@ export default function ProductsPage() {
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       globalReorderPoint: data.globalReorderPoint || 0,
-      basePrice: data.basePrice,
-      costPrice: data.costPrice || 0,
-      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount,
+      basePrice: data.basePrice, // This is now for the base unit
+      costPrice: data.costPrice || 0, // From form
+      exciseTax: data.exciseTaxAmount === undefined || data.exciseTaxAmount === null ? 0 : data.exciseTaxAmount, // This is also for the base unit
       batchNo: data.batchNo || undefined,
       productionDate: data.productionDate ? data.productionDate.toISOString() : undefined,
       expiryDate: data.expiryDate ? data.expiryDate.toISOString() : undefined,
@@ -279,8 +288,8 @@ export default function ProductsPage() {
       const updatedProductData: Product = {
         ...editingProduct,
         ...productDataForStorage,
-        stockLevel: editingProduct.stockLevel, // This field is no longer on Product, stock is in ProductStockLocation
-        reorderPoint: editingProduct.reorderPoint, // This field is no longer on Product, use globalReorderPoint
+        stockLevel: editingProduct.stockLevel, // Preserve existing stockLevel if not managed by form
+        reorderPoint: editingProduct.reorderPoint, // Preserve if not managed by form
       };
       updateProduct(updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} details have been updated.` });
@@ -304,12 +313,12 @@ export default function ProductsPage() {
       const newProduct: Product = {
         ...productDataForStorage,
         id: finalProductId,
-        // stockLevel: 0, // Removed, stock is managed per warehouse
-        // reorderPoint: 0, // Removed, use globalReorderPoint
+        stockLevel: data.stockLevel, // Initial stock on creation
+        reorderPoint: data.reorderPoint || 0, // Use globalReorderPoint alias
         createdAt: new Date().toISOString(),
       };
       addProduct(newProduct);
-      toast({ title: "Product Defined", description: `${newProduct.name} definition created. Manage stock in Inventory.` });
+      toast({ title: "Product Defined", description: `${newProduct.name} definition created.` });
     }
     setIsFormModalOpen(false);
     setEditingProduct(null);
@@ -336,7 +345,7 @@ export default function ProductsPage() {
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Products"
-          description="Manage your product catalog and definitions."
+          description="Manage your product catalog, definitions, pricing, and stock levels."
           actions={
             <Button onClick={handleAddProduct} className="w-full sm:w-auto" disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Define New Product
@@ -375,22 +384,22 @@ export default function ProductsPage() {
       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
          <div className="h-full overflow-y-auto">
           {isLoading ? (
-             <Table>
+            <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                 <TableRow>
-                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Product ID</TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[180px] px-2 align-middle text-sm">Name</TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-[11px]">SKU</TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
-                  <TableHead colSpan={2} className="text-center align-middle text-sm px-2">Inventory Levels</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
-                  <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2 text-sm">
-                     <div>Sale Price</div>
-                     <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
-                  </TableHead>
-                  <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
+                <TableRow>
+                    <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm">ID</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm">Name</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px]">SKU</TableHead>
+                    <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm">Category</TableHead>
+                    <TableHead colSpan={2} className="text-center align-middle text-sm px-2">Inventory Levels</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[100px] px-2 align-middle text-sm">Base Price</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
+                    <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
+                    <TableHead colSpan={2} className="text-center align-middle px-2 text-sm">
+                        <div>Sale Price</div>
+                        <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
+                    </TableHead>
+                    <TableHead rowSpan={2} className="text-center min-w-[100px] px-2 align-middle text-sm">Actions</TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">CTN</TableHead>
@@ -401,18 +410,18 @@ export default function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {[...Array(10)].map((_, i) => (
-                  <TableRow key={i} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                  <TableRow key={`skel-prod-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2 text-[11px]"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-center"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-center"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-center px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2 text-center">
                         <div className="flex justify-center items-center gap-1">
                             <Skeleton className="h-8 w-8" />
@@ -428,13 +437,13 @@ export default function ProductsPage() {
             <Table>
                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                  <TableRow>
-                  <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
-                    <div className="flex items-center">Product ID {renderSortIcon('id')}</div>
+                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('id')}>
+                    <div className="flex items-center">ID {renderSortIcon('id')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[180px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[150px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('name')}>
                      <div className="flex items-center">Name {renderSortIcon('name')}</div>
                   </TableHead>
-                  <TableHead rowSpan={2} className="text-left min-w-[80px] px-2 align-middle text-[11px] cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
+                  <TableHead rowSpan={2} className="text-left min-w-[70px] px-2 align-middle text-[11px] cursor-pointer hover:bg-primary/80" onClick={() => handleSort('sku')}>
                     <div className="flex items-center">SKU {renderSortIcon('sku')}</div>
                   </TableHead>
                   <TableHead rowSpan={2} className="text-left min-w-[100px] px-2 align-middle text-sm cursor-pointer hover:bg-primary/80" onClick={() => handleSort('category')}>
@@ -448,7 +457,7 @@ export default function ProductsPage() {
                   </TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">Excise Tax</TableHead>
                   <TableHead rowSpan={2} className="text-right min-w-[90px] px-2 align-middle text-sm">VAT ({companyProfile?.vatRate || 15}%)</TableHead>
-                  <TableHead colSpan={2} className="text-center align-bottom min-w-[180px] px-2 text-sm">
+                  <TableHead colSpan={2} className="text-center align-bottom px-2 text-sm">
                      <div>Sale Price</div>
                      <div className="text-xs font-normal opacity-75">(Inc VAT &amp; Excise)</div>
                   </TableHead>
@@ -456,7 +465,7 @@ export default function ProductsPage() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">CTN</TableHead>
-                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px]">PCS</TableHead>
+                  <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[70px] cursor-pointer hover:bg-primary/80" onClick={() => handleSort('totalPieces')}>PCS {renderSortIcon('totalPieces')}</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">CTN</TableHead>
                   <TableHead className="text-center text-xs font-normal opacity-75 px-2 min-w-[90px]">PCS</TableHead>
                 </TableRow>
@@ -464,23 +473,21 @@ export default function ProductsPage() {
               <TableBody>
                 {filteredProducts.map((product, index) => {
                     const totalStockBaseUnits = getTotalStockForProduct(product.id);
-                    
-                    let ctnStockDisplayValue: string | number = "-";
+                    let ctnStockDisplay: string | number = "-";
                     if (product.unitType.toLowerCase() === 'cartons') {
-                        ctnStockDisplayValue = totalStockBaseUnits.toFixed(0);
+                        ctnStockDisplay = totalStockBaseUnits.toFixed(0);
                     } else if (product.unitType.toLowerCase() === 'pcs' && product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-                        ctnStockDisplayValue = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
+                        ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
                     } else if (product.packagingUnit?.toLowerCase().includes('carton') && product.itemsPerPackagingUnit && product.itemsPerPackagingUnit > 0) {
-                        // For other base units packaged in cartons
-                        ctnStockDisplayValue = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
+                        ctnStockDisplay = (totalStockBaseUnits / product.itemsPerPackagingUnit).toFixed((totalStockBaseUnits / product.itemsPerPackagingUnit) % 1 !== 0 ? 1 : 0);
                     }
 
-                    let pcsStockDisplayValue: string | number = "-";
-                    if (product.unitType.toLowerCase() === 'pcs') {
-                        pcsStockDisplayValue = totalStockBaseUnits.toFixed(0);
-                    } else if (product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
-                        pcsStockDisplayValue = (totalStockBaseUnits * product.piecesInBaseUnit).toFixed(0);
+                    let pcsStockDisplay: string | number = "-";
+                    const totalPieces = totalStockBaseUnits * (product.piecesInBaseUnit || (product.unitType.toLowerCase() === 'pcs' ? 1 : 0));
+                     if (totalPieces > 0) {
+                        pcsStockDisplay = totalPieces.toFixed(0);
                     }
+
 
                     const basePriceInfo = getDisplayBasePriceInfo(product);
                     const exciseTaxInfo = getDisplayExciseTaxInfo(product);
@@ -502,10 +509,10 @@ export default function ProductsPage() {
                         "text-center font-medium px-2 text-xs",
                         product.globalReorderPoint !== undefined && totalStockBaseUnits <= product.globalReorderPoint ? "text-destructive" : ""
                       )}>
-                        {ctnStockDisplayValue}
+                        {ctnStockDisplay}
                       </TableCell>
                       <TableCell className="text-center px-2 text-xs">
-                        {pcsStockDisplayValue}
+                        {pcsStockDisplay}
                       </TableCell>
                       <TableCell className="text-right px-2 text-xs">${basePriceInfo.price.toFixed(2)} / {basePriceInfo.unit}</TableCell>
                       <TableCell className="text-right px-2 text-xs">${exciseTaxInfo.exciseAmount.toFixed(2)} / {exciseTaxInfo.unit}</TableCell>
@@ -600,28 +607,25 @@ export default function ProductsPage() {
                 </div>
               </CardContent></Card>
               
-              <Card><CardContent className="pt-4 grid grid-cols-2 gap-x-2 gap-y-1">
-                  <div><strong>Category:</strong></div>
-                  <div><Badge variant={getCategoryBadgeVariant(productToView.category)} className="text-xs">{productToView.category}</Badge></div>
+              <Card><CardContent className="pt-4 grid grid-cols-1 gap-y-2">
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <div><strong>Category:</strong></div>
+                    <div><Badge variant={getCategoryBadgeVariant(productToView.category)} className="text-xs">{productToView.category}</Badge></div>
+                  </div>
                   
-                  <div><strong>Primary Stocking Unit (Base Unit):</strong></div>
-                  <div><Badge variant="outline">{getDisplayUnit(productToView, 'base')}</Badge></div>
+                  <Separator className="my-1" />
 
+                  <div><strong>Primary Stocking Unit (Base Unit):</strong> <Badge variant="outline" className="ml-1">{getDisplayUnit(productToView, 'base')}</Badge></div>
+                  
                   {productToView.piecesInBaseUnit && productToView.piecesInBaseUnit > 0 && (
-                    <>
-                      <div><strong>Individual Pieces in Base Unit:</strong></div>
-                      <div>{productToView.piecesInBaseUnit} PCS</div>
-                    </>
+                    <div><strong>Individual Pieces in Base Unit:</strong> {productToView.piecesInBaseUnit} PCS</div>
                   )}
                   
                   {productToView.packagingUnit && productToView.itemsPerPackagingUnit && productToView.itemsPerPackagingUnit > 0 && (
                     <>
-                      <div className="col-span-2"><Separator className="my-0.5" /></div>
-                      <div><strong>Also Sold As (Larger Package):</strong></div>
-                      <div><Badge variant="outline">{getDisplayUnit(productToView, 'package')}</Badge></div>
-                      
-                      <div><strong>Base Units in Larger Package:</strong></div>
-                      <div>{productToView.itemsPerPackagingUnit} {getDisplayUnit(productToView, 'base')}</div>
+                      <Separator className="my-1" />
+                      <div><strong>Also Sold As (Larger Package):</strong> <Badge variant="outline" className="ml-1">{getDisplayUnit(productToView, 'package')}</Badge></div>
+                      <div><strong>Base Units in Larger Package:</strong> {productToView.itemsPerPackagingUnit} {getDisplayUnit(productToView, 'base')}</div>
                     </>
                   )}
               </CardContent></Card>
@@ -703,3 +707,5 @@ export default function ProductsPage() {
   );
 }
 
+// Export helper functions so they can be used by other pages if needed (e.g., warehouse detail page)
+// Already done in previous step
