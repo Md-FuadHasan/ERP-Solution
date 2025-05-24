@@ -52,12 +52,12 @@ const getSalesOrderStatusBadgeVariant = (status?: SalesOrderStatus): VariantProp
   if (!status) return 'outline';
   switch (status) {
     case 'Draft': return 'poDraft';
-    case 'Confirmed': return 'default';
+    case 'Confirmed': return 'default'; // Using default for 'Confirmed'
     case 'Processing': return 'secondary';
-    case 'Ready for Dispatch': return 'outline';
-    case 'Dispatched': return 'poSent';
-    case 'Partially Invoiced': return 'statusPartiallyPaid';
-    case 'Fully Invoiced': return 'statusPaid';
+    case 'Ready for Dispatch': return 'outline'; // Consider a specific color
+    case 'Dispatched': return 'poSent'; // Using 'poSent' (blue-ish)
+    case 'Partially Invoiced': return 'statusPartiallyPaid'; // Using 'statusPartiallyPaid' (orange-ish)
+    case 'Fully Invoiced': return 'statusPaid'; // Using 'statusPaid' (green)
     case 'Cancelled': return 'poCancelled';
     default: return 'outline';
   }
@@ -75,6 +75,7 @@ interface DateRange {
   to: Date | null;
 }
 
+
 export default function SalesOrdersPage() {
   const {
     salesOrders,
@@ -83,11 +84,12 @@ export default function SalesOrdersPage() {
     deleteSalesOrder,
     getSalesOrderById,
     getCustomerById,
-    products,
-    warehouses,
-    getTotalStockForProduct,
-    getStockForProductInWarehouse,
-    getProductById,
+    customers, // Added missing destructure
+    products,  // Added missing destructure
+    warehouses, // Added missing destructure
+    getTotalStockForProduct, // Added missing destructure
+    getStockForProductInWarehouse, // Added missing destructure
+    getProductById, // Added missing destructure
     isLoading
   } = useData();
   const { toast } = useToast();
@@ -105,6 +107,7 @@ export default function SalesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
+
 
   const handleAddSalesOrder = useCallback(() => {
     setEditingSalesOrder(null);
@@ -161,16 +164,42 @@ export default function SalesOrdersPage() {
   }, [salesOrderToCancel, updateSalesOrder, toast, isViewModalOpen, salesOrderToView]);
 
   const handleSubmitSalesOrder = (data: SalesOrderFormValues) => {
+    const customer = getCustomerById(data.customerId);
+    const itemsWithTotalsAndWarehouse = data.items.map(item => ({
+        ...item,
+        productName: getProductById(item.productId)?.name || item.productId, // Ensure productName is set
+        total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+        sourceWarehouseName: item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId)?.name : undefined,
+    }));
+
+    const subtotal = itemsWithTotalsAndWarehouse.reduce((sum, item) => sum + item.total, 0);
+    // For Sales Order, totalAmount is typically the subtotal before invoice-level VAT
+    const totalAmount = subtotal;
+
+    const salesOrderData = {
+        ...data,
+        customerName: customer?.name || data.customerId,
+        salespersonName: data.salespersonId, // Assuming salespersonId is their name for now
+        routeName: data.routeId, // Assuming routeId is the name/code
+        items: itemsWithTotalsAndWarehouse,
+        subtotal,
+        totalAmount,
+        status: editingSalesOrder?.status || 'Draft', // Retain status if editing, default to Draft if new
+        orderDate: data.orderDate.toISOString(),
+        expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
+    };
+
     if (editingSalesOrder) {
-      updateSalesOrder({ ...editingSalesOrder, ...data, items: data.items.map(item => ({...item, total: (item.quantity || 0) * (item.unitPrice || 0)})) });
+      updateSalesOrder({ ...editingSalesOrder, ...salesOrderData });
       toast({ title: "Sales Order Updated", description: `Sales Order ${editingSalesOrder.id} updated.` });
     } else {
-      addSalesOrder(data);
+      addSalesOrder(salesOrderData as Omit<SalesOrder, 'id' | 'createdAt' | 'status'>);
       toast({ title: "Sales Order Created", description: "New sales order has been created." });
     }
     setIsSalesOrderFormModalOpen(false);
     setEditingSalesOrder(null);
   };
+
 
   const salesOrderForViewModal = useMemo(() => {
     if (!salesOrderToView) return null;
@@ -211,12 +240,13 @@ export default function SalesOrdersPage() {
     let _salesOrders = [...salesOrders];
 
     if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       _salesOrders = _salesOrders.filter(so =>
-        so.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (so.customerName && so.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (getCustomerById(so.customerId)?.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (so.salespersonId && so.salespersonId.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (so.routeName && so.routeName.toLowerCase().includes(searchTerm.toLowerCase()))
+        so.id.toLowerCase().includes(lowerSearchTerm) ||
+        (so.customerName && so.customerName.toLowerCase().includes(lowerSearchTerm)) ||
+        (getCustomerById(so.customerId)?.name.toLowerCase().includes(lowerSearchTerm)) ||
+        (so.salespersonId && so.salespersonId.toLowerCase().includes(lowerSearchTerm)) ||
+        (so.routeName && so.routeName.toLowerCase().includes(lowerSearchTerm))
       );
     }
 
@@ -253,11 +283,16 @@ export default function SalesOrdersPage() {
             bValue = b.salespersonName || b.salespersonId || '';
         } else if (sortConfig.key === 'routeName') {
             aValue = a.routeName || a.routeId || '';
-            bValue = b.routeName || a.routeId || '';
+            bValue = b.routeName || b.routeId || '';
         } else {
             aValue = a[sortConfig.key as keyof SalesOrder];
             bValue = b[sortConfig.key as keyof SalesOrder];
         }
+        
+        // Handle undefined or null values to prevent crashes during sort
+        if (aValue === undefined || aValue === null) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+        if (bValue === undefined || bValue === null) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
@@ -272,12 +307,15 @@ export default function SalesOrdersPage() {
     return _salesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
 
+
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
-        <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
+        <div className="mb-4">
+            <Button variant="outline" size="sm" onClick={() => router.back()} className="w-auto">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
+        </div>
         <PageHeader
           title="Sales Orders"
           description="Manage all your sales orders and track their status."
@@ -474,7 +512,7 @@ export default function SalesOrdersPage() {
       </Dialog>
 
       {/* View Sales Order Modal */}
-      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+      <Dialog open={isViewModalOpen} onOpenChange={(isOpen) => { setIsViewModalOpen(isOpen); if(!isOpen) setSalesOrderToView(null);}}>
         <DialogContent className="w-[95vw] max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Sales Order Details: {salesOrderForViewModal?.id}</DialogTitle>
@@ -581,7 +619,7 @@ export default function SalesOrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={setIsCancelConfirmModalOpen}>
+      <AlertDialog open={isCancelConfirmModalOpen} onOpenChange={(isOpen) => {if(!isOpen) {setIsCancelConfirmModalOpen(false); setSalesOrderToCancel(null);}}}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
             <AlertDialogTitleComponent>Confirm Cancellation</AlertDialogTitleComponent>
