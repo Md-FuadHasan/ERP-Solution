@@ -1,10 +1,20 @@
 
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShoppingBasket, Eye, Edit, Trash2, Truck, XCircle, ArrowLeft, Filter as FilterIcon } from 'lucide-react';
+import {
+  PlusCircle,
+  ShoppingCart,
+  Eye,
+  Edit,
+  Trash2,
+  Truck,
+  XCircle,
+  ArrowLeft,
+  Filter as FilterIcon,
+} from 'lucide-react';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import {
   Dialog,
@@ -34,18 +44,18 @@ import {
 } from '@/components/ui/table';
 import { useData } from '@/context/DataContext';
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, Product, POStatus, Warehouse, ProductUnitType } from '@/types';
-import { ALL_PO_STATUSES } from '@/types'; // Import ALL_PO_STATUSES
+import { ALL_PO_STATUSES } from '@/types';
 import { PurchaseOrderForm, type PurchaseOrderFormValues } from '@/components/forms/purchase-order-form';
 import { ReceiveStockForm, type ReceiveStockFormValues } from '@/components/forms/receive-stock-form';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Badge, badgeVariants } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useRouter } from 'next/navigation';
-import { SearchInput } from '@/components/common/search-input'; // Import SearchInput
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select components
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { SearchInput } from '@/components/common/search-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getPOStatusBadgeVariant = (status: POStatus) => {
   switch (status) {
@@ -105,7 +115,6 @@ export default function PurchaseOrdersPage() {
     if (statusFilter !== 'all') {
       filtered = filtered.filter(po => po.status === statusFilter);
     }
-    // Add sorting logic here in the future if needed
     return filtered.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
   }, [purchaseOrders, searchTerm, statusFilter, getSupplierById]);
 
@@ -152,7 +161,7 @@ export default function PurchaseOrdersPage() {
 
   const confirmCancelPO = useCallback(() => {
     if (poToCancel) {
-      cancelPurchaseOrder(poToCancel.id);
+      updatePurchaseOrder({ ...poToCancel, status: 'Cancelled', updatedAt: new Date().toISOString() });
       toast({ title: "Purchase Order Cancelled", description: `PO ${poToCancel.id} has been cancelled.` });
       if (poToView && poToView.id === poToCancel.id) {
         setPoToView({ ...poToView, status: 'Cancelled', updatedAt: new Date().toISOString() });
@@ -160,7 +169,7 @@ export default function PurchaseOrdersPage() {
       setPoToCancel(null);
     }
     setIsCancelConfirmModalOpen(false);
-  }, [poToCancel, cancelPurchaseOrder, toast, poToView]);
+  }, [poToCancel, updatePurchaseOrder, toast, poToView]);
 
 
   const handleSubmitPO = useCallback((data: PurchaseOrderFormValues) => {
@@ -172,7 +181,7 @@ export default function PurchaseOrdersPage() {
     }));
 
     const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = 0; 
+    const taxAmount = 0;
     const totalAmount = subtotal + taxAmount;
     const supplier = getSupplierById(data.supplierId);
 
@@ -192,14 +201,13 @@ export default function PurchaseOrdersPage() {
       updatePurchaseOrder({
         ...editingPO,
         ...poDataForContext,
-        // Status transition handled by updatePurchaseOrder in context
       });
       toast({
         title: "Purchase Order Updated",
         description: `Purchase Order ${editingPO.id} has been successfully updated.`,
       });
     } else {
-      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'supplierName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> });
+      addPurchaseOrder(poDataForContext as Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'supplierName' | 'subtotal' | 'totalAmount' | 'taxAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> });
       toast({
         title: "Purchase Order Created",
         description: "The new purchase order has been successfully added.",
@@ -214,8 +222,8 @@ export default function PurchaseOrdersPage() {
     const supplier = getSupplierById(poToView.supplierId);
     const itemsWithProductDetails = poToView.items.map(item => {
       const product = getProductById(item.productId);
-      return { 
-        ...item, 
+      return {
+        ...item,
         productName: product?.name || item.productId,
         quantityReceived: typeof item.quantityReceived === 'number' ? item.quantityReceived : 0,
       };
@@ -240,14 +248,14 @@ export default function PurchaseOrdersPage() {
         productId: item.productId,
         quantityNewlyReceived: Number(item.quantityReceivedNow)!,
         warehouseId: item.destinationWarehouseId!,
-        itemUnitType: item.itemUnitType, 
+        itemUnitType: item.itemUnitType,
       }));
 
     if (itemsToProcess.length > 0) {
       processPOReceipt(data.poId, itemsToProcess);
       toast({ title: "Stock Received", description: `Stock has been updated for PO ${data.poId}.` });
       if (poToView && poToView.id === data.poId) {
-        const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId); // Re-fetch to get the latest state
+        const updatedPOFromContext = purchaseOrders.find(p => p.id === data.poId);
         if (updatedPOFromContext) {
           setPoToView(updatedPOFromContext);
         }
@@ -272,14 +280,14 @@ export default function PurchaseOrdersPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 flex-1 min-w-0"> {/* Group for left-aligned filters, takes available space */}
             <SearchInput
               value={searchTerm}
               onChange={setSearchTerm}
               placeholder="Search by PO ID, Supplier..."
-              className="w-full md:w-64 lg:flex-none"
+              className="w-full sm:w-auto md:w-64"
             />
-            <div className="relative w-full md:w-[200px] lg:flex-none">
+            <div className="relative w-full sm:w-auto md:w-[200px]">
               <Select
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value as POStatus | 'all')}
@@ -296,15 +304,18 @@ export default function PurchaseOrdersPage() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Placeholder for future date filters */}
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="shrink-0">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
         </div>
       </div>
 
        <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+        <CardHeader className="border-b">
+            <CardTitle>Purchase Order List</CardTitle>
+            <CardDescription>Overview of all purchase orders.</CardDescription>
+        </CardHeader>
         <div className="h-full overflow-y-auto">
           {isLoading ? (
             <Table>
@@ -371,7 +382,7 @@ export default function PurchaseOrdersPage() {
           ) : (
             <div className="h-full flex items-center justify-center p-6">
               <DataPlaceholder
-                icon={ShoppingBasket}
+                icon={ShoppingCart}
                 title="No Purchase Orders Found"
                 message={searchTerm || statusFilter !== 'all' ? "Try adjusting your search or filter criteria." : "Create your first purchase order to start managing procurement."}
                 action={!searchTerm && statusFilter === 'all' ? <Button onClick={handleAddPO}><PlusCircle className="mr-2 h-4 w-4" /> Create New PO</Button> : undefined}
@@ -468,23 +479,23 @@ export default function PurchaseOrdersPage() {
           )}
           <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row sm:justify-end gap-2">
             {(poForViewModal?.status === 'Sent' || poForViewModal?.status === 'Partially Received') && (
-                <Button 
-                    variant="default" 
-                    onClick={() => { if(poToView) { setIsViewModalOpen(false); setTimeout(() => handleOpenReceiveStockModal(poToView), 100); }}} 
+                <Button
+                    variant="default"
+                    onClick={() => { if(poToView) { setIsViewModalOpen(false); setTimeout(() => handleOpenReceiveStockModal(poToView), 100); }}}
                     className="w-full sm:w-auto"
                 >
                   <Truck className="mr-2 h-4 w-4" /> Receive Stock
                 </Button>
             )}
              {(poForViewModal?.status === 'Draft' || poForViewModal?.status === 'Sent') && (
-                <Button 
-                    variant="destructive" 
+                <Button
+                    variant="destructive"
                     onClick={() => {
                         if(poToView) {
-                            setIsViewModalOpen(false); 
+                            setIsViewModalOpen(false);
                             setTimeout(() => handleCancelPOConfirm(poToView), 100);
                         }
-                    }} 
+                    }}
                     className="w-full sm:w-auto"
                 >
                   <XCircle className="mr-2 h-4 w-4" /> Cancel PO
@@ -556,4 +567,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-
