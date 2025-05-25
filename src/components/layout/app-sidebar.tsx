@@ -53,7 +53,7 @@ export function AppSidebar() {
             </Button>
           </div>
         ) : (
-          <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} p-3 w-full`}>
+          <div className={cn("flex items-center p-3 w-full", collapsed ? 'justify-center' : 'justify-between')}>
             {!collapsed && (
               <Link href="/dashboard" className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-sidebar-ring rounded-sm">
                 <Logo showText={true} iconClassName="text-primary"/>
