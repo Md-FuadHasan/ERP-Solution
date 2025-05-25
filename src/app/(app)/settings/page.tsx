@@ -1,12 +1,12 @@
 
 'use client';
-import { useState, useEffect } from 'react';
 import type React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as SettingsCardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon, Truck, UserCheck } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon, Truck, UserCheck, UserCog } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,11 +17,10 @@ import {
 } from '@/components/ui/table';
 import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
-// WarehouseForm and SupplierForm are no longer directly used here, functionality moved to dedicated pages
 import { SalespersonForm, type SalespersonFormValues } from '@/components/forms/salesperson-form';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import type { CompanyProfile, Manager, Warehouse, Supplier, Salesperson } from '@/types';
-import { MOCK_MANAGERS } from '@/types';
+import { MOCK_MANAGERS } from '@/types'; // MOCK_MANAGERS is used as a fallback
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -29,7 +28,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as FormDialogDescription, // Renamed to avoid conflict with Radix's DialogDescription
+  DialogDescription as FormDialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -42,10 +41,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Renamed for clarity
-  AlertDialogFooter as AlertDialogFooterComponent, // Renamed for clarity
-  AlertDialogHeader as AlertDialogHeaderComponent, // Renamed for clarity
-  AlertDialogTitle as AlertDialogTitleComponent, // Renamed for clarity
+  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogFooter as AlertDialogFooterComponent,
+  AlertDialogHeader as AlertDialogHeaderComponent,
+  AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 
@@ -57,10 +56,24 @@ export default function SettingsPage() {
     addSalesperson, 
     updateSalesperson, 
     deleteSalesperson, 
-    isLoading: isDataLoading
+    isLoading: isDataLoading,
+    warehouses // Needed for SalespersonForm
   } = useData();
 
-  const [managers, setManagers] = useState<Manager[]>([]);
+  const [managers, setManagers] = useState<Manager[]>(() => {
+    // Initialize managers from localStorage synchronously
+    if (typeof window !== 'undefined') {
+      try {
+        const storedManagers = localStorage.getItem('invoiceflow_managers');
+        return storedManagers ? JSON.parse(storedManagers) : MOCK_MANAGERS;
+      } catch (error) {
+        console.error("Failed to load managers from localStorage on init", error);
+        return MOCK_MANAGERS;
+      }
+    }
+    return MOCK_MANAGERS; // Fallback for SSR or if window is not defined yet
+  });
+
   const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
   const [managerName, setManagerName] = useState('');
@@ -71,74 +84,89 @@ export default function SettingsPage() {
   const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null); 
   const [salespersonToDelete, setSalespersonToDelete] = useState<Salesperson | null>(null); 
 
-  const [localLoading, setLocalLoading] = useState(true);
   const { toast } = useToast();
 
+  // Effect to save managers to localStorage when 'managers' state changes
   useEffect(() => {
-    try {
-      const storedManagers = localStorage.getItem('invoiceflow_managers');
-      setManagers(storedManagers ? JSON.parse(storedManagers) : MOCK_MANAGERS);
-    } catch (error) {
-      console.error("Failed to load managers from localStorage", error);
-      setManagers(MOCK_MANAGERS);
-    } finally {
-      setLocalLoading(false);
+    if (typeof window !== 'undefined') {
+      try {
+        if (managers.length > 0) {
+          localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
+        } else {
+          // If managers array becomes empty after initial load, remove from storage
+          // This check avoids removing it if it was never there (e.g. first load with MOCK_MANAGERS being empty)
+          if (localStorage.getItem('invoiceflow_managers')) {
+             localStorage.removeItem('invoiceflow_managers');
+          }
+        }
+      } catch (error) {
+        console.error("Failed to save managers to localStorage", error);
+      }
     }
-  }, []);
+  }, [managers]);
 
-  useEffect(() => {
-    if (!localLoading && managers.length > 0) {
-        localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
-    } else if (!localLoading && managers.length === 0) {
-        localStorage.removeItem('invoiceflow_managers');
+
+  const handleCompanyDetailsSubmit = useCallback((data: CompanyDetailsFormValues) => {
+    if (companyProfile) {
+      updateCompanyProfile(data);
+      toast({ title: "Company Details Updated", description: "Your company information has been saved." });
     }
-  }, [managers, localLoading]);
+  }, [companyProfile, updateCompanyProfile, toast]);
 
+  const handleTaxSettingsSubmit = useCallback((data: TaxSettingsFormValues) => {
+    if (companyProfile) {
+      updateCompanyProfile({
+        vatRate: data.vatRate,
+        // taxRate is no longer in TaxSettingsFormValues, but ensure it's handled if it were
+        // taxRate: data.taxRate, 
+        excessTaxRate: data.excessTaxRate
+      });
+      toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
+    }
+  }, [companyProfile, updateCompanyProfile, toast]);
 
-  const handleCompanyDetailsSubmit = (data: CompanyDetailsFormValues) => {
-    updateCompanyProfile(data);
-    toast({ title: "Company Details Updated", description: "Your company information has been saved." });
-  };
-
-  const handleTaxSettingsSubmit = (data: TaxSettingsFormValues) => {
-    updateCompanyProfile({
-      vatRate: data.vatRate,
-      excessTaxRate: data.excessTaxRate
-    });
-    toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
-  };
-
-  const handleAddManager = () => {
+  const handleAddManager = useCallback(() => {
     setEditingManager(null); setManagerName(''); setManagerEmail(''); setManagerRole('');
     setIsUserManagerModalOpen(true);
-  };
-  const handleEditManager = (manager: Manager) => {
+  }, []);
+
+  const handleEditManager = useCallback((manager: Manager) => {
     setEditingManager(manager); setManagerName(manager.name); setManagerEmail(manager.email); setManagerRole(manager.role);
     setIsUserManagerModalOpen(true);
-  };
-  const handleDeleteManager = (managerId: string) => {
-    setManagers(managers.filter(m => m.id !== managerId));
+  }, []);
+
+  const handleDeleteManager = useCallback((managerId: string) => {
+    setManagers(prevManagers => prevManagers.filter(m => m.id !== managerId));
     toast({ title: "Manager Removed", description: "The manager has been removed."});
-  };
-  const handleManagerFormSubmit = (e: React.FormEvent) => {
+  }, [toast]);
+
+  const handleManagerFormSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!managerName || !managerEmail || !managerRole) {
       toast({ title: "Missing Information", description: "Please fill all manager details.", variant: "destructive" });
       return;
     }
     if (editingManager) {
-      setManagers(managers.map(m => m.id === editingManager.id ? { ...editingManager, name: managerName, email: managerEmail, role: managerRole } : m));
+      setManagers(prevManagers => prevManagers.map(m => m.id === editingManager.id ? { ...editingManager, name: managerName, email: managerEmail, role: managerRole } : m));
       toast({ title: "Manager Updated", description: `${managerName}'s details updated.`});
     } else {
-      setManagers([{ id: `MGR-${Date.now()}`, name: managerName, email: managerEmail, role: managerRole }, ...managers]);
+      setManagers(prevManagers => [{ id: `MGR-${Date.now()}`, name: managerName, email: managerEmail, role: managerRole }, ...prevManagers]);
       toast({ title: "Manager Added", description: `${managerName} added.`});
     }
     setIsUserManagerModalOpen(false);
-  };
+  }, [managerName, managerEmail, managerRole, editingManager, toast]);
 
-  const handleAddSalesperson = () => { setEditingSalesperson(null); setIsSalespersonFormModalOpen(true); };
-  const handleEditSalesperson = (salesperson: Salesperson) => { setEditingSalesperson(salesperson); setIsSalespersonFormModalOpen(true); };
-  const handleSalespersonFormSubmit = (data: SalespersonFormValues) => {
+  const handleAddSalesperson = useCallback(() => { 
+    setEditingSalesperson(null); 
+    setIsSalespersonFormModalOpen(true); 
+  }, []);
+
+  const handleEditSalesperson = useCallback((salesperson: Salesperson) => { 
+    setEditingSalesperson(salesperson); 
+    setIsSalespersonFormModalOpen(true); 
+  }, []);
+
+  const handleSalespersonFormSubmit = useCallback((data: SalespersonFormValues) => {
     if (editingSalesperson) {
       updateSalesperson({ ...editingSalesperson, ...data, createdAt: editingSalesperson.createdAt || new Date().toISOString() });
       toast({ title: "Salesperson Updated", description: `${data.name} updated.` });
@@ -146,20 +174,24 @@ export default function SettingsPage() {
       addSalesperson(data as Omit<Salesperson, 'id' | 'createdAt'>);
       toast({ title: "Salesperson Added", description: `${data.name} added.` });
     }
-    setIsSalespersonFormModalOpen(false); setEditingSalesperson(null);
-  };
-  const handleDeleteSalespersonConfirm = (salesperson: Salesperson) => { setSalespersonToDelete(salesperson); };
-  const confirmDeleteSalesperson = () => {
+    setIsSalespersonFormModalOpen(false); 
+    setEditingSalesperson(null);
+  }, [editingSalesperson, addSalesperson, updateSalesperson, toast]);
+  
+  const handleDeleteSalespersonConfirm = useCallback((salesperson: Salesperson) => { 
+    setSalespersonToDelete(salesperson); 
+  }, []);
+
+  const confirmDeleteSalesperson = useCallback(() => {
     if (salespersonToDelete) {
       deleteSalesperson(salespersonToDelete.id);
       toast({ title: "Salesperson Deleted", description: `${salespersonToDelete.name} removed.` });
       setSalespersonToDelete(null);
     }
-  };
+  }, [salespersonToDelete, deleteSalesperson, toast]);
 
-  // Warehouse and Supplier specific state and handlers are removed from here.
 
-  if (isDataLoading || localLoading || !companyProfile) {
+  if (isDataLoading || !companyProfile) { // Simplified loading condition
     return (
       <div className="flex flex-col h-full">
         <div className="shrink-0">
@@ -178,7 +210,7 @@ export default function SettingsPage() {
           </div>
         </Tabs>
       </div>
-    )
+    );
   }
 
   return (
@@ -200,20 +232,20 @@ export default function SettingsPage() {
           <div className="flex-grow min-h-0 overflow-y-auto">
             <TabsContent value="company" className="mt-0">
               <Card>
-                <CardHeader><CardTitle>Company Details</CardTitle><CardDescription>Update your company's name, address, and contact information.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Company Details</CardTitle><SettingsCardDescription>Update your company's name, address, and contact information.</SettingsCardDescription></CardHeader>
                 <CardContent><CompanyDetailsForm initialData={companyProfile} onSubmit={handleCompanyDetailsSubmit} /></CardContent>
               </Card>
             </TabsContent>
             <TabsContent value="tax" className="mt-0">
               <Card>
-                <CardHeader><CardTitle>Tax Settings</CardTitle><CardDescription>Configure VAT and Excess TAX rates for your invoices.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Tax Settings</CardTitle><SettingsCardDescription>Configure VAT and Excess TAX rates for your invoices.</SettingsCardDescription></CardHeader>
                 <CardContent><TaxSettingsForm initialData={companyProfile} onSubmit={handleTaxSettingsSubmit} /></CardContent>
               </Card>
             </TabsContent>
             <TabsContent value="users" className="mt-0">
               <Card>
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex-grow"><CardTitle>App User Management</CardTitle><CardDescription>Add, edit, or remove managers with custom roles.<br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small></CardDescription></div>
+                  <div className="flex-grow"><CardTitle>App User Management</CardTitle><SettingsCardDescription>Add, edit, or remove managers with custom roles.<br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small></SettingsCardDescription></div>
                   <Button onClick={handleAddManager} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Manager</Button>
                 </CardHeader>
                 <CardContent>
@@ -228,7 +260,7 @@ export default function SettingsPage() {
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex-grow">
                     <CardTitle>Salespeople Management</CardTitle>
-                    <CardDescription>Manage your sales team members.</CardDescription>
+                    <SettingsCardDescription>Manage your sales team members.</SettingsCardDescription>
                   </div>
                   <Button onClick={handleAddSalesperson} className="w-full sm:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add New Salesperson
@@ -284,7 +316,7 @@ export default function SettingsPage() {
             </TabsContent>
             <TabsContent value="storage" className="mt-0">
               <Card>
-                <CardHeader><CardTitle>Data Storage Configuration</CardTitle><CardDescription>Settings for connecting to local storage or SQL database systems.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Data Storage Configuration</CardTitle><SettingsCardDescription>Settings for connecting to local storage or SQL database systems.</SettingsCardDescription></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300"><Database className="h-6 w-6 text-green-500 dark:text-green-400" /><div><p className="font-medium">Using Local Storage</p><p className="text-sm">Currently, all application data is being stored in your browser's local storage. Changes are persisted across sessions on this device.</p></div></div>
                   <p className="text-muted-foreground">Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.</p>
@@ -307,10 +339,10 @@ export default function SettingsPage() {
             <FormDialogDescription>{editingSalesperson ? 'Update salesperson details.' : 'Enter details for the new salesperson.'}</FormDialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {isSalespersonFormModalOpen && ( // Conditionally render to reset form state
+            {isSalespersonFormModalOpen && ( 
               <SalespersonForm
                 initialData={editingSalesperson}
-                warehouses={useData().warehouses} // Pass warehouses from context
+                warehouses={warehouses} 
                 onSubmit={handleSalespersonFormSubmit}
                 onCancel={() => { setIsSalespersonFormModalOpen(false); setEditingSalesperson(null); }}
               />
@@ -333,3 +365,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
