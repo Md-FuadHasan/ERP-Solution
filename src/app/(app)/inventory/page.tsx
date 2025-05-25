@@ -103,12 +103,8 @@ export default function InventoryPage() {
   const handleOpenStockAdjustmentModal = () => setIsStockAdjustmentModalOpen(true);
   const handleOpenStockTransferModal = () => setIsStockTransferModalOpen(true);
 
-  const handleAddWarehouse = () => {
-    toast({
-      title: "Navigate to Settings",
-      description: "Warehouse management is available on the Settings page.",
-    });
-    router.push('/settings?tab=warehouses');
+  const handleNavigateToWarehouses = () => {
+    router.push('/warehouses');
   };
 
   const handleDefineNewProduct = () => setIsProductDefineModalOpen(true);
@@ -137,7 +133,7 @@ export default function InventoryPage() {
       sku: data.sku || '',
       category: data.category,
       unitType: data.unitType,
-      piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType.toLowerCase() === 'pcs' ? 1 : undefined),
+      piecesInBaseUnit: data.piecesInBaseUnit || (data.unitType === 'PCS' ? 1 : undefined),
       packagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' ? data.packagingUnit.trim() : undefined,
       itemsPerPackagingUnit: data.packagingUnit && data.packagingUnit.trim() !== '' && data.itemsPerPackagingUnit ? data.itemsPerPackagingUnit : undefined,
       globalReorderPoint: data.globalReorderPoint || 0,
@@ -165,15 +161,15 @@ export default function InventoryPage() {
       newCalculatedStockLevel = currentStock + data.adjustmentQuantity;
     } else if (data.adjustmentReason === "Stock Take Loss" || data.adjustmentReason === "Damaged Goods" || data.adjustmentReason === "Expired Goods" || data.adjustmentReason === "Internal Consumption" || data.adjustmentReason === "Promotion/Sample" || data.adjustmentReason === "Other Decrease") {
       newCalculatedStockLevel = Math.max(0, currentStock - data.adjustmentQuantity);
-      quantityChange = -(currentStock - newCalculatedStockLevel);
-    } else {
+      quantityChange = -(currentStock - newCalculatedStockLevel); // ensure actual change is logged
+    } else { // Should not happen due to enum type
       toast({ title: "Error", description: "Invalid adjustment reason.", variant: "destructive" });
       return;
     }
     
     upsertProductStockLocation(
         { productId: data.productId, warehouseId: data.warehouseId, stockLevel: newCalculatedStockLevel },
-        data.adjustmentReason,
+        data.adjustmentReason, // Pass the specific reason from form
         data.reference || undefined
     );
 
@@ -188,7 +184,7 @@ export default function InventoryPage() {
 
 
   const handleStockTransferSubmit = (data: StockTransferFormValues) => {
-    const { productId, sourceWarehouseId, destinationWarehouseId, transferQuantity } = data;
+    const { productId, sourceWarehouseId, destinationWarehouseId, transferQuantity, reference } = data;
 
     const currentSourceStock = getStockForProductInWarehouse(productId, sourceWarehouseId);
 
@@ -205,12 +201,12 @@ export default function InventoryPage() {
       productId,
       warehouseId: sourceWarehouseId,
       stockLevel: newSourceStock,
-    }, 'Transfer Out', `To WH: ${destinationWarehouseId} / Ref: ${data.reference || ''}`);
+    }, 'Transfer Out', `To WH: ${destinationWarehouseId} / Ref: ${reference || ''}`);
     upsertProductStockLocation({
       productId,
       warehouseId: destinationWarehouseId,
       stockLevel: newDestStock,
-    }, 'Transfer In', `From WH: ${sourceWarehouseId} / Ref: ${data.reference || ''}`);
+    }, 'Transfer In', `From WH: ${sourceWarehouseId} / Ref: ${reference || ''}`);
     
     const productName = products.find(p => p.id === productId)?.name || 'Product';
     const sourceWhName = warehouses.find(w => w.id === sourceWarehouseId)?.name || 'Source';
@@ -230,7 +226,7 @@ export default function InventoryPage() {
             actions={
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button className="w-full sm:w-auto" disabled><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
-                <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
+                <Button className="w-full sm:w-auto" disabled><WarehouseIcon className="mr-2 h-4 w-4" /> Manage Warehouses</Button>
                 <Button className="w-full sm:w-auto" disabled><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
                 <Button className="w-full sm:w-auto" disabled><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
               </div>
@@ -251,7 +247,7 @@ export default function InventoryPage() {
             </Card>
           ))}
         </div>
-         <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
+         <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:my-8">
           <CardHeader className="border-b">
              <Skeleton className="h-6 w-1/3 mb-1" />
              <Skeleton className="h-4 w-2/3" />
@@ -260,21 +256,25 @@ export default function InventoryPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
-                  <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
-                  <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Date</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Product</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Warehouse</TableHead>
+                  <TableHead className="px-2 min-w-[150px]">Type</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">Qty Change</TableHead>
+                  <TableHead className="px-2 text-right min-w-[100px]">New Qty</TableHead>
+                  <TableHead className="px-2 min-w-[200px]">Reason/Reference</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...Array(5)].map((_, i) => (
-                  <TableRow key={`skel-wh-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
+                {[...Array(7)].map((_, i) => (
+                  <TableRow key={`skel-txn-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                     <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell className="text-center px-2"><Skeleton className="h-8 w-20 mx-auto" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="px-2 text-right"><Skeleton className="h-5 w-3/4 ml-auto" /></TableCell>
+                    <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -290,11 +290,11 @@ export default function InventoryPage() {
        <div className="shrink-0 sticky top-0 z-20 bg-background pt-4 pb-4 px-4 md:px-6 lg:px-8 border-b">
         <PageHeader
           title="Inventory Management"
-          description="Overview of your multi-warehouse inventory, product stock levels, and inventory value."
+          description="Overview of your inventory, product stock levels, and inventory value."
           actions={
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button onClick={handleDefineNewProduct} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Define New Product</Button>
-              <Button onClick={handleAddWarehouse} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Add Warehouse</Button>
+              <Button onClick={handleNavigateToWarehouses} className="w-full sm:w-auto"><WarehouseIcon className="mr-2 h-4 w-4" /> Manage Warehouses</Button>
               <Button onClick={handleOpenStockTransferModal} className="w-full sm:w-auto"><Shuffle className="mr-2 h-4 w-4" /> Transfer Stock</Button>
               <Button onClick={handleOpenStockAdjustmentModal} className="w-full sm:w-auto"><Edit className="mr-2 h-4 w-4" /> Adjust Stock</Button>
             </div>
@@ -339,92 +339,6 @@ export default function InventoryPage() {
             <p className="text-xs text-muted-foreground">Unique products expiring within 30 days.</p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Warehouses Overview Table */}
-      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mb-4 md:mb-6 lg:mb-8">
-        <CardHeader className="border-b">
-          <CardTitle>Warehouses Overview</CardTitle>
-          <CardDescription>List of all warehouses. Click to view detailed stock.</CardDescription>
-        </CardHeader>
-        <div className="h-full overflow-y-auto">
-          {isLoading ? (
-             <Table>
-                <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                  <TableRow>
-                    <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
-                    <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
-                    <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
-                    <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
-                    <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(5)].map((_, i) => (
-                    <TableRow key={`skel-wh-${i}`} className={cn(i % 2 === 0 ? 'bg-card' : 'bg-muted/50')}>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="px-2"><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell className="text-center px-2"><Skeleton className="h-8 w-20 mx-auto" /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-          ) : warehouses.length > 0 ? (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
-                <TableRow>
-                  <TableHead className="min-w-[100px] px-2">WH ID</TableHead>
-                  <TableHead className="min-w-[180px] px-2">WH Name</TableHead>
-                  <TableHead className="min-w-[150px] px-2">WH Location</TableHead>
-                  <TableHead className="min-w-[120px] px-2">WH Type</TableHead>
-                  <TableHead className="text-center min-w-[100px] px-2">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {warehouses.map((warehouse, index) => (
-                    <TableRow
-                        key={warehouse.id}
-                        className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10 cursor-pointer")}
-                        onClick={() => router.push(`/inventory/${warehouse.id}`)}
-                    >
-                      <TableCell className="font-medium px-2">{warehouse.id}</TableCell>
-                      <TableCell className="px-2">{warehouse.name}</TableCell>
-                      <TableCell className="px-2">{warehouse.location}</TableCell>
-                      <TableCell className="px-2">{warehouse.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
-                      <TableCell className="text-center px-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                router.push(`/inventory/${warehouse.id}`);
-                            }}
-                            className="hover:text-primary"
-                        >
-                            <Eye className="mr-1 h-4 w-4" /> View Stock
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="h-full flex items-center justify-center p-6">
-              <DataPlaceholder
-                icon={WarehouseIcon}
-                title="No Warehouses Found"
-                message="Define warehouses in Settings to start managing inventory locations."
-                action={
-                    <Button onClick={handleAddWarehouse} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Go to Settings to Add Warehouse
-                    </Button>
-                }
-              />
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Stock Transaction Log Table */}
@@ -524,6 +438,7 @@ export default function InventoryPage() {
                 onSubmit={handleSubmitNewProductDefinition}
                 onCancel={() => setIsProductDefineModalOpen(false)}
                 isSubmitting={isLoading}
+                warehouses={warehouses} 
               />
             )}
           </div>
