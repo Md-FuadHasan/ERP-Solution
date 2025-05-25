@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 export default function UserManagementPage() {
-  // TODO: Eventually move user/manager management logic from Settings here if it becomes more complex.
   return (
     <div className="flex flex-col h-full">
       <PageHeader
@@ -26,7 +25,7 @@ export default function UserManagementPage() {
             User Administration
           </CardTitle>
           <CardDescription>
-            Define user roles and control access to application features.
+            Define user roles and control access to application features. For now, basic user/manager configuration is in Settings.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -34,7 +33,7 @@ export default function UserManagementPage() {
             <UserCog className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold text-foreground">User & Role Management Features Coming Soon</h3>
             <p className="text-muted-foreground max-w-md">
-              This section will allow for detailed user role creation, permission assignments, and user account management. For now, basic user/manager configuration is in Settings.
+              This section will allow for detailed user role creation, permission assignments, and user account management.
             </p>
           </div>
         </CardContent>
