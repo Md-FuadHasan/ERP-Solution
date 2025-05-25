@@ -39,7 +39,7 @@ import {
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
   AlertDialogTitle as AlertDialogTitleComponent,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // Removed as it was causing issues in table rows
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,6 +50,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from '@/components/ui/calendar';
+import InvoiceTaxView from '@/components/invoices/InvoiceTaxView';
+
 
 type SortableInvoiceKeys = keyof Pick<Invoice, 'id' | 'dueDate' | 'status' | 'issueDate'> | 'customerName' | 'totalAmount' | 'remainingBalance' | 'amountPaid';
 
@@ -73,8 +75,8 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
-    products,
-    warehouses,
+    products, 
+    warehouses, 
     getStockForProductInWarehouse,
     getProductById,
   } = useData();
@@ -103,6 +105,43 @@ export default function InvoicesPage() {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'issueDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
 
+  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
+    setIsFormModalOpen(isOpen);
+    if (!isOpen) {
+      setEditingInvoice(null);
+      setCurrentPrefillValues(null);
+      const action = searchParams.get('action');
+      if (action === 'new' || action === 'edit') {
+        // Clear URL params only if the modal was opened by them
+        const newSearchParams = new URLSearchParams(searchParams.toString());
+        newSearchParams.delete('action');
+        newSearchParams.delete('id');
+        newSearchParams.delete('customerId');
+        newSearchParams.delete('customerName');
+        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        // It's crucial to also reset the processed intent key when the URL is cleared
+        // This will be handled by the useEffect below
+      }
+    }
+  }, [searchParams, router, pathname]);
+
+  const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
+    setIsViewModalOpen(isOpen);
+    if (!isOpen) {
+      setInvoiceToViewInModal(null);
+      const action = searchParams.get('action');
+      if (action === 'view') {
+        const newSearchParams = new URLSearchParams(searchParams.toString());
+        newSearchParams.delete('action');
+        newSearchParams.delete('id');
+        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+         // It's crucial to also reset the processed intent key when the URL is cleared
+        // This will be handled by the useEffect below
+      }
+    }
+  }, [searchParams, router, pathname]);
+
+
   useEffect(() => {
     const action = searchParams.get('action');
     const invoiceIdParam = searchParams.get('id');
@@ -117,80 +156,45 @@ export default function InvoicesPage() {
     } else if (action === 'view' && invoiceIdParam) {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
-
-    if (currentUrlIntentKey && urlParamsProcessedIntentKey !== currentUrlIntentKey) {
-      if (action === 'new' && !isFormModalOpen && !editingInvoice) {
-        setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
-        setEditingInvoice(null);
-        setIsFormModalOpen(true);
-        setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-      } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
-        const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
-        if (invoiceToEdit) {
-          setEditingInvoice(invoiceToEdit);
-          setCurrentPrefillValues(null);
+    
+    if (currentUrlIntentKey) {
+      if (urlParamsProcessedIntentKey !== currentUrlIntentKey) {
+        if (action === 'new' && !isFormModalOpen && !editingInvoice) {
+          setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
+          setEditingInvoice(null);
           setIsFormModalOpen(true);
           setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        } else {
-          const newSearchParams = new URLSearchParams(searchParams.toString());
-          newSearchParams.delete('action'); newSearchParams.delete('id');
-          router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
+        } else if (action === 'edit' && invoiceIdParam && !isFormModalOpen) {
+          const invoiceToEdit = invoices.find(inv => inv.id === invoiceIdParam);
+          if (invoiceToEdit) {
+            setEditingInvoice(invoiceToEdit);
+            setCurrentPrefillValues(null);
+            setIsFormModalOpen(true);
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+          }
+        } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
+          const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
+          if (invoiceToView) {
+            setInvoiceToViewInModal(invoiceToView);
+            setIsViewModalOpen(true);
+            setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+          }
         }
-      } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
-        const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
-        if (invoiceToView) {
-          setInvoiceToViewInModal(invoiceToView);
-          setIsViewModalOpen(true);
-          setUrlParamsProcessedIntentKey(currentUrlIntentKey);
-        } else {
-          const newSearchParams = new URLSearchParams(searchParams.toString());
-          newSearchParams.delete('action'); newSearchParams.delete('id');
-          router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        }
       }
-    } else if (!currentUrlIntentKey && urlParamsProcessedIntentKey) {
-      setUrlParamsProcessedIntentKey(null);
+    } else {
+      // If URL no longer has an actionable intent, reset the processed key
+      if (urlParamsProcessedIntentKey) {
+        setUrlParamsProcessedIntentKey(null);
+      }
     }
-  }, [searchParams, invoices, router, pathname, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
+  }, [searchParams, invoices, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
 
-  const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsFormModalOpen(isOpen);
-    if (!isOpen) {
-      setEditingInvoice(null);
-      setCurrentPrefillValues(null);
-      // Only clear URL params if the modal was opened by them
-      const currentAction = searchParams.get('action');
-      if (currentAction === 'new' || currentAction === 'edit') {
-        const newSearchParams = new URLSearchParams(searchParams.toString());
-        newSearchParams.delete('action');
-        newSearchParams.delete('id');
-        newSearchParams.delete('customerId');
-        newSearchParams.delete('customerName');
-        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // It's safer to let the useEffect handle resetting urlParamsProcessedIntentKey when URL is clean
-      }
-    }
-  }, [searchParams, router, pathname]);
-
-  const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsViewModalOpen(isOpen);
-    if (!isOpen) {
-      setInvoiceToViewInModal(null);
-      const currentAction = searchParams.get('action');
-      if (currentAction === 'view') {
-        const newSearchParams = new URLSearchParams(searchParams.toString());
-        newSearchParams.delete('action');
-        newSearchParams.delete('id');
-        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-      }
-    }
-  }, [searchParams, router, pathname]);
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'new');
-    newSearchParams.delete('id');
-    newSearchParams.delete('customerId');
+    newSearchParams.delete('id'); // Clear any existing edit ID
+    newSearchParams.delete('customerId'); // Clear specific customer prefill if any
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
   }, [searchParams, router, pathname]);
@@ -212,12 +216,13 @@ export default function InvoicesPage() {
     let _filtered = [...invoices];
 
     if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       _filtered = _filtered.filter(invoice => {
-        const customer = getCustomerById(invoice.customerId);
-        return invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               (invoice.customerName && invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-               (customer && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-               invoice.customerId.toLowerCase().includes(searchTerm.toLowerCase());
+        const customer = getCustomerById(invoice.customerId); // Fetch customer for comprehensive search
+        return invoice.id.toLowerCase().includes(lowerSearchTerm) ||
+               (invoice.customerName && invoice.customerName.toLowerCase().includes(lowerSearchTerm)) ||
+               (customer && customer.name.toLowerCase().includes(lowerSearchTerm)) ||
+               invoice.customerId.toLowerCase().includes(lowerSearchTerm);
       });
     }
 
@@ -227,45 +232,60 @@ export default function InvoicesPage() {
         if (statusFilter === 'unpaid') return ['Pending', 'Overdue'].includes(invoice.status);
         if (statusFilter === 'partially-paid') return invoice.status === 'Partially Paid';
         if (statusFilter === 'cancelled') return invoice.status === 'Cancelled';
-        return true;
+        return true; 
       });
     }
-    
+
     if (dateRange.from || dateRange.to) {
       _filtered = _filtered.filter(invoice => {
-        const issueDate = parseISO(invoice.issueDate);
-        if (!isValid(issueDate)) return false;
-        
-        const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
-        const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
+        try {
+            const issueDate = parseISO(invoice.issueDate);
+            if (!isValid(issueDate)) return false;
 
-        if (fromDate && toDate) {
-          return isWithinInterval(issueDate, { start: fromDate, end: toDate });
+            const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+            const toDate = dateRange.to ? startOfDay(dateRange.to) : null;
+
+            if (fromDate && toDate) {
+            return isWithinInterval(issueDate, { start: fromDate, end: toDate });
+            }
+            if (fromDate) {
+            return issueDate >= fromDate;
+            }
+            if (toDate) {
+            return issueDate <= toDate;
+            }
+            return true;
+        } catch(e) {
+            console.error("Error parsing invoice date:", invoice.issueDate, e);
+            return false; // Exclude problematic dates
         }
-        if (fromDate) {
-          return issueDate >= fromDate;
-        }
-        if (toDate) {
-          return issueDate <= toDate;
-        }
-        return true;
       });
     }
 
     if (sortConfig.key) {
       _filtered.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof Invoice];
-        let bValue: any = b[sortConfig.key as keyof Invoice];
-
+        let aValue: any;
+        let bValue: any;
         if (sortConfig.key === 'customerName') {
-          aValue = a.customerName || getCustomerById(a.customerId)?.name || '';
-          bValue = b.customerName || getCustomerById(b.customerId)?.name || '';
+            aValue = a.customerName || getCustomerById(a.customerId)?.name || '';
+            bValue = b.customerName || getCustomerById(b.customerId)?.name || '';
+        } else if (sortConfig.key === 'issueDate' || sortConfig.key === 'dueDate') {
+            try {
+                aValue = new Date(a[sortConfig.key as 'issueDate' | 'dueDate']).getTime();
+                bValue = new Date(b[sortConfig.key as 'issueDate' | 'dueDate']).getTime();
+                if (isNaN(aValue)) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+                if (isNaN(bValue)) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+            } catch (e) {
+                aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+                bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+            }
+        } else {
+            aValue = a[sortConfig.key as keyof Invoice];
+            bValue = b[sortConfig.key as keyof Invoice];
         }
-        
-        if (sortConfig.key === 'issueDate' || sortConfig.key === 'dueDate') {
-          aValue = new Date(aValue).getTime();
-          bValue = new Date(bValue).getTime();
-        }
+
+        if (aValue === undefined || aValue === null) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+        if (bValue === undefined || bValue === null) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
@@ -306,7 +326,7 @@ export default function InvoicesPage() {
     }
   }, [invoiceToViewInModal, companyProfile]);
 
-  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => { 
+  const handleDeleteInvoiceConfirm = useCallback((invoice: Invoice) => {
     setInvoiceToDelete(invoice);
   }, []);
 
@@ -321,13 +341,23 @@ export default function InvoicesPage() {
   const handleSubmit = useCallback(async (data: InvoiceFormValues) => {
     setIsSaving(true);
     const customer = getCustomerById(data.customerId);
+    if (!companyProfile) {
+        toast({ title: "Error", description: "Company profile not loaded.", variant: "destructive" });
+        setIsSaving(false);
+        return;
+    }
 
-    const calculatedSubtotal = data.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+    const calculatedItems = data.items.map(item => ({
+        ...item,
+        total: (item.quantity || 0) * (item.unitPrice || 0), // unitPrice already includes product-level excise
+    }));
     
-    const generalTaxAmount = 0; // General tax rate is 0 as per updated logic
-    const vatRate = companyProfile && companyProfile.vatRate ? Number(companyProfile.vatRate) / 100 : 0;
+    const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
+    const calculatedGeneralTaxAmount = 0; // General tax is 0.
+    const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
     const calculatedVatAmount = calculatedSubtotal * vatRate;
-    const calculatedTotalAmount = calculatedSubtotal + generalTaxAmount + calculatedVatAmount;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
+
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -351,11 +381,11 @@ export default function InvoicesPage() {
     let finalStatus: InvoiceStatus = data.status;
 
     if (data.paymentProcessingStatus === 'Fully Paid') {
-      const paymentAmount = calculatedTotalAmount - newAmountPaid;
-      if (paymentAmount > 0 || (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount)) {
-        const effectivePayment = paymentAmount > 0 ? paymentAmount : (calculatedTotalAmount - newAmountPaid);
+       const paymentAmount = calculatedTotalAmount - newAmountPaid;
+       if (paymentAmount > 0 || (paymentAmount === 0 && newAmountPaid < calculatedTotalAmount)) {
+         const effectivePayment = paymentAmount > 0 ? paymentAmount : (calculatedTotalAmount - newAmountPaid);
          if (effectivePayment > 0) {
-            newPaymentHistory.push({
+           newPaymentHistory.push({
             id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
             paymentDate: new Date().toISOString(),
             amount: effectivePayment,
@@ -367,10 +397,10 @@ export default function InvoicesPage() {
                 bankAccountNumber: data.bankAccountNumber,
                 onlineTransactionNumber: data.onlineTransactionNumber,
             }),
-            });
+           });
          }
          newAmountPaid = calculatedTotalAmount;
-      }
+       }
     } else if (data.paymentProcessingStatus === 'Partially Paid' && data.partialAmountPaid && data.partialAmountPaid > 0) {
       const actualPartialPayment = Math.min(data.partialAmountPaid, calculatedTotalAmount - newAmountPaid);
       if (actualPartialPayment > 0) {
@@ -393,8 +423,8 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { // Directly respect user choice for 'Cancelled'
-      finalStatus = 'Cancelled';
+    if (data.status === 'Cancelled') {
+        finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
     } else if (newAmountPaid > 0 && newAmountPaid < calculatedTotalAmount) {
@@ -403,8 +433,8 @@ export default function InvoicesPage() {
       finalStatus = 'Overdue';
     } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
-    } else { 
-      finalStatus = 'Paid'; 
+    } else {
+      finalStatus = 'Paid'; // Default to paid if no other conditions met for balance > 0
     }
 
     const invoiceToSave: Invoice = {
@@ -413,13 +443,13 @@ export default function InvoicesPage() {
       customerName: customer?.name || 'N/A',
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
-      items: data.items.map(item => ({ ...item, total: (item.quantity || 0) * (item.unitPrice || 0), sourceWarehouseId: item.sourceWarehouseId })), 
-      subtotal: calculatedSubtotal, 
-      taxAmount: generalTaxAmount, 
-      vatAmount: calculatedVatAmount, 
-      totalAmount: calculatedTotalAmount, 
+      items: calculatedItems,
+      subtotal: calculatedSubtotal,
+      taxAmount: calculatedGeneralTaxAmount, // General tax is 0
+      vatAmount: calculatedVatAmount,
+      totalAmount: calculatedTotalAmount,
       status: finalStatus,
-      paymentProcessingStatus: data.paymentProcessingStatus, 
+      paymentProcessingStatus: data.paymentProcessingStatus,
       amountPaid: newAmountPaid,
       remainingBalance: newRemainingBalance,
       paymentHistory: newPaymentHistory,
@@ -439,10 +469,11 @@ export default function InvoicesPage() {
       addInvoice(invoiceToSave as Omit<Invoice, 'customerName' | 'paymentHistory' | 'amountPaid' | 'remainingBalance'> & { items: Array<InvoiceItem & { sourceWarehouseId?: string }>});
       toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
     }
-    
-    handleFormModalOpenChange(false);
+
+    handleFormModalOpenChange(false); 
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
+
 
   const customerForModal = invoiceToViewInModal ? getCustomerById(invoiceToViewInModal.customerId) : null;
   const vatRatePercent = companyProfile?.vatRate ? (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate)) : 0;
@@ -467,8 +498,8 @@ export default function InvoicesPage() {
           }
         />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer, Cust ID..." className="w-full md:w-64 lg:flex-none" />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 flex-1 min-w-0">
+            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by ID, Customer..." className="w-full md:w-64 lg:flex-none" />
             <StatusFilterDropdown selectedStatus={statusFilter} onStatusChange={setStatusFilter} className="w-full md:w-[200px] lg:flex-none" />
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Popover>
@@ -495,13 +526,13 @@ export default function InvoicesPage() {
               </Popover>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="shrink-0">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
         </div>
       </div>
 
-       <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
+      <div className="flex-grow min-h-0 flex flex-col rounded-lg border shadow-sm bg-card mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6 mb-4 md:mb-6 lg:mb-8">
         <CardHeader className="border-b">
             <CardTitle>Invoice List</CardTitle>
             <CardDescription>Overview of all invoices.</CardDescription>
@@ -511,14 +542,14 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                 <TableRow>
-                  <TableHead className="min-w-[100px] px-2 text-sm">Invoice ID</TableHead>
-                  <TableHead className="min-w-[150px] px-2 text-sm">Customer</TableHead>
-                  <TableHead className="min-w-[120px] px-2 text-sm">Due Date</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Amount</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Paid</TableHead>
-                  <TableHead className="min-w-[100px] text-right px-2 text-sm">Balance</TableHead>
-                  <TableHead className="min-w-[110px] px-2 text-sm">Status</TableHead>
-                  <TableHead className="text-right min-w-[150px] px-2 text-sm">Actions</TableHead>
+                  <TableHead className="min-w-[100px] px-2 text-sm font-semibold">Invoice ID</TableHead>
+                  <TableHead className="min-w-[150px] px-2 text-sm font-semibold">Customer</TableHead>
+                  <TableHead className="min-w-[120px] px-2 text-sm font-semibold">Due Date</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold">Amount</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold">Paid</TableHead>
+                  <TableHead className="min-w-[100px] text-right px-2 text-sm font-semibold">Balance</TableHead>
+                  <TableHead className="min-w-[110px] px-2 text-sm font-semibold">Status</TableHead>
+                  <TableHead className="text-right min-w-[150px] px-2 text-sm font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -589,15 +620,15 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary" title="View Invoice">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewInvoiceInModal(invoice)} className="hover:text-primary p-1.5" title="View Invoice">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary" title="Edit Invoice">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditInvoice(invoice)} className="hover:text-primary p-1.5" title="Edit Invoice">
                           <Edit className="h-4 w-4" />
                         </Button>
-                         <Button variant="ghost" size="icon" className="hover:text-destructive" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
-                            <Trash2 className="h-4 w-4" />
-                         </Button>
+                           <Button variant="ghost" size="icon" className="hover:text-destructive p-1.5" title="Delete Invoice" onClick={(e) => { e.stopPropagation(); handleDeleteInvoiceConfirm(invoice); }}>
+                              <Trash2 className="h-4 w-4" />
+                           </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -652,190 +683,40 @@ export default function InvoicesPage() {
       </Dialog>
 
       {/* View Invoice Details Modal */}
-      <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
+       <Dialog open={isViewModalOpen} onOpenChange={handleViewModalOpenChange}>
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto print-root-content">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
-            <div className="p-6 space-y-6 animate-pulse">
-              <Skeleton className="h-8 w-1/2 mb-2" />
-              <Skeleton className="h-4 w-3/4 mb-6" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div className="flex-grow overflow-y-auto p-6 space-y-6 animate-pulse">
+              <Skeleton className="h-8 w-1/3 mb-2" />
+              <Skeleton className="h-4 w-1/2 mb-6" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div><Skeleton className="h-24 w-full" /></div>
                 <div><Skeleton className="h-24 w-full" /></div>
               </div>
-              <Skeleton className="h-16 w-full mb-8" />
-              <Skeleton className="h-40 w-full mb-8" />
-              <div className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8">
-                <Skeleton className="h-32 w-32" />
-                <Skeleton className="h-48 w-full md:max-w-sm" />
+              <Skeleton className="h-12 w-full mb-6" />
+              <Skeleton className="h-6 w-1/4 mb-4" />
+              <Skeleton className="h-48 w-full mb-6" />
+              <div className="flex justify-between items-start gap-6">
+                <Skeleton className="h-40 w-32" />
+                <Skeleton className="h-40 w-1/2" />
               </div>
-            </div>
+             </div>
           )}
-          {(!isDataContextLoading && invoiceToViewInModal && companyProfile) && (
+          {(!isDataContextLoading && invoiceToViewInModal && companyProfile && customerForModal) && (
             <>
               <DialogHeader className="p-6 pb-4 border-b print:hidden">
-                <DialogTitle>TAX INVOICE</DialogTitle>
-                <FormDialogDescription className="print:hidden">
-                  Viewing details for invoice #{invoiceToViewInModal.id}.
+                <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
+                <FormDialogDescription>
+                  Viewing details for invoice #{invoiceToViewInModal.id}. This dialog will change to TAX INVOICE when printed.
                 </FormDialogDescription>
               </DialogHeader>
-              <div className="flex-grow overflow-y-auto p-6 space-y-6 print:overflow-visible print:h-auto print:p-4 sm:print:p-6">
-                {!customerForModal && <div className="text-destructive p-4 rounded-md border border-destructive/50 bg-destructive/10">Error: Customer not found for this invoice. Please check customer records.</div>}
-                {customerForModal && companyProfile && (
-                  <>
-                    <header className="mb-8 print:mt-0">
-                      <div className="flex justify-between items-center mb-2">
-                        <h1 className="text-3xl md:text-4xl font-bold text-foreground print:text-2xl">TAX INVOICE</h1>
-                        <Badge variant={getStatusBadgeVariant(invoiceToViewInModal.status)} className="text-base px-4 py-1.5 print:hidden">
-                          {invoiceToViewInModal.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">Invoice # {invoiceToViewInModal.id}</p>
-                    </header>
-
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8 text-sm">
-                      <div>
-                        <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">From</h3>
-                        <p className="font-semibold text-lg text-foreground">{companyProfile.name}</p>
-                        <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{companyProfile.address}</p>
-                        <p className="text-muted-foreground">{companyProfile.email} | {companyProfile.phone}</p>
-                      </div>
-                      <div className="md:text-left">
-                        <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-2">Bill To</h3>
-                        <p className="font-semibold text-lg text-foreground">{customerForModal.name}</p>
-                        <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{customerForModal.billingAddress}</p>
-                        <p className="text-muted-foreground">{customerForModal.email} | {customerForModal.phone}</p>
-                      </div>
-                    </section>
-
-                    <Separator className="my-8 print:my-4" />
-
-                    <section className="mb-8 p-4 sm:p-6 rounded-lg border bg-muted/40 print:p-3 print:mb-4">
-                      <div className="grid grid-cols-3 gap-x-4 text-sm">
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Issue Date</p>
-                          <p className="font-medium text-base text-foreground">{format(new Date(invoiceToViewInModal.issueDate), 'MMMM d, yyyy')}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Due Date</p>
-                          <p className="font-medium text-base text-foreground">{format(new Date(invoiceToViewInModal.dueDate), 'MMMM d, yyyy')}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Invoice Total</p>
-                          <p className="font-bold text-base text-primary">${(typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="mb-8 print:mb-4">
-                      <h2 className="text-xl font-semibold mb-4 text-foreground print:text-lg print:mb-2">Order Summary</h2>
-                      <div className="overflow-x-auto rounded-lg border">
-                        <Table>
-                          <TableHeader className="bg-muted/50">
-                            <TableRow>
-                              <TableHead className="min-w-[200px] pl-4 sm:pl-6 print:pl-2 print:min-w-[150px]">Item Description</TableHead>
-                              <TableHead className="w-32 print:w-auto">Source Warehouse</TableHead>
-                              <TableHead className="text-center w-24 print:w-auto">Qty</TableHead>
-                              <TableHead className="px-3 py-2">Unit</TableHead>
-                              <TableHead className="text-right w-32 print:w-auto">Unit Price (incl. Excise)</TableHead>
-                              <TableHead className="text-right w-32 pr-4 sm:pr-6 print:pr-2 print:w-auto">Amount (incl. Excise)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {invoiceToViewInModal.items.map((item: InvoiceItem, index: number) => {
-                              const warehouseName = item.sourceWarehouseId ? warehouses.find(w => w.id === item.sourceWarehouseId)?.name : 'N/A';
-                              return (
-                                <TableRow key={item.id || index} className="even:bg-muted/20">
-                                  <TableCell className="font-medium text-foreground py-3 pl-4 sm:pl-6 print:pl-2 print:py-1.5">{item.description}</TableCell>
-                                  <TableCell className="text-muted-foreground py-3 print:py-1.5">{warehouseName}</TableCell>
-                                  <TableCell className="text-center text-muted-foreground py-3 print:py-1.5">{item.quantity}</TableCell>
-                                  <TableCell className="px-3 py-2 print:py-1.5">{item.unitType}</TableCell>
-                                  <TableCell className="text-right text-muted-foreground py-3 print:py-1.5">${(typeof item.unitPrice === 'number' ? item.unitPrice : 0).toFixed(2)}</TableCell>
-                                  <TableCell className="text-right font-medium text-foreground py-3 pr-4 sm:pr-6 print:pr-2 print:py-1.5">${(typeof item.total === 'number' ? item.total : 0).toFixed(2)}</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </section>
-
-                    <section className="flex flex-col-reverse md:flex-row justify-between items-start mb-8 gap-8 print:mb-4">
-                      <div className="w-full md:w-auto flex flex-col items-center md:items-start print:hidden">
-                        {qrCodeValueForModal && (
-                          <>
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center"><QrCode className="w-4 h-4 mr-2"/>Scan for Quick Details</h3>
-                            <div className="p-3 border rounded-lg inline-block bg-white shadow-sm">
-                              <QRCodeCanvas value={qrCodeValueForModal} size={128} bgColor="#ffffff" fgColor="#000000" level="Q" />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <div className="w-full md:max-w-sm space-y-2.5 text-sm border p-4 sm:p-6 rounded-lg bg-muted/40 print:p-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subtotal (incl. Item Excise):</span>
-                          <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.subtotal === 'number' ? invoiceToViewInModal.subtotal : 0).toFixed(2)}</span>
-                        </div>
-                        {invoiceToViewInModal.vatAmount > 0 && (
-                          <div className="flex justify-between">
-                              <span className="text-muted-foreground">VAT ({vatRatePercent.toFixed(0)}%):</span>
-                              <span className="font-medium text-foreground">${(typeof invoiceToViewInModal.vatAmount === 'number' ? invoiceToViewInModal.vatAmount : 0).toFixed(2)}</span>
-                          </div>
-                        )}
-                        <Separator className="my-3 !bg-border print:my-1.5" />
-                        <div className="flex justify-between text-base font-semibold">
-                          <span className="text-foreground">Total Amount:</span>
-                          <span className="text-foreground">${(typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between mt-2 text-green-600 dark:text-green-400">
-                          <span className="font-medium">Amount Paid:</span>
-                          <span className="font-semibold">${(typeof invoiceToViewInModal.amountPaid === 'number' ? invoiceToViewInModal.amountPaid : 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold">
-                          <span className="text-foreground">Balance Due:</span>
-                          <span className={`${(typeof invoiceToViewInModal.remainingBalance === 'number' ? invoiceToViewInModal.remainingBalance : 0) > 0 ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>
-                            ${(typeof invoiceToViewInModal.remainingBalance === 'number' ? invoiceToViewInModal.remainingBalance : 0).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </section>
-
-                    {invoiceToViewInModal.paymentHistory && invoiceToViewInModal.paymentHistory.length > 0 && (
-                      <section className="mb-8 print:hidden">
-                        <Separator className="my-8" />
-                        <h3 className="text-lg font-semibold text-foreground mb-3">Payment History</h3>
-                          <div className="rounded-md border">
-                          {invoiceToViewInModal.paymentHistory.map((record, index) => (
-                              <div key={record.id} className={`p-3 ${index < invoiceToViewInModal.paymentHistory!.length -1 ? 'border-b' : ''} ${index % 2 === 0 ? 'bg-muted/20' : 'bg-card'}`}>
-                                  <div className="flex justify-between items-center text-sm">
-                                      <div>
-                                          <p className="font-medium">{record.status} {record.paymentMethod ? `(${record.paymentMethod})` : ''}</p>
-                                          <p className="text-xs text-muted-foreground">
-                                              {format(new Date(record.paymentDate), "MMM d, yyyy 'at' hh:mm a")}
-                                          </p>
-                                      </div>
-                                      <p className="font-semibold text-primary">${(typeof record.amount === 'number' ? record.amount : 0).toFixed(2)}</p>
-                                  </div>
-                                  {record.paymentMethod === 'Cash' && record.cashVoucherNumber && (
-                                      <p className="text-xs text-muted-foreground mt-1">Voucher: {record.cashVoucherNumber}</p>
-                                  )}
-                                  {record.paymentMethod === 'Bank Transfer' && (
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                      {record.bankName && <p>Bank: {record.bankName}</p>}
-                                      {record.bankAccountNumber && <p>Acc: {record.bankAccountNumber}</p>}
-                                      {record.onlineTransactionNumber && <p>TxN: {record.onlineTransactionNumber}</p>}
-                                      </div>
-                                  )}
-                              </div>
-                          ))}
-                          </div>
-                      </section>
-                    )}
-                    <div className="mt-12 text-center text-xs text-muted-foreground print:block hidden">
-                        <p>Thank you for your business!</p>
-                        {companyProfile && <p>{companyProfile.name} | {companyProfile.email} | {companyProfile.phone}</p>}
-                    </div>
-                  </>
-                )}
+              <div className="flex-grow overflow-y-auto space-y-0 print:overflow-visible print:h-auto print:p-0">
+                <InvoiceTaxView
+                    invoice={invoiceToViewInModal}
+                    customer={customerForModal}
+                    companyProfile={companyProfile}
+                    warehouses={warehouses} // Make sure warehouses is passed
+                />
               </div>
               <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 print:hidden">
                 <Button variant="outline" onClick={() => window.print()} className="w-full sm:w-auto">
@@ -846,10 +727,10 @@ export default function InvoicesPage() {
                 </Button>
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
-                    handleViewModalOpenChange(false); 
-                    setTimeout(() => { 
-                      handleEditInvoice(invoiceToViewInModal); 
-                    }, 100); 
+                    handleViewModalOpenChange(false);
+                    setTimeout(() => {
+                      handleEditInvoice(invoiceToViewInModal);
+                    }, 100);
                   }
                 }} className="w-full sm:w-auto">
                   <Edit className="mr-2 h-4 w-4" /> Edit Invoice
@@ -858,8 +739,11 @@ export default function InvoicesPage() {
               </DialogFooter>
             </>
           )}
-          {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && ( 
+          {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && (
              <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><FormDialogDescription>No invoice selected or invoice data is unavailable.</FormDialogDescription></DialogHeader></div>
+          )}
+           {(!customerForModal && invoiceToViewInModal && !isDataContextLoading) && (
+             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><FormDialogDescription>Customer for invoice "{invoiceToViewInModal.id}" not found.</FormDialogDescription></DialogHeader></div>
           )}
         </DialogContent>
       </Dialog>
