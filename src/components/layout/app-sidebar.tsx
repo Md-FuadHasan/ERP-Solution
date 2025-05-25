@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { MAIN_NAV_SECTIONS, APP_NAME } from '@/lib/constants'; // Updated import
+import { MAIN_NAV_SECTIONS, APP_NAME } from '@/lib/constants';
 import { Logo } from '@/components/icons/logo';
 import { PanelLeftClose, PanelRightClose, X, Settings, LogOut, UserCircle, Files } from 'lucide-react';
 import { 
@@ -54,21 +54,21 @@ export function AppSidebar() {
           </div>
         ) : (
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} p-3 w-full`}>
-            <Link href="/dashboard" className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-sidebar-ring rounded-sm">
-              <Logo showText={!collapsed} iconClassName="text-primary"/>
-            </Link>
-            {!isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                onClick={() => setOpen(!open)}
-                title={open ? "Collapse Sidebar" : "Expand Sidebar"}
-              >
-                {open ? <PanelLeftClose /> : <PanelRightClose />}
-                <span className="sr-only">{open ? "Collapse Sidebar" : "Expand Sidebar"}</span>
-              </Button>
+            {!collapsed && (
+              <Link href="/dashboard" className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-sidebar-ring rounded-sm">
+                <Logo showText={true} iconClassName="text-primary"/>
+              </Link>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              onClick={() => setOpen(!open)}
+              title={open ? "Collapse Sidebar" : "Expand Sidebar"}
+            >
+              {open ? <PanelLeftClose /> : <PanelRightClose />}
+              <span className="sr-only">{open ? "Collapse Sidebar" : "Expand Sidebar"}</span>
+            </Button>
           </div>
         )}
       </SidebarHeader>
@@ -174,7 +174,7 @@ export function AppSidebar() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); }}>
+            <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); /* Add actual logout logic here */ }}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
