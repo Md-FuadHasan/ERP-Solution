@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as SettingsCardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, Warehouse as WarehouseIcon, Truck, UserCheck, UserCog } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, UserCog } from 'lucide-react'; // Removed WarehouseIcon, Truck, UserCheck
 import {
   Table,
   TableBody,
@@ -17,10 +17,10 @@ import {
 } from '@/components/ui/table';
 import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
 import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
-import { SalespersonForm, type SalespersonFormValues } from '@/components/forms/salesperson-form';
+// Removed SalespersonForm import
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { CompanyProfile, Manager, Warehouse, Supplier, Salesperson } from '@/types';
-import { MOCK_MANAGERS } from '@/types'; // MOCK_MANAGERS is used as a fallback
+import type { CompanyProfile, Manager } from '@/types'; // Removed Warehouse, Supplier, Salesperson
+import { MOCK_MANAGERS } from '@/types';
 import { SETTINGS_TABS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -52,56 +52,49 @@ export default function SettingsPage() {
   const {
     companyProfile,
     updateCompanyProfile,
-    salespeople, 
-    addSalesperson, 
-    updateSalesperson, 
-    deleteSalesperson, 
+    // Removed salespeople related context items
     isLoading: isDataLoading,
-    warehouses // Needed for SalespersonForm
+    // warehouses // No longer needed here
   } = useData();
 
-  const [managers, setManagers] = useState<Manager[]>(() => {
-    // Initialize managers from localStorage synchronously
-    if (typeof window !== 'undefined') {
-      try {
-        const storedManagers = localStorage.getItem('invoiceflow_managers');
-        return storedManagers ? JSON.parse(storedManagers) : MOCK_MANAGERS;
-      } catch (error) {
-        console.error("Failed to load managers from localStorage on init", error);
-        return MOCK_MANAGERS;
-      }
-    }
-    return MOCK_MANAGERS; // Fallback for SSR or if window is not defined yet
-  });
-
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
   const [managerName, setManagerName] = useState('');
   const [managerEmail, setManagerEmail] = useState('');
   const [managerRole, setManagerRole] = useState('');
 
-  const [isSalespersonFormModalOpen, setIsSalespersonFormModalOpen] = useState(false); 
-  const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null); 
-  const [salespersonToDelete, setSalespersonToDelete] = useState<Salesperson | null>(null); 
+  // Removed state for Salesperson form and delete confirmation
+  // const [isSalespersonFormModalOpen, setIsSalespersonFormModalOpen] = useState(false);
+  // const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null);
+  // const [salespersonToDelete, setSalespersonToDelete] = useState<Salesperson | null>(null);
 
   const { toast } = useToast();
 
-  // Effect to save managers to localStorage when 'managers' state changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        if (managers.length > 0) {
-          localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
-        } else {
-          // If managers array becomes empty after initial load, remove from storage
-          // This check avoids removing it if it was never there (e.g. first load with MOCK_MANAGERS being empty)
-          if (localStorage.getItem('invoiceflow_managers')) {
-             localStorage.removeItem('invoiceflow_managers');
-          }
-        }
+        const storedManagers = localStorage.getItem('invoiceflow_managers');
+        setManagers(storedManagers ? JSON.parse(storedManagers) : MOCK_MANAGERS);
+      } catch (error) {
+        console.error("Failed to load managers from localStorage on init", error);
+        setManagers(MOCK_MANAGERS);
+      }
+    }
+  }, []);
+
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && managers.length > 0) {
+      try {
+        localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
       } catch (error) {
         console.error("Failed to save managers to localStorage", error);
       }
+    } else if (typeof window !== 'undefined' && managers.length === 0) {
+        if (localStorage.getItem('invoiceflow_managers')) {
+             localStorage.removeItem('invoiceflow_managers');
+        }
     }
   }, [managers]);
 
@@ -117,8 +110,7 @@ export default function SettingsPage() {
     if (companyProfile) {
       updateCompanyProfile({
         vatRate: data.vatRate,
-        // taxRate is no longer in TaxSettingsFormValues, but ensure it's handled if it were
-        // taxRate: data.taxRate, 
+        taxRate: data.taxRate,
         excessTaxRate: data.excessTaxRate
       });
       toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
@@ -156,46 +148,18 @@ export default function SettingsPage() {
     setIsUserManagerModalOpen(false);
   }, [managerName, managerEmail, managerRole, editingManager, toast]);
 
-  const handleAddSalesperson = useCallback(() => { 
-    setEditingSalesperson(null); 
-    setIsSalespersonFormModalOpen(true); 
-  }, []);
+  // Removed Salesperson form handlers
+  // const handleAddSalesperson = useCallback(() => { setEditingSalesperson(null); setIsSalespersonFormModalOpen(true); }, []);
+  // const handleEditSalesperson = useCallback((salesperson: Salesperson) => { setEditingSalesperson(salesperson); setIsSalespersonFormModalOpen(true); }, []);
+  // const handleSalespersonFormSubmit = useCallback((data: SalespersonFormValues) => { ... }, []);
+  // const handleDeleteSalespersonConfirm = useCallback((salesperson: Salesperson) => { setSalespersonToDelete(salesperson); }, []);
+  // const confirmDeleteSalesperson = useCallback(() => { ... }, []);
 
-  const handleEditSalesperson = useCallback((salesperson: Salesperson) => { 
-    setEditingSalesperson(salesperson); 
-    setIsSalespersonFormModalOpen(true); 
-  }, []);
-
-  const handleSalespersonFormSubmit = useCallback((data: SalespersonFormValues) => {
-    if (editingSalesperson) {
-      updateSalesperson({ ...editingSalesperson, ...data, createdAt: editingSalesperson.createdAt || new Date().toISOString() });
-      toast({ title: "Salesperson Updated", description: `${data.name} updated.` });
-    } else {
-      addSalesperson(data as Omit<Salesperson, 'id' | 'createdAt'>);
-      toast({ title: "Salesperson Added", description: `${data.name} added.` });
-    }
-    setIsSalespersonFormModalOpen(false); 
-    setEditingSalesperson(null);
-  }, [editingSalesperson, addSalesperson, updateSalesperson, toast]);
-  
-  const handleDeleteSalespersonConfirm = useCallback((salesperson: Salesperson) => { 
-    setSalespersonToDelete(salesperson); 
-  }, []);
-
-  const confirmDeleteSalesperson = useCallback(() => {
-    if (salespersonToDelete) {
-      deleteSalesperson(salespersonToDelete.id);
-      toast({ title: "Salesperson Deleted", description: `${salespersonToDelete.name} removed.` });
-      setSalespersonToDelete(null);
-    }
-  }, [salespersonToDelete, deleteSalesperson, toast]);
-
-
-  if (isDataLoading || !companyProfile) { // Simplified loading condition
+  if (isDataLoading || !companyProfile) {
     return (
       <div className="flex flex-col h-full">
         <div className="shrink-0">
-          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, salespeople, and data storage." />
+          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
         </div>
         <Tabs defaultValue="company" className="w-full flex-grow min-h-0 flex flex-col">
            <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar">
@@ -216,7 +180,7 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0">
-        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, salespeople, and data storage." />
+        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
       </div>
 
       <div className="flex-grow min-h-0">
@@ -238,14 +202,14 @@ export default function SettingsPage() {
             </TabsContent>
             <TabsContent value="tax" className="mt-0">
               <Card>
-                <CardHeader><CardTitle>Tax Settings</CardTitle><SettingsCardDescription>Configure VAT and Excess TAX rates for your invoices.</SettingsCardDescription></CardHeader>
+                <CardHeader><CardTitle>Tax Settings</CardTitle><SettingsCardDescription>Configure VAT and other tax rates for your invoices.</SettingsCardDescription></CardHeader>
                 <CardContent><TaxSettingsForm initialData={companyProfile} onSubmit={handleTaxSettingsSubmit} /></CardContent>
               </Card>
             </TabsContent>
             <TabsContent value="users" className="mt-0">
               <Card>
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex-grow"><CardTitle>App User Management</CardTitle><SettingsCardDescription>Add, edit, or remove managers with custom roles.<br/><small className="text-destructive">Note: Managers cannot delete invoices or customers.</small></SettingsCardDescription></div>
+                  <div className="flex-grow"><CardTitle>App User Management</CardTitle><SettingsCardDescription>Add, edit, or remove managers with custom roles.<br/><small className="text-destructive">Note: User roles are for reference. Specific permissions are not yet implemented.</small></SettingsCardDescription></div>
                   <Button onClick={handleAddManager} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Manager</Button>
                 </CardHeader>
                 <CardContent>
@@ -255,65 +219,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="salespeople" className="mt-0">
-              <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex-grow">
-                    <CardTitle>Salespeople Management</CardTitle>
-                    <SettingsCardDescription>Manage your sales team members.</SettingsCardDescription>
-                  </div>
-                  <Button onClick={handleAddSalesperson} className="w-full sm:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Salesperson
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {salespeople.length > 0 ? (
-                    <div className="rounded-lg border overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-muted">
-                          <TableRow>
-                            <TableHead className="min-w-[100px] px-2">ID</TableHead>
-                            <TableHead className="min-w-[150px] px-2">Name</TableHead>
-                            <TableHead className="min-w-[180px] px-2">Email</TableHead>
-                            <TableHead className="min-w-[120px] px-2">Route ID</TableHead>
-                            <TableHead className="min-w-[150px] px-2">Warehouse ID</TableHead>
-                            <TableHead className="text-right min-w-[100px] px-2">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {salespeople.map((sp, index) => (
-                            <TableRow key={sp.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}>
-                              <TableCell className="px-2">{sp.id}</TableCell>
-                              <TableCell className="px-2">{sp.name}</TableCell>
-                              <TableCell className="px-2">{sp.email || '-'}</TableCell>
-                              <TableCell className="px-2">{sp.assignedRouteId || '-'}</TableCell>
-                              <TableCell className="px-2">{sp.assignedWarehouseId || '-'}</TableCell>
-                              <TableCell className="text-right px-2">
-                                <div className="flex justify-end items-center gap-1">
-                                  <Button variant="ghost" size="icon" onClick={() => handleEditSalesperson(sp)} className="hover:text-primary"><Edit className="h-4 w-4" /></Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteSalespersonConfirm(sp)} className="hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <DataPlaceholder
-                      title="No Salespeople Found"
-                      message="Get started by adding your first salesperson."
-                      icon={UserCheck}
-                      action={
-                        <Button onClick={handleAddSalesperson} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0">
-                          <PlusCircle className="mr-2 h-4 w-4" /> Add Salesperson
-                        </Button>
-                      }
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            {/* Salespeople Tab Content Removed */}
             <TabsContent value="storage" className="mt-0">
               <Card>
                 <CardHeader><CardTitle>Data Storage Configuration</CardTitle><SettingsCardDescription>Settings for connecting to local storage or SQL database systems.</SettingsCardDescription></CardHeader>
@@ -331,38 +237,10 @@ export default function SettingsPage() {
       <Dialog open={isUserManagerModalOpen} onOpenChange={setIsUserManagerModalOpen}>
         <DialogContent className="w-[90vw] max-w-md"><DialogHeader><DialogTitle>{editingManager ? 'Edit Manager' : 'Add New Manager'}</DialogTitle><FormDialogDescription>{editingManager ? 'Update manager details.' : 'Enter details for the new manager.'}</FormDialogDescription></DialogHeader><form onSubmit={handleManagerFormSubmit} className="space-y-4 py-4"><div><Label htmlFor="managerName">Name</Label><Input id="managerName" value={managerName} onChange={(e) => setManagerName(e.target.value)} placeholder="Full Name" /></div><div><Label htmlFor="managerEmail">Email</Label><Input id="managerEmail" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} placeholder="email@example.com" /></div><div><Label htmlFor="managerRole">Role</Label><Input id="managerRole" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} placeholder="e.g., Invoice Clerk, Sales Manager" /><p className="text-xs text-muted-foreground mt-1">Note: Roles are descriptive. Specific permissions will be implemented later.</p></div><DialogFooter className="flex flex-col sm:flex-row gap-2"><Button type="button" variant="outline" onClick={() => setIsUserManagerModalOpen(false)} className="w-full sm:w-auto">Cancel</Button><Button type="submit" className="w-full sm:w-auto">{editingManager ? 'Save Changes' : 'Add Manager'}</Button></DialogFooter></form></DialogContent>
       </Dialog>
-      
-      <Dialog open={isSalespersonFormModalOpen} onOpenChange={(isOpen) => { setIsSalespersonFormModalOpen(isOpen); if (!isOpen) setEditingSalesperson(null); }}>
-        <DialogContent className="w-[90vw] max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingSalesperson ? 'Edit Salesperson' : 'Add New Salesperson'}</DialogTitle>
-            <FormDialogDescription>{editingSalesperson ? 'Update salesperson details.' : 'Enter details for the new salesperson.'}</FormDialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {isSalespersonFormModalOpen && ( 
-              <SalespersonForm
-                initialData={editingSalesperson}
-                warehouses={warehouses} 
-                onSubmit={handleSalespersonFormSubmit}
-                onCancel={() => { setIsSalespersonFormModalOpen(false); setEditingSalesperson(null); }}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={!!salespersonToDelete} onOpenChange={(isOpen) => !isOpen && setSalespersonToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeaderComponent>
-            <AlertDialogTitleComponent>Are you absolutely sure?</AlertDialogTitleComponent>
-            <AlertDialogDesc>This action cannot be undone. This will permanently delete salesperson "{salespersonToDelete?.name}".</AlertDialogDesc>
-          </AlertDialogHeaderComponent>
-          <AlertDialogFooterComponent>
-            <AlertDialogCancel onClick={() => setSalespersonToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteSalesperson} className="bg-destructive hover:bg-destructive/90">Delete Salesperson</AlertDialogAction>
-          </AlertDialogFooterComponent>
-        </AlertDialogContent>
-      </AlertDialog>
+
+      {/* Salesperson Modals Removed */}
+      {/* <Dialog open={isSalespersonFormModalOpen} ... /> */}
+      {/* <AlertDialog open={!!salespersonToDelete} ... /> */}
     </div>
   );
 }
-
