@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
@@ -17,21 +17,11 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
         // Invoice Status Colors
-        statusPaid:
-          "border-transparent bg-status-paid text-status-paid-foreground hover:bg-status-paid/80",
-        statusPartiallyPaid:
-          "border-transparent bg-status-partially-paid text-status-partially-paid-foreground hover:bg-status-partially-paid/80",
-        statusPending:
-          "border-transparent bg-status-pending text-status-pending-foreground hover:bg-status-pending/80",
-        statusOverdue:
-          "border-transparent bg-status-overdue text-status-overdue-foreground hover:bg-status-overdue/80",
-        statusCancelled:
-          "border-transparent bg-status-cancelled text-status-cancelled-foreground hover:bg-status-cancelled/80",
-        // Customer Type Colors
-        creditCustomer:
-          "border-transparent bg-primary/70 text-primary-foreground hover:bg-primary/60",
-        cashCustomer:
-          "border-transparent bg-status-paid/70 text-status-paid-foreground hover:bg-status-paid/60",
+        statusPaid: "border-transparent bg-green-100 text-green-700 hover:bg-green-100/80",
+        statusDue: "border-transparent bg-yellow-100 text-yellow-700 hover:bg-yellow-100/80",
+        statusOverdue: "border-transparent bg-red-100 text-red-700 hover:bg-red-100/80",
+ statusPartiallyPaid: "border-transparent bg-orange-100 text-orange-700 hover:bg-orange-100/80",
+ statusPending: "border-transparent bg-blue-100 text-blue-700 hover:bg-blue-100/80",
         // Product Category Colors
         categoryFrozen:
           "border-transparent bg-[hsl(var(--category-frozen-bg))] text-[hsl(var(--category-frozen-fg))] hover:bg-[hsl(var(--category-frozen-bg))]/80",
@@ -69,8 +59,6 @@ const badgeVariants = cva(
             "border-transparent bg-[hsl(var(--status-so-partially-invoiced-bg))] text-[hsl(var(--status-so-partially-invoiced-fg))] hover:bg-[hsl(var(--status-so-partially-invoiced-bg))]/80",
         soFullyInvoiced:
             "border-transparent bg-[hsl(var(--status-so-fully-invoiced-bg))] text-[hsl(var(--status-so-fully-invoiced-fg))] hover:bg-[hsl(var(--status-so-fully-invoiced-bg))]/80",
-        soCancelled:
-            "border-transparent bg-[hsl(var(--status-so-cancelled-bg))] text-[hsl(var(--status-so-cancelled-fg))] hover:bg-[hsl(var(--status-so-cancelled-bg))]/80",
       },
     },
     defaultVariants: {

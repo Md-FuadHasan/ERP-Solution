@@ -38,7 +38,6 @@ import {
   AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
-  AlertDialogTitle as AlertDialogTitleComponent,
   // AlertDialogTrigger, // Removed as it was causing issues in table rows
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
@@ -75,8 +74,8 @@ export default function InvoicesPage() {
     isLoading: isDataContextLoading,
     getCustomerById,
     companyProfile,
-    products, 
-    warehouses, 
+    products,
+    warehouses,
     getStockForProductInWarehouse,
     getProductById,
   } = useData();
@@ -156,7 +155,7 @@ export default function InvoicesPage() {
     } else if (action === 'view' && invoiceIdParam) {
       currentUrlIntentKey = `action=view&id=${invoiceIdParam}`;
     }
-    
+
     if (currentUrlIntentKey) {
       if (urlParamsProcessedIntentKey !== currentUrlIntentKey) {
         if (action === 'new' && !isFormModalOpen && !editingInvoice) {
@@ -232,7 +231,7 @@ export default function InvoicesPage() {
         if (statusFilter === 'unpaid') return ['Pending', 'Overdue'].includes(invoice.status);
         if (statusFilter === 'partially-paid') return invoice.status === 'Partially Paid';
         if (statusFilter === 'cancelled') return invoice.status === 'Cancelled';
-        return true; 
+        return true;
       });
     }
 
@@ -320,7 +319,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (invoiceToViewInModal && companyProfile) {
       const totalAmount = typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0;
-      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
+      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\\nTotal Amount: $${totalAmount.toFixed(2)}\\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
     } else {
       setQrCodeValueForModal('');
     }
@@ -351,7 +350,7 @@ export default function InvoicesPage() {
         ...item,
         total: (item.quantity || 0) * (item.unitPrice || 0), // unitPrice already includes product-level excise
     }));
-    
+
     const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
     const calculatedGeneralTaxAmount = 0; // General tax is 0.
     const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
@@ -470,7 +469,7 @@ export default function InvoicesPage() {
       toast({ title: "Invoice Added", description: `Invoice ${data.id} has been created.` });
     }
 
-    handleFormModalOpenChange(false); 
+    handleFormModalOpenChange(false);
     setIsSaving(false);
   }, [editingInvoice, invoices, getCustomerById, companyProfile, addInvoice, updateInvoice, toast, handleFormModalOpenChange]);
 
@@ -753,7 +752,7 @@ export default function InvoicesPage() {
        <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
-            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDesc>
               This action cannot be undone. This will permanently delete the invoice "{invoiceToDelete?.id}".
             </AlertDialogDesc>
@@ -770,7 +769,7 @@ export default function InvoicesPage() {
       <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
-            <AlertDialogTitleComponent>Credit Limit Exceeded</AlertDialogTitleComponent>
+            <AlertDialogTitle>Credit Limit Exceeded</AlertDialogTitle>
             <AlertDialogDesc>{creditLimitAlertMessage}</AlertDialogDesc>
           </AlertDialogHeaderComponent>
           <AlertDialogFooterComponent>
@@ -793,3 +792,4 @@ function getStatusBadgeVariant(status: InvoiceStatus): BadgeProps['variant'] {
     default: return 'default';
   }
 }
+

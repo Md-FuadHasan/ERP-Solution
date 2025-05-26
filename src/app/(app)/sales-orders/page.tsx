@@ -68,7 +68,6 @@ import { SearchInput } from '@/components/common/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { getSalesOrderStatusBadgeVariant } from '@/lib/invoiceUtils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 
@@ -321,6 +320,21 @@ export default function SalesOrdersPage() {
     return _filteredSalesOrders;
   }, [salesOrders, searchTerm, statusFilter, dateRange, sortConfig, getCustomerById]);
 
+  const getSalesOrderStatusBadgeVariant = useCallback((status: SalesOrderStatus) => {
+    switch (status) {
+      case 'Paid':
+        return 'statusPaid';
+      case 'Due':
+        return 'statusDue';
+      case 'Overdue':
+      case 'Cancelled': // Assuming cancelled should also be a 'destructive' type color
+        return 'statusOverdue';
+      case 'Draft':
+      case 'Confirmed':
+      default:
+        return 'outline'; // Or a neutral color like 'secondary' or 'outline'
+    }
+  }, []);
   const getSalespersonById = useCallback((id?: string) => {
     if (!id) return undefined;
     return salesOrders.find(so => so.salespersonId === id); // Placeholder, should use actual salespeople list

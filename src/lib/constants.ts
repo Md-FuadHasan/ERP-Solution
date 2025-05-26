@@ -1,4 +1,3 @@
-
 import {
   Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse as WarehouseIcon, Truck, UserCheck, Files, TrendingUp, FilePlus2, Calculator, CreditCard, AreaChart, CalendarCheck, Banknote, Activity as ActivityIcon, SlidersHorizontal, ShieldQuestion, ShoppingBasket, Users2
 } from 'lucide-react';
@@ -33,7 +32,7 @@ export const MAIN_NAV_SECTIONS: NavSection[] = [
       { href: '/sales-orders', label: 'Sales Orders', icon: Files },
       { href: '/customers', label: 'Customers', icon: Users },
       { href: '/salespeople', label: 'Salespeople', icon: UserCheck },
-      { href: '/invoices', label: 'Invoices', icon: FileText },
+      
       { href: '/quotations', label: 'Quotations', icon: FilePlus2, disabled: true },
     ],
   },
@@ -50,9 +49,13 @@ export const MAIN_NAV_SECTIONS: NavSection[] = [
   {
     title: 'FINANCE & ACCOUNTING',
     items: [
-      { href: '/accounting', label: 'Accounting', icon: Calculator, disabled: true },
-      { href: '/payments', label: 'Payments', icon: CreditCard, disabled: true },
-      { href: '/financial-reports', label: 'Financial Reports', icon: AreaChart, disabled: true },
+      { href: '/accounting', label: 'Dashboard', icon: Calculator },
+      { href: '/accounting/invoices', label: 'Invoices', icon: FileText },
+      { href: '/accounting/expense-tracking', label: 'Expense Tracking', icon: CreditCard },
+      { href: '/accounting/payment-integration', label: 'Payment Integration', icon: CreditCard },
+      { href: '/accounting/financial-reports', label: 'Financial Reports', icon: AreaChart },
+      { href: '/accounting/tax-compliance', label: 'Tax Compliance', icon: AreaChart },
+      { href: '/accounting/settings', label: 'Settings', icon: Settings },
     ],
   },
   {
