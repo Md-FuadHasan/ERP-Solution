@@ -6,6 +6,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, children, ...props }, ref) => {
+  // This wrapper div handles rounded corners, full width, height context, and vertical scrolling.
   return (
     <div className="relative w-full rounded-lg overflow-hidden overflow-y-auto h-full">
       <table
@@ -71,18 +72,7 @@ const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, children, ...props }, ref) => {
-  return (
-    <tr
-      ref={ref}
-      className={cn(
-        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </tr>
-  );
+  return <tr ref={ref} className={cn("border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted", className)} {...props}>{children}</tr>;
 });
 TableRow.displayName = "TableRow";
 
@@ -90,18 +80,7 @@ const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => {
-  return (
-    <th
-      ref={ref}
-      className={cn(
-        "h-10 px-2 py-2 text-left align-middle font-bold text-xs", // Removed text-foreground to allow inheritance
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </th>
-  );
+  return <th ref={ref} className={cn("h-10 px-2 py-2 text-left align-middle font-semibold text-xs", className)} {...props}>{children}</th>;
 });
 TableHead.displayName = "TableHead";
 
@@ -109,15 +88,7 @@ const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, children, ...props }, ref) => {
-  return (
-    <td
-      ref={ref}
-      className={cn("px-2 py-2 align-middle text-xs", className)}
-      {...props}
-    >
-      {children}
-    </td>
-  );
+  return <td ref={ref} className={cn("px-2 py-2 align-middle text-xs", className)} {...props}>{children}</td>;
 });
 TableCell.displayName = "TableCell";
 
