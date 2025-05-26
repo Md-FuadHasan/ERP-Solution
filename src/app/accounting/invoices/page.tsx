@@ -18,7 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as FormDialogDescription,
+  DialogDescription as FormDialogDescription, // Alias for clarity
   DialogFooter,
 } from '@/components/ui/dialog';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/forms/invoice-form';
@@ -38,8 +38,7 @@ import {
   AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
-  AlertDialogTitle as AlertDialogTitleComponent, // Added import with alias
-  // AlertDialogTrigger, // Removed as it was causing issues in table rows
+  AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,40 +105,38 @@ export default function InvoicesPage() {
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
 
   const handleFormModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsFormModalOpen(isOpen);
     if (!isOpen) {
       setEditingInvoice(null);
       setCurrentPrefillValues(null);
       const action = searchParams.get('action');
-      if (action === 'new' || action === 'edit') {
-        // Clear URL params only if the modal was opened by them
+      // Only clear URL params if the modal was opened by them and is now closing
+      if ((action === 'new' || action === 'edit') && urlParamsProcessedIntentKey) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
         newSearchParams.delete('customerId');
         newSearchParams.delete('customerName');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-        // It's crucial to also reset the processed intent key when the URL is cleared
-        // This will be handled by the useEffect below
+        // The useEffect below will handle setting urlParamsProcessedIntentKey to null
       }
     }
-  }, [searchParams, router, pathname]);
+    setIsFormModalOpen(isOpen);
+  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
+
 
   const handleViewModalOpenChange = useCallback((isOpen: boolean) => {
-    setIsViewModalOpen(isOpen);
     if (!isOpen) {
       setInvoiceToViewInModal(null);
       const action = searchParams.get('action');
-      if (action === 'view') {
+      if (action === 'view' && urlParamsProcessedIntentKey) {
         const newSearchParams = new URLSearchParams(searchParams.toString());
         newSearchParams.delete('action');
         newSearchParams.delete('id');
         router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
-         // It's crucial to also reset the processed intent key when the URL is cleared
-        // This will be handled by the useEffect below
       }
     }
-  }, [searchParams, router, pathname]);
+    setIsViewModalOpen(isOpen);
+  }, [searchParams, router, pathname, urlParamsProcessedIntentKey]);
 
 
   useEffect(() => {
@@ -159,7 +156,7 @@ export default function InvoicesPage() {
 
     if (currentUrlIntentKey) {
       if (urlParamsProcessedIntentKey !== currentUrlIntentKey) {
-        if (action === 'new' && !isFormModalOpen && !editingInvoice) {
+        if (action === 'new' && !isFormModalOpen) {
           setCurrentPrefillValues({ customerId: customerIdParam, customerName: customerNameParam });
           setEditingInvoice(null);
           setIsFormModalOpen(true);
@@ -171,6 +168,12 @@ export default function InvoicesPage() {
             setCurrentPrefillValues(null);
             setIsFormModalOpen(true);
             setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+          } else {
+            toast({ title: "Error", description: `Invoice ${invoiceIdParam} not found.`, variant: "destructive"});
+            // Clear bad params
+            const newSearchParams = new URLSearchParams(searchParams.toString());
+            newSearchParams.delete('action'); newSearchParams.delete('id');
+            router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
           }
         } else if (action === 'view' && invoiceIdParam && !isViewModalOpen) {
           const invoiceToView = invoices.find(inv => inv.id === invoiceIdParam);
@@ -178,6 +181,11 @@ export default function InvoicesPage() {
             setInvoiceToViewInModal(invoiceToView);
             setIsViewModalOpen(true);
             setUrlParamsProcessedIntentKey(currentUrlIntentKey);
+          } else {
+            toast({ title: "Error", description: `Invoice ${invoiceIdParam} not found.`, variant: "destructive"});
+            const newSearchParams = new URLSearchParams(searchParams.toString());
+            newSearchParams.delete('action'); newSearchParams.delete('id');
+            router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
           }
         }
       }
@@ -187,14 +195,14 @@ export default function InvoicesPage() {
         setUrlParamsProcessedIntentKey(null);
       }
     }
-  }, [searchParams, invoices, isFormModalOpen, editingInvoice, isViewModalOpen, urlParamsProcessedIntentKey]);
+  }, [searchParams, invoices, isFormModalOpen, isViewModalOpen, urlParamsProcessedIntentKey, router, pathname, toast]);
 
 
   const handleAddNewInvoice = useCallback(() => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set('action', 'new');
-    newSearchParams.delete('id'); // Clear any existing edit ID
-    newSearchParams.delete('customerId'); // Clear specific customer prefill if any
+    newSearchParams.delete('id');
+    newSearchParams.delete('customerId');
     newSearchParams.delete('customerName');
     router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false });
   }, [searchParams, router, pathname]);
@@ -218,7 +226,7 @@ export default function InvoicesPage() {
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       _filtered = _filtered.filter(invoice => {
-        const customer = getCustomerById(invoice.customerId); // Fetch customer for comprehensive search
+        const customer = getCustomerById(invoice.customerId);
         return invoice.id.toLowerCase().includes(lowerSearchTerm) ||
                (invoice.customerName && invoice.customerName.toLowerCase().includes(lowerSearchTerm)) ||
                (customer && customer.name.toLowerCase().includes(lowerSearchTerm)) ||
@@ -257,7 +265,7 @@ export default function InvoicesPage() {
             return true;
         } catch(e) {
             console.error("Error parsing invoice date:", invoice.issueDate, e);
-            return false; // Exclude problematic dates
+            return false;
         }
       });
     }
@@ -320,7 +328,8 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (invoiceToViewInModal && companyProfile) {
       const totalAmount = typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0;
-      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
+      const vatAmount = typeof invoiceToViewInModal.vatAmount === 'number' ? invoiceToViewInModal.vatAmount : 0;
+      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: ${totalAmount.toFixed(2)}\nVAT: ${vatAmount.toFixed(2)}\nIssue Date: ${format(new Date(invoiceToViewInModal.issueDate), 'yyyy-MM-dd')}`);
     } else {
       setQrCodeValueForModal('');
     }
@@ -349,17 +358,14 @@ export default function InvoicesPage() {
 
     const calculatedItems = data.items.map(item => ({
         ...item,
-        // unitPrice on invoice item = product.basePrice + product.exciseTax (price before invoice-level VAT)
         total: (item.quantity || 0) * (item.unitPrice || 0),
     }));
-    
-    // subtotal already includes item-level base price + item-level excise tax
-    const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
-    const calculatedGeneralTaxAmount = 0; // General tax (companyProfile.taxRate) is 0
-    const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
-    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT is on subtotal (which includes excise)
-    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
 
+    const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
+    const calculatedGeneralTaxAmount = 0; // General tax (companyProfile.taxRate) is set to 0
+    const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
+    const calculatedVatAmount = calculatedSubtotal * vatRate;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
 
     if (customer?.customerType === 'Credit' && customer.creditLimit && customer.creditLimit > 0) {
       const totalOutstandingBalance = invoices
@@ -425,7 +431,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') { // If user explicitly sets status to Cancelled via form
+    if (data.status === 'Cancelled') {
         finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
@@ -433,10 +439,10 @@ export default function InvoicesPage() {
       finalStatus = 'Partially Paid';
     } else if (isBefore(startOfDay(new Date(data.dueDate)), startOfDay(new Date())) && newRemainingBalance > 0) {
       finalStatus = 'Overdue';
-    } else if (newRemainingBalance > 0) { // Default to pending if balance remains and not overdue
+    } else if (newRemainingBalance > 0) {
       finalStatus = 'Pending';
     } else {
-      finalStatus = 'Paid'; // Should ideally be covered by newRemainingBalance <=0
+      finalStatus = 'Paid';
     }
 
     const invoiceToSave: Invoice = {
@@ -446,9 +452,9 @@ export default function InvoicesPage() {
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: calculatedItems,
-      subtotal: calculatedSubtotal, // Includes item-level excise
-      taxAmount: calculatedGeneralTaxAmount, // General tax is 0
-      vatAmount: calculatedVatAmount, // VAT on (subtotal which includes excise)
+      subtotal: calculatedSubtotal,
+      taxAmount: calculatedGeneralTaxAmount,
+      vatAmount: calculatedVatAmount,
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus,
@@ -689,8 +695,10 @@ export default function InvoicesPage() {
         <DialogContent className="w-[95vw] max-w-4xl lg:max-w-5xl max-h-[90vh] flex flex-col p-0 print:shadow-none print:border-none print:m-0 print:p-0 print:max-w-none print:max-h-none print:h-auto print:w-auto print-root-content">
           {(isDataContextLoading && isViewModalOpen && !invoiceToViewInModal) && (
             <div className="flex-grow overflow-y-auto p-6 space-y-6 animate-pulse">
-              <Skeleton className="h-8 w-1/3 mb-2" />
-              <Skeleton className="h-4 w-1/2 mb-6" />
+              <DialogHeader className="print:hidden"> {/* Added Header */}
+                 <DialogTitle><Skeleton className="h-8 w-1/3 mb-2" /></DialogTitle>
+                 <FormDialogDescription><Skeleton className="h-4 w-1/2 mb-6" /></FormDialogDescription>
+              </DialogHeader>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div><Skeleton className="h-24 w-full" /></div>
                 <div><Skeleton className="h-24 w-full" /></div>
@@ -706,12 +714,18 @@ export default function InvoicesPage() {
           )}
           {(!isDataContextLoading && invoiceToViewInModal && companyProfile && customerForModal) && (
             <>
+              <DialogHeader className="p-6 pb-4 border-b print:hidden">
+                <DialogTitle>Invoice Details: {invoiceToViewInModal.id}</DialogTitle>
+                <FormDialogDescription>
+                  Viewing details for invoice issued to {customerForModal.name}.
+                </FormDialogDescription>
+              </DialogHeader>
               <div className="flex-grow overflow-y-auto space-y-0 print:overflow-visible print:h-auto print:p-0">
                 <InvoiceTaxView
                     invoice={invoiceToViewInModal}
                     customer={customerForModal}
                     companyProfile={companyProfile}
-                    warehouses={warehouses} // Make sure warehouses is passed
+                    warehouses={warehouses}
                 />
               </div>
               <DialogFooter className="p-6 pt-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 print:hidden">
@@ -723,9 +737,9 @@ export default function InvoicesPage() {
                 </Button>
                 <Button onClick={() => {
                   if (invoiceToViewInModal) {
-                    handleViewModalOpenChange(false);
-                    setTimeout(() => {
-                      handleEditInvoice(invoiceToViewInModal);
+                    handleViewModalOpenChange(false); // Close view modal
+                    setTimeout(() => { // Slight delay
+                      handleEditInvoice(invoiceToViewInModal); // Open edit modal
                     }, 100);
                   }
                 }} className="w-full sm:w-auto">
@@ -736,10 +750,20 @@ export default function InvoicesPage() {
             </>
           )}
           {(!invoiceToViewInModal && isViewModalOpen && !isDataContextLoading) && (
-             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><FormDialogDescription>No invoice selected or invoice data is unavailable.</FormDialogDescription></DialogHeader></div>
+             <div className="p-6">
+                <DialogHeader>
+                    <DialogTitle>Error</DialogTitle>
+                    <FormDialogDescription>No invoice selected or invoice data is unavailable.</FormDialogDescription>
+                </DialogHeader>
+             </div>
           )}
            {(!customerForModal && invoiceToViewInModal && !isDataContextLoading) && (
-             <div className="p-6"><DialogHeader><DialogTitle>Error</DialogTitle><FormDialogDescription>Customer for invoice "{invoiceToViewInModal.id}" not found.</FormDialogDescription></DialogHeader></div>
+             <div className="p-6">
+                <DialogHeader>
+                    <DialogTitle>Error</DialogTitle>
+                    <FormDialogDescription>Customer for invoice "{invoiceToViewInModal.id}" not found.</FormDialogDescription>
+                </DialogHeader>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -776,15 +800,13 @@ export default function InvoicesPage() {
   );
 }
 
-// Helper function to map invoice status to badge variant (can be moved to invoiceUtils.ts)
 function getStatusBadgeVariant(status: InvoiceStatus): BadgeProps['variant'] {
   switch (status) {
     case 'Paid': return 'statusPaid';
     case 'Partially Paid': return 'statusPartiallyPaid';
     case 'Overdue': return 'statusOverdue';
     case 'Pending': return 'statusPending';
-    case 'Cancelled': return 'destructive'; // Or a specific cancelled status variant
+    case 'Cancelled': return 'statusCancelled';
     default: return 'default';
   }
 }
-
