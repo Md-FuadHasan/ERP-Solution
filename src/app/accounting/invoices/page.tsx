@@ -38,6 +38,7 @@ import {
   AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter as AlertDialogFooterComponent,
   AlertDialogHeader as AlertDialogHeaderComponent,
+  AlertDialogTitle as AlertDialogTitleComponent, // Added import with alias
   // AlertDialogTrigger, // Removed as it was causing issues in table rows
 } from "@/components/ui/alert-dialog";
 import { useData } from '@/context/DataContext';
@@ -319,7 +320,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (invoiceToViewInModal && companyProfile) {
       const totalAmount = typeof invoiceToViewInModal.totalAmount === 'number' ? invoiceToViewInModal.totalAmount : 0;
-      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\\nTotal Amount: $${totalAmount.toFixed(2)}\\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
+      setQrCodeValueForModal(`Invoice ID: ${invoiceToViewInModal.id}\nTotal Amount: $${totalAmount.toFixed(2)}\nDue Date: ${format(new Date(invoiceToViewInModal.dueDate), 'MMM d, yyyy')}`);
     } else {
       setQrCodeValueForModal('');
     }
@@ -348,13 +349,15 @@ export default function InvoicesPage() {
 
     const calculatedItems = data.items.map(item => ({
         ...item,
-        total: (item.quantity || 0) * (item.unitPrice || 0), // unitPrice already includes product-level excise
+        // unitPrice on invoice item = product.basePrice + product.exciseTax (price before invoice-level VAT)
+        total: (item.quantity || 0) * (item.unitPrice || 0),
     }));
-
+    
+    // subtotal already includes item-level base price + item-level excise tax
     const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
-    const calculatedGeneralTaxAmount = 0; // General tax is 0.
+    const calculatedGeneralTaxAmount = 0; // General tax (companyProfile.taxRate) is 0
     const vatRate = (typeof companyProfile.vatRate === 'string' ? parseFloat(companyProfile.vatRate) : Number(companyProfile.vatRate) || 0) / 100;
-    const calculatedVatAmount = calculatedSubtotal * vatRate;
+    const calculatedVatAmount = calculatedSubtotal * vatRate; // VAT is on subtotal (which includes excise)
     const calculatedTotalAmount = calculatedSubtotal + calculatedVatAmount;
 
 
@@ -422,7 +425,7 @@ export default function InvoicesPage() {
 
     const newRemainingBalance = Math.max(0, calculatedTotalAmount - newAmountPaid);
 
-    if (data.status === 'Cancelled') {
+    if (data.status === 'Cancelled') { // If user explicitly sets status to Cancelled via form
         finalStatus = 'Cancelled';
     } else if (newRemainingBalance <= 0 && newAmountPaid >= calculatedTotalAmount) {
       finalStatus = 'Paid';
@@ -430,10 +433,10 @@ export default function InvoicesPage() {
       finalStatus = 'Partially Paid';
     } else if (isBefore(startOfDay(new Date(data.dueDate)), startOfDay(new Date())) && newRemainingBalance > 0) {
       finalStatus = 'Overdue';
-    } else if (newRemainingBalance > 0) {
+    } else if (newRemainingBalance > 0) { // Default to pending if balance remains and not overdue
       finalStatus = 'Pending';
     } else {
-      finalStatus = 'Paid'; // Default to paid if no other conditions met for balance > 0
+      finalStatus = 'Paid'; // Should ideally be covered by newRemainingBalance <=0
     }
 
     const invoiceToSave: Invoice = {
@@ -443,9 +446,9 @@ export default function InvoicesPage() {
       issueDate: format(new Date(data.issueDate), 'yyyy-MM-dd'),
       dueDate: format(new Date(data.dueDate), 'yyyy-MM-dd'),
       items: calculatedItems,
-      subtotal: calculatedSubtotal,
+      subtotal: calculatedSubtotal, // Includes item-level excise
       taxAmount: calculatedGeneralTaxAmount, // General tax is 0
-      vatAmount: calculatedVatAmount,
+      vatAmount: calculatedVatAmount, // VAT on (subtotal which includes excise)
       totalAmount: calculatedTotalAmount,
       status: finalStatus,
       paymentProcessingStatus: data.paymentProcessingStatus,
@@ -614,16 +617,8 @@ export default function InvoicesPage() {
                       )}>${invoice.remainingBalance.toFixed(2)}</TableCell>
                     <TableCell className="px-2 text-xs">
                       <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                        {invoice.status === 'Paid' ? 'Paid'
- : invoice.status === 'Partially Paid' ? 'Partially Paid'
- : invoice.status === 'Pending' ? 'Pending'
- : invoice.status === 'Cancelled' ? 'Cancelled'
- : invoice.status === 'Overdue' ? 'Overdue'
- : invoice.status}
+                        {invoice.status}
                       </Badge>
-                      {/*
-                       // Original code using helper function:
-                       <Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge>*/}
                     </TableCell>
                     <TableCell className="text-right px-2 text-xs">
                       <div className="flex justify-end items-center gap-1">
@@ -752,7 +747,7 @@ export default function InvoicesPage() {
        <AlertDialog open={!!invoiceToDelete} onOpenChange={(isOpen) => !isOpen && setInvoiceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
             <AlertDialogDesc>
               This action cannot be undone. This will permanently delete the invoice "{invoiceToDelete?.id}".
             </AlertDialogDesc>
@@ -769,7 +764,7 @@ export default function InvoicesPage() {
       <AlertDialog open={isCreditLimitAlertOpen} onOpenChange={setIsCreditLimitAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeaderComponent>
-            <AlertDialogTitle>Credit Limit Exceeded</AlertDialogTitle>
+            <AlertDialogTitleComponent>Credit Limit Exceeded</AlertDialogTitleComponent>
             <AlertDialogDesc>{creditLimitAlertMessage}</AlertDialogDesc>
           </AlertDialogHeaderComponent>
           <AlertDialogFooterComponent>
