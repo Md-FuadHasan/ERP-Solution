@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from "@/lib/utils";
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { useToast } from '@/hooks/use-toast';
+import { SearchInput } from '@/components/common/search-input'; // Added import
 
 interface Employee {
   id: string;
@@ -59,6 +60,8 @@ interface Employee {
   salaryNumber: string;
   medicalInsuranceNumber: string;
   socialInsuranceNumber: string;
+  // Added for consistency with employee-management/page.tsx
+  status?: string; // e.g. 'Active', 'On Leave'
 }
 
 const initialEmployeeFormState: Employee = {
@@ -104,7 +107,7 @@ export default function EmployeeManagerPage() {
     setViewingEmployee(employee);
     setIsViewModalOpen(true);
   }, []);
-  
+
   const handleDeleteEmployeeConfirm = useCallback((employee: Employee) => {
     setEmployeeToDelete(employee);
   }, []);
@@ -418,3 +421,4 @@ export default function EmployeeManagerPage() {
     </div>
   );
 }
+
