@@ -85,7 +85,7 @@ interface DateRange {
 
 export default function SalesOrdersPage() {
   const {
-    salesOrders,
+    salesOrders: initialSalesOrders, // Rename the imported salesOrders to avoid conflict
     addSalesOrder,
     updateSalesOrder,
     deleteSalesOrder,
@@ -101,7 +101,7 @@ export default function SalesOrdersPage() {
   } = useData();
   const { toast } = useToast();
   const router = useRouter();
-
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]); // Initialize with an empty array
   const [isSalesOrderFormModalOpen, setIsSalesOrderFormModalOpen] = useState(false);
   const [editingSalesOrder, setEditingSalesOrder] = useState<SalesOrder | null>(null);
   const [salesOrderToView, setSalesOrderToView] = useState<SalesOrder | null>(null);
@@ -114,6 +114,11 @@ export default function SalesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<SalesOrderStatus | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'orderDate', direction: 'descending' });
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
+
+  // Effect to update local state when data from context changes
+  useEffect(() => {
+    setSalesOrders(initialSalesOrders);
+  }, [initialSalesOrders]);
 
   const handleAddSalesOrder = useCallback(() => {
     setEditingSalesOrder(null);

@@ -55,7 +55,7 @@ interface SortConfig {
 }
 
 export default function CustomersPage() {
-  const {
+  const { // The customers state is initialized with an empty array in the useData hook
     customers,
     addCustomer,
     updateCustomer,

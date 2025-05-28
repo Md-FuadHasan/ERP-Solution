@@ -11,51 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
-import { MOCK_EMPLOYEES } from '@/types';
 
 export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
-  // Dummy data for attendance records
-  const attendanceData = [
-    {
-      id: '1',
-      employeeName: 'John Doe',
-      date: '2023-10-26',
-      checkIn: '09:00 AM',
-      checkOut: '05:00 PM',
-      status: 'present',
-      hoursWorked: 8,
-    },
-    {
-      id: '2',
-      employeeName: 'Jane Smith',
-      date: '2023-10-26',
-      checkIn: '08:30 AM',
-      checkOut: '04:30 PM',
-      status: 'present',
-      hoursWorked: 8,
-    },
-    {
-      id: '3',
-      employeeName: 'Peter Jones',
-      date: '2023-10-26',
-      checkIn: null,
-      checkOut: null,
-      status: 'absent',
-      hoursWorked: 0,
-    },
-    {
-      id: '4',
-      employeeName: 'Mary Brown',
-      date: '2023-10-26',
-      checkIn: null,
-      checkOut: null,
-      status: 'on_leave',
-      hoursWorked: 0,
-    },
-    // Add more dummy data...
-  ];
 
   // Define columns for the attendance data table
   const attendanceColumns = [

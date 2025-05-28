@@ -1,7 +1,8 @@
 import {
-  Home, Users, FileText, BarChart3, Settings, Building, Percent, UserCog, Database, Archive, ShoppingCart, Briefcase, Lightbulb, Package, Warehouse as WarehouseIcon, Truck, UserCheck, Files, TrendingUp, FilePlus2, Calculator, CreditCard, AreaChart, CalendarCheck, Banknote, Activity as ActivityIcon, SlidersHorizontal, ShieldQuestion, ShoppingBasket, Users2
+ Building, Percent, UserCog, Database, ShoppingCart, Package, ReceiptText, Settings, DollarSign, LucideIcon, LayoutDashboard, BarChart2, Users, Clock, Activity, Wand2, Banknote, ShoppingBag, User, FileText, Wrench, FileLineChart, Car
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+
+export const APP_NAME = "ProERP";
 
 export interface NavItem {
   href: string;
@@ -15,76 +16,66 @@ export interface NavSection {
   items: NavItem[];
 }
 
-export const APP_NAME = "ProERP";
-
 export const MAIN_NAV_SECTIONS: NavSection[] = [
   {
     title: 'DASHBOARD',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: Home },
-      { href: '/analytics', label: 'Analytics', icon: TrendingUp, disabled: true },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/analytics', label: 'Analytics', icon: BarChart2 },
     ],
   },
-  {
-    title: 'SALES & CRM',
+ {
+    title: 'Sales & CRM',
     items: [
-      { href: '/sales', label: 'Sales Management', icon: ShoppingCart },
-      { href: '/sales-orders', label: 'Sales Orders', icon: Files },
-      { href: '/customers', label: 'Customers', icon: Users },
-      { href: '/salespeople', label: 'Salespeople', icon: UserCheck },
-      
-      { href: '/quotations', label: 'Quotations', icon: FilePlus2, disabled: true },
+ { href: '/sales', label: 'Sales', icon: ShoppingCart },
+ { href: '/customers', label: 'Customers', icon: Users }, // Assuming Users for customers
+ { href: '/invoices', label: 'Invoices', icon: ReceiptText },
+ { href: '/quotations', label: 'Quotations', icon: FileText }, // Assuming FileText for quotations
+ { href: '/vansales', label: 'Van Sales', icon: Car }, // Added Van Sales
     ],
   },
   {
     title: 'INVENTORY & SUPPLY',
     items: [
-      { href: '/inventory', label: 'Inventory', icon: Archive },
+      { href: '/inventory', label: 'Inventory', icon: Package },
       { href: '/products', label: 'Products', icon: Package },
-      { href: '/suppliers', label: 'Suppliers', icon: Truck },
-      { href: '/warehouses', label: 'Warehouses', icon: WarehouseIcon },
-      { href: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBasket },
+      { href: '/suppliers', label: 'Suppliers', icon: Building },
+      { href: '/warehouses', label: 'Warehouses', icon: Building },
     ],
   },
   {
     title: 'FINANCE & ACCOUNTING',
     items: [
-      { href: '/accounting', label: 'Dashboard', icon: Calculator },
-      { href: '/accounting/invoices', label: 'Invoices', icon: FileText },
-      { href: '/accounting/expense-tracking', label: 'Expense Tracking', icon: CreditCard },
-      { href: '/accounting/payment-integration', label: 'Payment Integration', icon: CreditCard },
-      { href: '/accounting/financial-reports', label: 'Financial Reports', icon: AreaChart },
-      { href: '/accounting/tax-compliance', label: 'Tax Compliance', icon: AreaChart },
-      { href: '/accounting/settings', label: 'Settings', icon: Settings },
+      { href: '/accounting', label: 'Accounting', icon: Banknote }, // Assuming a general accounting page
+      { href: '/payments', label: 'Payments', icon: DollarSign }, // Assuming a payments page
+ { href: '/financial-reports', label: 'Financial Reports', icon: FileText },
     ],
   },
   {
-    title: 'HUMAN RESOURCES',
+    title: 'Human Resources',
     items: [
-      { href: '/employee-management', label: 'Employees', icon: Briefcase },
-      { href: '/attendance', label: 'Attendance', icon: UserCheck },
-      { href: '/payroll', label: 'Payroll', icon: Banknote, disabled: true },
+      { href: '/employee-manager', label: 'Employees', icon: Users },
+      { href: '/attendance', label: 'Attendance', icon: Clock },
+      { href: '/payroll', label: 'Payroll', icon: DollarSign },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/user-management', label: 'User Management', icon: Users }, // Using Users for user management
+      { href: '/system-tools', label: 'System Tools', icon: Wrench }, // Using Wrench for system tools
     ],
   },
   {
     title: 'REPORTS & ANALYTICS',
     items: [
-      { href: '/reports', label: 'Reports', icon: BarChart3 },
-      { href: '/ai-suggestions', label: 'AI Insights', icon: Lightbulb },
-      { href: '/activity', label: 'Activity', icon: ActivityIcon, disabled: true },
+      { href: '/reports', label: 'Reports', icon: FileLineChart }, // Assuming FileLineChart for reports
+      { href: '/ai-suggestions', label: 'AI Insights', icon: Wand2 }, // Using Wand2 for AI suggestions
+      { href: '/activity', label: 'Activity', icon: Activity }, // Using Activity for activity log
     ],
-  },
-  {
-    title: 'SYSTEM',
-    items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
-      { href: '/user-management', label: 'User Management', icon: UserCog },
-      { href: '/system-tools', label: 'System Tools', icon: SlidersHorizontal, disabled: true },
-    ],
-  },
+  }
 ];
-
-
 export interface SettingsTab {
   value: string;
   label: string;
@@ -94,7 +85,5 @@ export interface SettingsTab {
 export const SETTINGS_TABS: SettingsTab[] = [
   { value: 'company', label: 'Company Details', icon: Building },
   { value: 'tax', label: 'Tax Settings', icon: Percent },
-  { value: 'users', label: 'App Users', icon: UserCog },
-  // { value: 'salespeople', label: 'Salespeople', icon: UserCheck }, // Removed from here
   { value: 'storage', label: 'Data Storage', icon: Database },
 ];
