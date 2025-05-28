@@ -61,14 +61,39 @@ interface Employee {
 const initialEmployeeFormState: Employee = {
   id: '', employeeId: '', name: '', nationality: '', department: '', designation: '',
   joiningDate: '', nationalId: '', iqamaNumber: '', iqamaExpiryDate: '',
-  passportNumber: '', passportExpiryDate: '', mobileNumber: '', email: '',
+  passportNumber: '', passportExpiryDate: '', mobileNumber: '', email: '', 
   salary: '', salaryNumber: '', medicalInsuranceNumber: '', socialInsuranceNumber: '',
+};
+
+// Helper to generate a random ID
+const generateRandomId = () => String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+
+// Helper to generate a unique employee ID
+const generateUniqueEmployeeId = (existingIds: string[]) => {
+  let id;
+  do { id = `EMP${String(Date.now()).slice(-4)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`; } while (existingIds.includes(id));
+  return id;
 };
 
 export default function EmployeeManagementPage() {
   const [employees, setEmployees] = useState<Employee[]>([
     { id: '1', employeeId: 'EMP001', name: 'John Michael Doe', nationality: 'American', department: 'Sales & Marketing', designation: 'Senior Sales Manager', joiningDate: '2022-01-15', nationalId: '12345678901234', iqamaNumber: '2345678901', iqamaExpiryDate: '2025-12-31', passportNumber: 'ABC12345XYZ', passportExpiryDate: '2030-05-20', mobileNumber: '+1-123-456-7890', email: 'john.doe@example.com', salary: '15000', salaryNumber: 'SAL001', medicalInsuranceNumber: 'MEDINS12345', socialInsuranceNumber: 'SOCSEC67890' },
     { id: '2', employeeId: 'EMP002', name: 'Jane Alice Smith', nationality: 'British', department: 'Operations', designation: 'Logistics Coordinator', joiningDate: '2023-03-10', nationalId: '09876543210987', iqamaNumber: '', iqamaExpiryDate: '', passportNumber: 'DEF67890ABC', passportExpiryDate: '2028-11-15', mobileNumber: '+44-987-654-3210', email: 'jane.smith@example.com', salary: '12000', salaryNumber: 'SAL002', medicalInsuranceNumber: 'MEDINS67890', socialInsuranceNumber: 'SOCSEC11223' },
+  ]);
+
+  // Add 10 more mock employees
+  useState<Employee[]>([
+    ...employees,
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Carlos Eduardo Garcia', nationality: 'Mexican', department: 'Engineering', designation: 'Software Developer', joiningDate: '2021-07-01', nationalId: '98765432109876', iqamaNumber: '3456789012', iqamaExpiryDate: '2026-08-25', passportNumber: 'GHI12345JKL', passportExpiryDate: '2031-02-10', mobileNumber: '+52-55-1234-5678', email: 'carlos.garcia@example.com', salary: '18000', salaryNumber: 'SAL003', medicalInsuranceNumber: 'MEDINS98765', socialInsuranceNumber: 'SOCSEC44556' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Fatima Zahra Al Farsi', nationality: 'Saudi Arabian', department: 'Human Resources', designation: 'HR Specialist', joiningDate: '2022-11-20', nationalId: '10112233445566', iqamaNumber: '4567890123', iqamaExpiryDate: '2027-01-15', passportNumber: null, passportExpiryDate: null, mobileNumber: '+966-50-1234567', email: 'fatima.alfarsi@example.com', salary: '14000', salaryNumber: 'SAL004', medicalInsuranceNumber: 'MEDINS11223', socialInsuranceNumber: 'SOCSEC77889' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Chen Wei', nationality: 'Chinese', department: 'Finance', designation: 'Accountant', joiningDate: '2023-05-18', nationalId: '13579246801357', iqamaNumber: '5678901234', iqamaExpiryDate: '2025-09-30', passportNumber: 'MNO45678PQR', passportExpiryDate: '2029-06-01', mobileNumber: '+86-10-9876-5432', email: 'chen.wei@example.com', salary: '16000', salaryNumber: 'SAL005', medicalInsuranceNumber: 'MEDINS33445', socialInsuranceNumber: 'SOCSEC99001' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Maria Rodriguez', nationality: 'Spanish', department: 'Sales & Marketing', designation: 'Marketing Specialist', joiningDate: '2024-01-05', nationalId: '24680135792468', iqamaNumber: '6789012345', iqamaExpiryDate: '2028-04-10', passportNumber: 'STU78901VWX', passportExpiryDate: '2033-10-25', mobileNumber: '+34-6-12345678', email: 'maria.rodriguez@example.com', salary: '13000', salaryNumber: 'SAL006', medicalInsuranceNumber: 'MEDINS55667', socialInsuranceNumber: 'SOCSEC22334' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Ahmed Hassan', nationality: 'Egyptian', department: 'IT', designation: 'Network Administrator', joiningDate: '2021-09-01', nationalId: '36914725803691', iqamaNumber: null, iqamaExpiryDate: null, passportNumber: 'YZA01234BCD', passportExpiryDate: '2030-12-31', mobileNumber: '+20-10-12345678', email: 'ahmed.hassan@example.com', salary: '17000', salaryNumber: 'SAL007', medicalInsuranceNumber: 'MEDINS77889', socialInsuranceNumber: 'SOCSEC55667' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Sophia Anderson', nationality: 'Australian', department: 'Customer Service', designation: 'Customer Support Representative', joiningDate: '2023-07-12', nationalId: '48159263704815', iqamaNumber: '7890123456', iqamaExpiryDate: '2027-11-05', passportNumber: 'EFG34567HIJ', passportExpiryDate: '2032-03-18', mobileNumber: '+61-4-1234-5678', email: 'sophia.anderson@example.com', salary: '11000', salaryNumber: 'SAL008', medicalInsuranceNumber: 'MEDINS88990', socialInsuranceNumber: 'SOCSEC11223' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Hiroshi Tanaka', nationality: 'Japanese', department: 'Engineering', designation: 'Mechanical Engineer', joiningDate: '2022-04-25', nationalId: '59370148265937', iqamaNumber: '8901234567', iqamaExpiryDate: '2026-06-20', passportNumber: 'KLM67890NOL', passportExpiryDate: '2031-09-14', mobileNumber: '+81-90-1234-5678', email: 'hiroshi.tanaka@example.com', salary: '19000', salaryNumber: 'SAL009', medicalInsuranceNumber: 'MEDINS00112', socialInsuranceNumber: 'SOCSEC33445' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Priya Sharma', nationality: 'Indian', department: 'Finance', designation: 'Financial Analyst', joiningDate: '2024-02-14', nationalId: '60581937426058', iqamaNumber: null, iqamaExpiryDate: null, passportNumber: 'PQR90123STU', passportExpiryDate: '2034-07-01', mobileNumber: '+91-98765-43210', email: 'priya.sharma@example.com', salary: '15500', salaryNumber: 'SAL010', medicalInsuranceNumber: 'MEDINS22334', socialInsuranceNumber: 'SOCSEC66778' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'David Lee', nationality: 'South Korean', department: 'IT', designation: 'Systems Administrator', joiningDate: '2023-09-10', nationalId: '71793058647179', iqamaNumber: '9012345678', iqamaExpiryDate: '2028-12-10', passportNumber: 'VWX23456YZA', passportExpiryDate: '2033-05-22', mobileNumber: '+82-10-1234-5678', email: 'david.lee@example.com', salary: '17500', salaryNumber: 'SAL011', medicalInsuranceNumber: 'MEDINS44556', socialInsuranceNumber: 'SOCSEC88990' },
+    { id: generateRandomId(), employeeId: generateUniqueEmployeeId(employees.map(e => e.employeeId)), name: 'Aisha Khan', nationality: 'Pakistani', department: 'Operations', designation: 'Supply Chain Manager', joiningDate: '2022-06-01', nationalId: '82904169758290', iqamaNumber: '0123456789', iqamaExpiryDate: '2026-03-01', passportNumber: null, passportExpiryDate: null, mobileNumber: '+92-300-1234567', email: 'aisha.khan@example.com', salary: '20000', salaryNumber: 'SAL012', medicalInsuranceNumber: 'MEDINS66778', socialInsuranceNumber: 'SOCSEC00112' },
   ]);
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);

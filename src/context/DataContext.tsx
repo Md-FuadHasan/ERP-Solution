@@ -21,7 +21,8 @@ import type {
   SalesOrder,
   SalesOrderStatus,
   SalesOrderItem,
-  Salesperson
+  Salesperson,
+  Employee, // Added Employee
 } from '@/types';
 import {
   MOCK_CUSTOMERS,
@@ -35,10 +36,11 @@ import {
   MOCK_PURCHASE_ORDERS,
   MOCK_SALESPEOPLE,
   MOCK_SALES_ORDERS,
+  MOCK_EMPLOYEES as INITIAL_MOCK_EMPLOYEES, // Renamed for clarity
 } from '@/types';
 import { toast } from '@/hooks/use-toast';
 
-// --- Plain Helper Finder Functions (defined outside component) ---
+// --- Plain Helper Finder Functions ---
 const findCustomerById = (customersArray: Customer[], customerId: string): Customer | undefined => customersArray.find(c => c.id === customerId);
 const findInvoiceById = (invoicesArray: Invoice[], invoiceId: string): Invoice | undefined => invoicesArray.find(i => i.id === invoiceId);
 const findProductById = (productsArray: Product[], productId: string): Product | undefined => productsArray.find(p => p.id === productId);
@@ -47,6 +49,8 @@ const findSupplierById = (suppliersArray: Supplier[], supplierId: string): Suppl
 const findPurchaseOrderById = (purchaseOrdersArray: PurchaseOrder[], poId: string): PurchaseOrder | undefined => purchaseOrdersArray.find(po => po.id === poId);
 const findSalespersonById = (salespeopleArray: Salesperson[], salespersonId: string): Salesperson | undefined => salespeopleArray.find(sp => sp.id === salespersonId);
 const findSalesOrderById = (salesOrdersArray: SalesOrder[], soId: string): SalesOrder | undefined => salesOrdersArray.find(so => so.id === soId);
+// Add Employee finder if needed, though likely not for basic list/add/edit
+const findEmployeeById = (employeesArray: Employee[], employeeId: string): Employee | undefined => employeesArray.find(e => e.id === employeeId);
 
 
 interface DataContextType {
@@ -60,6 +64,7 @@ interface DataContextType {
   purchaseOrders: PurchaseOrder[];
   salespeople: Salesperson[];
   salesOrders: SalesOrder[];
+  employees: Employee[]; // Added employees
   companyProfile: CompanyProfile | null;
   isLoading: boolean;
   addCustomer: (customer: Customer) => void;
@@ -73,7 +78,7 @@ interface DataContextType {
   getCustomerById: (customerId: string) => Customer | undefined;
   getInvoiceById: (invoiceId: string) => Invoice | undefined;
   getOutstandingBalanceByCustomerId: (customerId: string) => number;
-  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => void;
+  addProduct: (product: Omit<Product, 'id' | 'createdAt'> & {costPrice?:number}) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
   getProductById: (productId: string) => Product | undefined;
@@ -93,7 +98,7 @@ interface DataContextType {
   updateSupplier: (supplier: Supplier) => void;
   deleteSupplier: (supplierId: string) => void;
   getSupplierById: (supplierId: string) => Supplier | undefined;
-  addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items' | 'supplierName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived' | 'productName'>> }) => void;
+  addPurchaseOrder: (poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items' | 'supplierName' | 'subtotal' | 'totalAmount'| 'taxAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> }) => void;
   updatePurchaseOrder: (po: PurchaseOrder) => void;
   deletePurchaseOrder: (poId: string) => void;
   cancelPurchaseOrder: (poId: string) => void;
@@ -103,10 +108,14 @@ interface DataContextType {
   updateSalesperson: (salesperson: Salesperson) => void;
   deleteSalesperson: (salespersonId: string) => void;
   getSalespersonById: (salespersonId: string) => Salesperson | undefined;
-  addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName'>> }) => void;
+  addSalesOrder: (orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName' | 'sourceWarehouseId' >> }) => void;
   updateSalesOrder: (order: SalesOrder) => void;
   deleteSalesOrder: (orderId: string) => void;
   getSalesOrderById: (orderId: string) => SalesOrder | undefined;
+  // Employee CRUD
+  addEmployee: (employee: Omit<Employee, 'id'>) => void;
+  updateEmployee: (employee: Employee) => void;
+  deleteEmployee: (employeeId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -123,7 +132,22 @@ const LOCAL_STORAGE_KEYS = {
   PURCHASE_ORDERS: 'invoiceflow_purchase_orders',
   SALESPEOPLE: 'invoiceflow_salespeople',
   SALES_ORDERS: 'invoiceflow_sales_orders',
+  EMPLOYEES: 'invoiceflow_employees', // Added employees key
 };
+
+const MOCK_EMPLOYEES: Employee[] = [
+  { id: 'EMP001', employeeId: 'E001', name: 'Aisha Khan', nationality: 'Saudi Arabian', department: 'Sales', designation: 'Sales Manager', joiningDate: '2022-03-15', nationalId: '1012345678', mobileNumber: '0501234567', email: 'aisha.khan@example.com', salary: '18000', salaryNumber: 'SAL001', medicalInsuranceNumber: 'MED001', socialInsuranceNumber: 'SOC001' },
+  { id: 'EMP002', employeeId: 'E002', name: 'Omar Al-Fahad', nationality: 'Saudi Arabian', department: 'Production', designation: 'Production Supervisor', joiningDate: '2021-07-20', nationalId: '1023456789', mobileNumber: '0532345678', email: 'omar.alfahad@example.com', salary: '15000', salaryNumber: 'SAL002', medicalInsuranceNumber: 'MED002', socialInsuranceNumber: 'SOC002' },
+  { id: 'EMP003', employeeId: 'E003', name: 'Fatima Ibrahim', nationality: 'Egyptian', department: 'Human Resources', designation: 'HR Specialist', joiningDate: '2023-01-10', nationalId: '2034567890', iqamaNumber: '2450001122', iqamaExpiryDate: '2025-10-10', mobileNumber: '0553456789', salary: '12000', salaryNumber: 'SAL003', medicalInsuranceNumber: 'MED003', socialInsuranceNumber: 'SOC003' },
+  { id: 'EMP004', employeeId: 'E004', name: 'David Miller', nationality: 'American', department: 'Marketing', designation: 'Marketing Executive', joiningDate: '2023-05-01', nationalId: 'N/A', passportNumber: 'A12345678', passportExpiryDate: '2028-04-30', mobileNumber: '0564567890', email: 'david.miller@example.com', salary: '16000', salaryNumber: 'SAL004', medicalInsuranceNumber: 'MED004', socialInsuranceNumber: 'SOC004' },
+  { id: 'EMP005', employeeId: 'E005', name: 'Layla Hassan', nationality: 'Saudi Arabian', department: 'Finance', designation: 'Accountant', joiningDate: '2022-11-05', nationalId: '1045678901', mobileNumber: '0545678901', salary: '14000', salaryNumber: 'SAL005', medicalInsuranceNumber: 'MED005', socialInsuranceNumber: 'SOC005' },
+  { id: 'EMP006', employeeId: 'E006', name: 'Rajesh Kumar', nationality: 'Indian', department: 'IT', designation: 'IT Support Engineer', joiningDate: '2023-08-12', nationalId: 'N/A', iqamaNumber: '2501112233', iqamaExpiryDate: '2026-07-15', mobileNumber: '0586789012', email: 'rajesh.kumar@example.com', salary: '13000', salaryNumber: 'SAL006', medicalInsuranceNumber: 'MED006', socialInsuranceNumber: 'SOC006' },
+  { id: 'EMP007', employeeId: 'E007', name: 'Sara Al-Jamil', nationality: 'Saudi Arabian', department: 'Sales', designation: 'Sales Representative', joiningDate: '2024-01-20', nationalId: '1056789012', mobileNumber: '0597890123', salary: '10000', salaryNumber: 'SAL007', medicalInsuranceNumber: 'MED007', socialInsuranceNumber: 'SOC007' },
+  { id: 'EMP008', employeeId: 'E008', name: 'Mohammed Yusuf', nationality: 'Pakistani', department: 'Warehouse', designation: 'Store Keeper', joiningDate: '2023-02-25', nationalId: 'N/A', iqamaNumber: '2398887766', iqamaExpiryDate: '2025-02-01', mobileNumber: '0578901234', email: 'mohammed.yusuf@example.com', salary: '8000', salaryNumber: 'SAL008', medicalInsuranceNumber: 'MED008', socialInsuranceNumber: 'SOC008' },
+  { id: 'EMP009', employeeId: 'E009', name: 'Abdullah Al-Harbi', nationality: 'Saudi Arabian', department: 'Security', designation: 'Security Officer', joiningDate: '2022-09-01', nationalId: '1067890123', mobileNumber: '0521234567', salary: '7500', salaryNumber: 'SAL009', medicalInsuranceNumber: 'MED009', socialInsuranceNumber: 'SOC009' },
+  { id: 'EMP010', employeeId: 'E010', name: 'Chen Wei', nationality: 'Chinese', department: 'Production', designation: 'Machine Operator', joiningDate: '2023-06-18', nationalId: 'N/A', iqamaNumber: '2512223344', iqamaExpiryDate: '2026-05-20', mobileNumber: '0512345678', email: 'chen.wei@example.com', salary: '9000', salaryNumber: 'SAL010', medicalInsuranceNumber: 'MED010', socialInsuranceNumber: 'SOC010' },
+];
+
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -136,6 +160,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]); // Added employees state
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -144,11 +169,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const loadItem = <T,>(key: string, fallback: T[]): T[] => {
+        if (typeof window === 'undefined') return fallback;
         const stored = localStorage.getItem(key);
         try { return stored ? JSON.parse(stored) : fallback; }
         catch (parseError) { console.warn(`DataContext: Failed to parse item ${key}, using fallback:`, parseError); return fallback; }
       };
       const loadSingleItem = <T,>(key: string, fallback: T): T => {
+         if (typeof window === 'undefined') return fallback;
         const stored = localStorage.getItem(key);
          try { return stored ? JSON.parse(stored) : fallback; }
          catch (parseError) { console.warn(`DataContext: Failed to parse single item ${key}, using fallback:`, parseError); return fallback; }
@@ -165,6 +192,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPurchaseOrders(loadItem(LOCAL_STORAGE_KEYS.PURCHASE_ORDERS, MOCK_PURCHASE_ORDERS));
       setSalespeople(loadItem(LOCAL_STORAGE_KEYS.SALESPEOPLE, MOCK_SALESPEOPLE));
       setSalesOrders(loadItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, MOCK_SALES_ORDERS));
+      setEmployees(loadItem(LOCAL_STORAGE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)); // Load employees
 
     } catch (error) {
       console.error("DataContext: Failed to load data from localStorage, using mocks:", error);
@@ -179,24 +207,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPurchaseOrders(MOCK_PURCHASE_ORDERS);
       setSalespeople(MOCK_SALESPEOPLE);
       setSalesOrders(MOCK_SALES_ORDERS);
+      setEmployees(MOCK_EMPLOYEES); // Fallback to new mock employees
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   // Data Saving Effects
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers)); }, [customers, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices)); }, [invoices, isLoading]);
-  useEffect(() => { if (!isLoading && companyProfile) localStorage.setItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(companyProfile)); }, [companyProfile, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.PRODUCTS, JSON.stringify(products)); }, [products, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.WAREHOUSES, JSON.stringify(warehouses)); }, [warehouses, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.PRODUCT_STOCK_LOCATIONS, JSON.stringify(productStockLocations)); }, [productStockLocations, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.STOCK_TRANSACTIONS, JSON.stringify(stockTransactions)); }, [stockTransactions, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers)); }, [suppliers, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.PURCHASE_ORDERS, JSON.stringify(purchaseOrders)); }, [purchaseOrders, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SALESPEOPLE, JSON.stringify(salespeople)); }, [salespeople, isLoading]);
-  useEffect(() => { if (!isLoading) localStorage.setItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, JSON.stringify(salesOrders)); }, [salesOrders, isLoading]);
-
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers)); }, [customers, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.INVOICES, JSON.stringify(invoices)); }, [invoices, isLoading]);
+  useEffect(() => { if (!isLoading && companyProfile && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(companyProfile)); }, [companyProfile, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.PRODUCTS, JSON.stringify(products)); }, [products, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.WAREHOUSES, JSON.stringify(warehouses)); }, [warehouses, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.PRODUCT_STOCK_LOCATIONS, JSON.stringify(productStockLocations)); }, [productStockLocations, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.STOCK_TRANSACTIONS, JSON.stringify(stockTransactions)); }, [stockTransactions, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers)); }, [suppliers, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.PURCHASE_ORDERS, JSON.stringify(purchaseOrders)); }, [purchaseOrders, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.SALESPEOPLE, JSON.stringify(salespeople)); }, [salespeople, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.SALES_ORDERS, JSON.stringify(salesOrders)); }, [salesOrders, isLoading]);
+  useEffect(() => { if (!isLoading && typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees)); }, [employees, isLoading]); // Save employees
 
   // --- Memoized Getter Functions ---
   const getCustomerById = useCallback((customerId: string) => findCustomerById(customers, customerId), [customers]);
@@ -207,6 +236,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getPurchaseOrderById = useCallback((poId: string) => findPurchaseOrderById(purchaseOrders, poId), [purchaseOrders]);
   const getSalespersonById = useCallback((salespersonId: string) => findSalespersonById(salespeople, salespersonId), [salespeople]);
   const getSalesOrderById = useCallback((soId: string) => findSalesOrderById(salesOrders, soId), [salesOrders]);
+  const getEmployeeById = useCallback((employeeId: string) => findEmployeeById(employees, employeeId), [employees]);
+
 
   const getInvoicesByCustomerId = useCallback((customerId: string) => invoices.filter(invoice => invoice.customerId === customerId), [invoices]);
   const getOutstandingBalanceByCustomerId = useCallback((customerId: string) => {
@@ -270,7 +301,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             type: transactionTypeForLog,
             quantityChange,
             newStockLevelAfterTransaction: newStockLevel,
-            reason: reason, // The reason passed from the form or operation
+            reason: reason,
             reference,
           });
         }
@@ -359,9 +390,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCustomers(prev => prev.filter(c => c.id !== customerId));
   }, []);
 
-  const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt'>) => {
+  const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt'> & {costPrice?:number}) => {
     const newProduct: Product = {
       ...productData,
+      costPrice: productData.costPrice || 0,
       id: `PROD-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
       createdAt: new Date().toISOString(),
     };
@@ -372,10 +404,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProducts(prev => prev.filter(p => p.id !== productId));
     setProductStockLocations(prevPsl => prevPsl.filter(psl => psl.productId !== productId));
     setStockTransactions(prevTxn => prevTxn.filter(txn => txn.productId !== productId));
-    setInvoices(prevInvoices => prevInvoices.map(inv => ({
-        ...inv,
-        items: inv.items.filter(item => item.productId !== productId)
-    })));
+    // Also remove product from items in Sales Orders and Invoices if needed
+    setSalesOrders(prevSOs => prevSOs.map(so => ({...so, items: so.items.filter(item => item.productId !== productId)})));
+    setInvoices(prevInvoices => prevInvoices.map(inv => ({...inv, items: inv.items.filter(item => item.productId !== productId)})));
   }, []);
 
   const addWarehouse = useCallback((warehouseData: Omit<Warehouse, 'id'>) => {
@@ -387,6 +418,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setWarehouses(prevWh => prevWh.filter(wh => wh.id !== warehouseId));
     setProductStockLocations(prevPsl => prevPsl.filter(psl => psl.warehouseId !== warehouseId));
     setStockTransactions(prevTxn => prevTxn.filter(txn => txn.warehouseId !== warehouseId));
+    // Also potentially update products that might have this as a default warehouse if such a field existed
   }, []);
 
   const addSupplier = useCallback((supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
@@ -401,9 +433,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newInvoice: Invoice = {
       ...invoiceData,
       customerName: customer?.name || 'N/A',
-      paymentHistory: [],
-      amountPaid: 0,
-      remainingBalance: invoiceData.totalAmount,
+      paymentHistory: invoiceData.paymentHistory || [], // Ensure payment history exists
+      amountPaid: invoiceData.amountPaid || 0, // Ensure amountPaid exists
+      remainingBalance: invoiceData.totalAmount - (invoiceData.amountPaid || 0), // Recalculate remainingBalance
     };
     setInvoices((prev) => [...prev, newInvoice].sort((a,b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
 
@@ -430,7 +462,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [getCustomerById, getProductById, deductStockForInvoiceItem]);
 
   const updateInvoice = useCallback((updatedInvoice: Invoice) => {
-    const originalInvoice = findInvoiceById(invoices, updatedInvoice.id);
+    const originalInvoice = invoices.find(inv => inv.id === updatedInvoice.id);
 
     if (originalInvoice && originalInvoice.status !== 'Cancelled') {
       originalInvoice.items.forEach(item => {
@@ -475,7 +507,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [invoices, getProductById, deductStockForInvoiceItem, returnStockForInvoiceItem]);
 
   const deleteInvoice = useCallback((invoiceId: string) => {
-    const invoiceToDelete = findInvoiceById(invoices, invoiceId);
+    const invoiceToDelete = invoices.find(inv => inv.id === invoiceId);
     if (invoiceToDelete && invoiceToDelete.status !== 'Cancelled') {
         invoiceToDelete.items.forEach(item => {
             const productDetails = getProductById(item.productId || '');
@@ -501,7 +533,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCompanyProfile(prev => ({ ...(prev || MOCK_COMPANY_PROFILE), ...profileUpdate }));
   }, []);
 
-  const addPurchaseOrder = useCallback((poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items' | 'supplierName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived' | 'productName'>> }) => {
+  const addPurchaseOrder = useCallback((poData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'status' | 'items' | 'supplierName' | 'subtotal' | 'totalAmount' | 'taxAmount'> & { items: Array<Omit<PurchaseOrderItem, 'id' | 'total' | 'quantityReceived'| 'productName'>> }) => {
     const supplier = getSupplierById(poData.supplierId);
     const itemsWithDetails = poData.items.map(item => {
       const product = getProductById(item.productId);
@@ -546,6 +578,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const taxAmount = updatedPO.taxAmount || 0;
                 const totalAmount = subtotal + taxAmount;
                 let finalStatus = updatedPO.status;
+                 // Only transition from Draft to Sent automatically. Other statuses should be managed explicitly.
                 if (finalStatus === 'Draft' && itemsWithTotals.length > 0 && updatedPO.supplierId) {
                     finalStatus = 'Sent';
                 }
@@ -582,15 +615,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (!product) return item;
 
                 let quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived;
+
                 if (receivedInfo.itemUnitType.toLowerCase() !== product.unitType.toLowerCase()) {
                     if (product.packagingUnit && receivedInfo.itemUnitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
+                        // PO item is a larger package, convert to base units for stock
                         quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived * product.itemsPerPackagingUnit;
                     } else if (receivedInfo.itemUnitType.toLowerCase() === 'pcs' && product.unitType.toLowerCase() !== 'pcs' && product.piecesInBaseUnit && product.piecesInBaseUnit > 0) {
+                        // PO item is PCS, product base unit is a package of PCS, convert PCS to base units (packages)
                         quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived / product.piecesInBaseUnit;
                     } else if (product.unitType.toLowerCase() === 'pcs' && product.piecesInBaseUnit === 1 && product.packagingUnit && receivedInfo.itemUnitType.toLowerCase() === product.packagingUnit.toLowerCase() && product.itemsPerPackagingUnit) {
+                        // Product base is PCS, but ordered in a larger package. Convert package qty to PCS qty.
                          quantityToReceiveInBaseUnits = receivedInfo.quantityNewlyReceived * product.itemsPerPackagingUnit;
                     }
                 }
+
 
                 const currentStockInWarehouse = getStockForProductInWarehouse(item.productId, receivedInfo.warehouseId);
                 upsertProductStockLocation(
@@ -601,7 +639,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 anyStockUpdatedThisTime = true;
                 return {
                     ...item,
-                    quantityReceived: (item.quantityReceived || 0) + receivedInfo.quantityNewlyReceived,
+                    quantityReceived: (item.quantityReceived || 0) + receivedInfo.quantityNewlyReceived, // Update PO item in its original unit
                 };
             }
             return item;
@@ -639,7 +677,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSalespeople(prev => prev.filter(sp => sp.id !== salespersonId));
   }, []);
 
-  const addSalesOrder = useCallback((orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName'>> }) => {
+  const addSalesOrder = useCallback((orderData: Omit<SalesOrder, 'id' | 'createdAt' | 'status' | 'customerName' | 'salespersonName' | 'routeName' | 'subtotal' | 'totalAmount'> & { items: Array<Omit<SalesOrderItem, 'id'| 'total' | 'productName' | 'sourceWarehouseName' | 'sourceWarehouseId' >> }) => {
     const customer = getCustomerById(orderData.customerId);
     const salesperson = orderData.salespersonId ? getSalespersonById(orderData.salespersonId) : undefined;
 
@@ -649,7 +687,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return {
             ...item,
             id: `soi-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+            productId: item.productId, // ensure productId is carried over
             productName: product?.name || item.productId,
+            sourceWarehouseId: item.sourceWarehouseId,
             sourceWarehouseName: warehouse?.name || item.sourceWarehouseId,
             total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
         };
@@ -662,13 +702,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       customerName: customer?.name || orderData.customerId,
       salespersonId: orderData.salespersonId,
       salespersonName: salesperson?.name || orderData.salespersonId,
-      routeId: orderData.routeId, // Placeholder for route name
-      routeName: orderData.routeId ? `Route ${orderData.routeId}` : undefined, // Placeholder for route name
+      routeId: orderData.routeId,
+      routeName: orderData.routeId ? `Route ${orderData.routeId}` : undefined,
       orderDate: orderData.orderDate,
       expectedDeliveryDate: orderData.expectedDeliveryDate,
       items: itemsWithDetails,
       subtotal: subtotal,
-      totalAmount: subtotal,
+      totalAmount: subtotal, // SO total is typically pre-VAT
       status: 'Draft',
       shippingAddress: orderData.shippingAddress || customer?.shippingAddress || customer?.billingAddress,
       billingAddress: orderData.billingAddress || customer?.billingAddress,
@@ -698,11 +738,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSalesOrders(prev => prev.filter(order => order.id !== orderId));
   }, []);
 
+  const addEmployee = useCallback((employeeData: Omit<Employee, 'id'>) => {
+    const newEmployee: Employee = {
+      ...employeeData,
+      id: `EMP-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
+    };
+    setEmployees(prev => [...prev, newEmployee].sort((a,b) => a.name.localeCompare(b.name)));
+  }, []);
+
+  const updateEmployee = useCallback((updatedEmployee: Employee) => {
+    setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp).sort((a,b) => a.name.localeCompare(b.name)));
+  }, []);
+
+  const deleteEmployee = useCallback((employeeId: string) => {
+    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+  }, []);
+
 
   return (
     <DataContext.Provider
       value={{
-        customers, invoices, products, warehouses, productStockLocations, stockTransactions, suppliers, purchaseOrders, salespeople, salesOrders, companyProfile, isLoading,
+        customers, invoices, products, warehouses, productStockLocations, stockTransactions, suppliers, purchaseOrders, salespeople, salesOrders, employees, companyProfile, isLoading,
         addCustomer, updateCustomer, deleteCustomer,
         addInvoice, updateInvoice, deleteInvoice,
         updateCompanyProfile,
@@ -716,6 +772,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         processPOReceipt,
         addSalesperson, updateSalesperson, deleteSalesperson,
         addSalesOrder, updateSalesOrder, deleteSalesOrder,
+        addEmployee, updateEmployee, deleteEmployee, // Expose employee functions
       }}
     >
       {children}
@@ -730,5 +787,3 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
-
-    
