@@ -62,7 +62,7 @@ export const MAIN_NAV_SECTIONS: NavSection[] = [
     title: 'HUMAN RESOURCES',
     items: [
       { href: '/employee-management', label: 'Employees', icon: Briefcase },
-      { href: '/attendance', label: 'Attendance', icon: UserCheck, disabled: true },
+      { href: '/attendance', label: 'Attendance', icon: UserCheck },
       { href: '/payroll', label: 'Payroll', icon: Banknote, disabled: true },
     ],
   },
