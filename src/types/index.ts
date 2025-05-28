@@ -559,3 +559,40 @@ export const MOCK_SALESPEOPLE: Salesperson[] = [
 export const MOCK_SALES_ORDERS: SalesOrder[] = [];
 
     
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string; // e.g., "Salesperson", "Warehouse Staff", "Admin"
+  hireDate: string; // ISO string
+  salary?: number;
+  // Other employee details like address, bank info etc. could be added
+  attendanceHistory?: { date: string; status: string; checkIn?: string | null; checkOut?: string | null }[];
+}
+
+export const MOCK_EMPLOYEES: Employee[] = [
+  {
+    id: 'EMP001', name: 'Aisha Khan', email: 'aisha.k@example.com', phone: '555-0301', role: 'Salesperson', hireDate: '2023-01-15T00:00:00.000Z',
+    attendanceHistory: [
+      { date: '2024-07-22', status: 'Present', checkIn: '08:00', checkOut: '17:00' },
+      { date: '2024-07-23', status: 'Present', checkIn: '08:15', checkOut: '17:30' },
+      { date: '2024-07-24', status: 'Absent - Sick' },
+      { date: '2024-07-25', status: 'Present', checkIn: '09:00', checkOut: '18:00' }, // Late check-in example
+      { date: '2024-07-26', status: 'On Leave' },
+    ]
+  },
+  {
+    id: 'EMP002', name: 'Ben Carter', email: 'ben.c@example.com', phone: '555-0302', role: 'Warehouse Staff', hireDate: '2023-03-10T00:00:00.000Z',
+    attendanceHistory: [
+      { date: '2024-07-22', status: 'Present', checkIn: '07:30', checkOut: '16:00' },
+      { date: '2024-07-23', status: 'Present', checkIn: '07:45', checkOut: '16:15' },
+      { date: '2024-07-24', status: 'Present', checkIn: '07:35', checkOut: '16:05' },
+      { date: '2024-07-25', status: 'Present', checkIn: '07:30', checkOut: '16:30' },
+      { date: '2024-07-26', status: 'Present', checkIn: '07:40', checkOut: '16:20' },
+    ]
+  },
+  { id: 'EMP003', name: 'Chloe Davis', email: 'chloe.d@example.com', phone: '555-0303', role: 'Admin', hireDate: '2022-08-01T00:00:00.000Z', attendanceHistory: [] },
+  { id: 'EMP004', name: 'David Lee', email: 'david.l@example.com', phone: '555-0304', role: 'Salesperson', hireDate: '2023-06-20T00:00:00.000Z', attendanceHistory: [] },
+];
