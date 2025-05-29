@@ -4,24 +4,26 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useState, useMemo, useCallback } from 'react';
 import { format, startOfWeek, endOfWeek, addDays, subDays, eachDayOfInterval, isSameDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, UserCheck, Clock, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, UserCheck, Clock, Users, CircleDot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input'; // Added Input import
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+// Removed RadioGroup imports
+// import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useData } from '@/context/DataContext';
-import type { Employee } from '@/types';
+import type { Employee, AttendanceStatus } from '@/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 
-type ManualAttendanceData = Record<string, Record<string, boolean>>; // { employeeId: { 'YYYY-MM-DD': true/false } }
+type ManualAttendanceData = Record<string, Record<string, AttendanceStatus>>; // { employeeId: { 'YYYY-MM-DD': AttendanceStatus } }
 
 export default function AttendancePage() {
   const { employees, isLoading: isDataLoading } = useData();
-  const [attendanceMode, setAttendanceMode] = useState<'manual' | 'automatic'>('manual');
+  const [attendanceMode, setAttendanceMode] = useState<'manual' | 'automatic'>('manual'); // manual mode is default now
   const [currentDate, setCurrentDate] = useState(new Date()); // Reference date for the week
   const [manualAttendanceData, setManualAttendanceData] = useState<ManualAttendanceData>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,15 +51,39 @@ export default function AttendancePage() {
     setCurrentDate(prevDate => addDays(prevDate, 7));
   };
 
-  const handleManualAttendanceChange = (employeeId: string, date: Date, isPresent: boolean) => {
+  const handleManualAttendanceChange = (employeeId: string, date: Date, status: AttendanceStatus, isChecked: boolean) => {
     const dateString = format(date, 'yyyy-MM-dd');
-    setManualAttendanceData(prevData => ({
-      ...prevData,
-      [employeeId]: {
-        ...(prevData[employeeId] || {}),
-        [dateString]: isPresent,
-      },
-    }));
+    setManualAttendanceData(prevData => {
+      const employeeAttendance = prevData[employeeId] || {};
+      let newEmployeeAttendance = { ...employeeAttendance };
+
+      if (isChecked) {
+        // If a checkbox is checked, set the status for this employee and day to the status of the checked box.
+        // This implicitly "unchecks" other statuses for this day in the state by overwriting the value.
+        newEmployeeAttendance[dateString] = status;
+      } else {
+        // If a checkbox is unchecked, and its status was the current status for this employee and day,
+        // then clear the status (delete the key).
+        if (newEmployeeAttendance[dateString] === status) {
+           delete newEmployeeAttendance[dateString]; // Clear the status if the unchecked box was the active one
+        }
+      }
+
+      // Optional: If strict single selection is required like radio buttons, uncomment this.
+      // This ensures only the *last* checked box's status is kept if multiple are checked quickly.
+      // However, standard checkbox behavior is independent.
+      // const allStatuses: AttendanceStatus[] = ['Present', 'Absent', 'Annual Leave', 'Sick Leave'];
+      // allStatuses.forEach(s => {
+      //    if (s !== status && isChecked) {
+      //        delete newEmployeeAttendance[dateString]; // Clear other statuses if a new one is checked
+      //    }
+      // });
+
+      return {
+        ...prevData,
+        [employeeId]: newEmployeeAttendance,
+      };
+    });
     // Here you would typically save this to local storage or a backend
   };
 
@@ -73,18 +99,30 @@ export default function AttendancePage() {
 
   // Placeholder KPIs - these would need real logic
   const kpis = {
-    totalPresentToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === true).length,
-    totalAbsentToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === false).length,
-    onLeave: 0, // Placeholder
-    unaccounted: filteredEmployees.length - (filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === true).length + filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === false).length), // Placeholder
+    totalPresentToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === 'Present').length,
+    totalAbsentToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === 'Absent').length,
+    onAnnualLeaveToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === 'Annual Leave').length,
+    onSickLeaveToday: filteredEmployees.filter(emp => manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] === 'Sick Leave').length,
+    unaccounted: filteredEmployees.length - (filteredEmployees.filter(emp => ['Present', 'Absent', 'Annual Leave', 'Sick Leave'].includes(manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] as AttendanceStatus)).length),
+    totalOnLeaveToday: filteredEmployees.filter(emp => ['Annual Leave', 'Sick Leave'].includes(manualAttendanceData[emp.id]?.[format(new Date(), 'yyyy-MM-dd')] as AttendanceStatus)).length,
   };
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader
-        title="Attendance Management"
-        description="Track employee attendance, check-ins, check-outs, and manage leave."
-      />
+      {/* New flex container for header elements */}
+      <div className="flex justify-between items-center mb-6">
+         <PageHeader
+            title="Attendance Management"
+            description="Track employee attendance, check-ins, check-outs, and manage leave."
+          />
+          {attendanceMode === 'manual' && (
+            <div> {/* Wrapper div for date */}
+              <h3 className="text-lg font-semibold text-center">
+                {format(currentDate, 'EEEE, MMM dd, yyyy')}
+              </h3>
+            </div>
+          )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -109,22 +147,22 @@ export default function AttendancePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Leave</CardTitle>
+            <CardTitle className="text-sm font-medium">Sick Leave Today</CardTitle>
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isDataLoading ? <Skeleton className="h-8 w-12" /> : kpis.onLeave}</div>
-             <p className="text-xs text-muted-foreground">Currently on approved leave</p>
+            <div className="text-2xl font-bold">{isDataLoading ? <Skeleton className="h-8 w-12" /> : kpis.onSickLeaveToday}</div>
+             <p className="text-xs text-muted-foreground">Currently on sick leave</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unaccounted</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Annual Leave Today</CardTitle>
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isDataLoading ? <Skeleton className="h-8 w-12" /> : kpis.unaccounted}</div>
-             <p className="text-xs text-muted-foreground">Status not yet updated</p>
+          <CardContent className="pb-2"> {/* Adjusted padding */}
+            <div className="text-2xl font-bold">{isDataLoading ? <Skeleton className="h-8 w-12" /> : kpis.onAnnualLeaveToday}</div>
+             <p className="text-xs text-muted-foreground">Currently on annual leave</p>
           </CardContent>
         </Card>
       </div>
@@ -153,19 +191,6 @@ export default function AttendancePage() {
           </div>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col min-h-0 p-0 sm:p-2 md:p-4">
-          {attendanceMode === 'manual' && (
-            <div className="flex items-center justify-between mb-4 px-2 sm:px-0">
-              <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <h3 className="text-lg font-semibold text-center">
-                Week: {format(weekInterval.start, 'MMM dd, yyyy')} - {format(weekInterval.end, 'MMM dd, yyyy')}
-              </h3>
-              <Button variant="outline" size="icon" onClick={handleNextWeek}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
 
           <div className="flex-grow min-h-0 rounded-lg border shadow-sm bg-card flex flex-col">
              <div className="shrink-0 p-4 border-b">
@@ -183,9 +208,8 @@ export default function AttendancePage() {
                     <TableRow>
                       <TableHead className="w-[150px] px-2 text-sm">Employee Name</TableHead>
                       {attendanceMode === 'manual' && daysOfWeek.map(day => (
-                        <TableHead key={day.toISOString()} className="text-center px-2 text-sm">{format(day, 'EEE')}</TableHead>
+                        <TableHead key={day.toISOString()} className="text-center px-2 text-sm">{format(day, 'EEE')}</TableHead> // Still showing all days for skeleton
                       ))}
-                       {attendanceMode === 'automatic' && <TableHead className="px-2 text-sm">Status</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -197,7 +221,6 @@ export default function AttendancePage() {
                             <Skeleton className="h-5 w-5 mx-auto" />
                           </TableCell>
                         ))}
-                        {attendanceMode === 'automatic' && <TableCell className="px-2 text-xs"><Skeleton className="h-5 w-1/2" /></TableCell>}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -210,38 +233,80 @@ export default function AttendancePage() {
                       <TableHead className="min-w-[180px] px-2 text-sm">Name</TableHead>
                       <TableHead className="min-w-[120px] px-2 text-sm">Department</TableHead>
                       <TableHead className="min-w-[120px] px-2 text-sm">Designation</TableHead>
-                      {attendanceMode === 'manual' && daysOfWeek.map(day => (
-                        <TableHead key={day.toISOString()} className="text-center px-2 text-sm min-w-[60px]">
-                          {format(day, 'EEE dd')}
+                      {attendanceMode === 'manual' && (
+                         <TableHead className="text-center px-2 text-sm min-w-[250px]"> {/* Adjusted width for checkboxes */}
+                          Attendance Status ({format(currentDate, 'MMM dd')})
                         </TableHead>
-                      ))}
+                      )}
                       {attendanceMode === 'automatic' && <TableHead className="px-2 text-sm">Status</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredEmployees.map((employee, empIndex) => (
                       <TableRow key={employee.id} className={cn(empIndex % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
+                        {/* Common Employee Details Columns */}
                         <TableCell className="px-2 text-xs">{employee.employeeId}</TableCell>
                         <TableCell className="px-2 text-xs">{employee.name}</TableCell>
                         <TableCell className="px-2 text-xs">{employee.department}</TableCell>
                         <TableCell className="px-2 text-xs">{employee.designation}</TableCell>
                         {attendanceMode === 'manual' && daysOfWeek.map(day => {
+                          // In Manual mode, only show column for the current date
+                          if (!isSameDay(day, currentDate)) return null;
+
                           const dateString = format(day, 'yyyy-MM-dd');
-                          const isPresent = manualAttendanceData[employee.id]?.[dateString] || false;
+                          // Fetch current status, defaults to undefined if not set
+                          const currentStatus = manualAttendanceData[employee.id]?.[dateString];
+
                           return (
                             <TableCell key={day.toISOString()} className="text-center px-2 py-1">
-                              <Checkbox
-                                checked={isPresent}
-                                onCheckedChange={(checked) => handleManualAttendanceChange(employee.id, day, !!checked)}
-                                id={`att-${employee.id}-${dateString}`}
-                                aria-label={`Attendance for ${employee.name} on ${format(day, 'PPP')}`}
-                              />
+                              {/* Replaced RadioGroup with Checkboxes */}
+                              <div className="flex flex-wrap gap-2 justify-center">
+                                {/* Present Checkbox */}
+                                <div className="flex items-center space-x-1">
+                                  <Checkbox
+                                    id={`att-${employee.id}-${dateString}-present`}
+                                    checked={currentStatus === 'Present'}
+                                    onCheckedChange={(isChecked: boolean) => handleManualAttendanceChange(employee.id, day, 'Present', isChecked)}
+                                  />
+                                  <Label htmlFor={`att-${employee.id}-${dateString}-present`} className="text-xs">Present</Label>
+                                </div>
+                                {/* Absent Checkbox */}
+                                <div className="flex items-center space-x-1">
+                                  <Checkbox
+                                    id={`att-${employee.id}-${dateString}-absent`}
+                                    checked={currentStatus === 'Absent'}
+                                    onCheckedChange={(isChecked: boolean) => handleManualAttendanceChange(employee.id, day, 'Absent', isChecked)}
+                                  />
+                                  <Label htmlFor={`att-${employee.id}-${dateString}-absent`} className="text-xs">Absent</Label>
+                                </div>
+                                {/* Annual Leave Checkbox */}
+                                <div className="flex items-center space-x-1">
+                                  <Checkbox
+                                    id={`att-${employee.id}-${dateString}-annual-leave`}
+                                    checked={currentStatus === 'Annual Leave'}
+                                    onCheckedChange={(isChecked: boolean) => handleManualAttendanceChange(employee.id, day, 'Annual Leave', isChecked)}
+                                  />
+                                  <Label htmlFor={`att-${employee.id}-${dateString}-annual-leave`} className="text-xs whitespace-nowrap">Annual Leave</Label>
+                                </div>
+                                {/* Sick Leave Checkbox */}
+                                <div className="flex items-center space-x-1">
+                                  <Checkbox
+                                    id={`att-${employee.id}-${dateString}-sick-leave`}
+                                    checked={currentStatus === 'Sick Leave'}
+                                    onCheckedChange={(isChecked: boolean) => handleManualAttendanceChange(employee.id, day, 'Sick Leave', isChecked)}
+                                  />
+                                  <Label htmlFor={`att-${employee.id}-${dateString}-sick-leave`} className="text-xs whitespace-nowrap">Sick Leave</Label>
+                                </div>
+                              </div>
                             </TableCell>
                           );
                         })}
                         {attendanceMode === 'automatic' && (
                           <TableCell className="px-2 text-xs">
-                            <span className="text-muted-foreground italic">Awaiting Biometric Data</span>
+                            {/* Placeholder for automatic status */}
+                            <div className="flex items-center justify-center text-muted-foreground italic">
+                                <CircleDot className="mr-1 h-3 w-3" /> Awaiting Biometric Data
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
@@ -268,7 +333,3 @@ export default function AttendancePage() {
     </div>
   );
 }
-
-    
-
-    
