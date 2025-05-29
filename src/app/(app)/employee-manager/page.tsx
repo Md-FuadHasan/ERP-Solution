@@ -39,7 +39,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from "@/lib/utils";
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { useToast } from '@/hooks/use-toast';
-import { SearchInput } from '@/components/common/search-input'; // Added import
+import { SearchInput } from '@/components/common/search-input';
 
 interface Employee {
   id: string;
@@ -60,8 +60,7 @@ interface Employee {
   salaryNumber: string;
   medicalInsuranceNumber: string;
   socialInsuranceNumber: string;
-  // Added for consistency with employee-management/page.tsx
-  status?: string; // e.g. 'Active', 'On Leave'
+  status?: string;
 }
 
 const initialEmployeeFormState: Employee = {
@@ -71,8 +70,7 @@ const initialEmployeeFormState: Employee = {
   salary: '', salaryNumber: '', medicalInsuranceNumber: '', socialInsuranceNumber: '',
 };
 
-// Placeholder component for Progress if the actual component is not imported:
-const Progress = ({ value }: { value: number }) => <div className="h-2 w-full bg-blue-500 rounded" style={{ width: `${value}%` }}></div>; // Placeholder if Progress component is not available
+const Progress = ({ value }: { value: number }) => <div className="h-2 w-full bg-blue-500 rounded" style={{ width: `${value}%` }}></div>;
 
 export default function EmployeeManagerPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -85,6 +83,7 @@ export default function EmployeeManagerPage() {
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState(''); // Added for SearchInput
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -139,6 +138,13 @@ export default function EmployeeManagerPage() {
       setEmployeeToDelete(null);
     }
   }, [employeeToDelete, toast]);
+
+  const filteredEmployees = employees.filter(employee =>
+    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (employee.department && employee.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (employee.designation && employee.designation.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
 
   return (
@@ -213,8 +219,8 @@ export default function EmployeeManagerPage() {
                     <CardTitle>Employee List</CardTitle>
                     <CardDescription>Overview of all current employees.</CardDescription>
                 </div>
-                <div className="flex w-full sm:w-auto gap-2">
-                    <SearchInput placeholder="Search employees..." className="w-full sm:w-64" value={''} onChange={() => {}} />
+                <div className="flex w-full sm:w-auto gap-4"> {/* Changed gap-2 to gap-4 */}
+                    <SearchInput placeholder="Search employees..." className="w-full sm:w-64" value={searchTerm} onChange={setSearchTerm} />
                     <Button variant="outline" className="w-full sm:w-auto">
                         <Filter className="mr-2 h-4 w-4" /> Filter
                     </Button>
@@ -223,7 +229,7 @@ export default function EmployeeManagerPage() {
             </CardHeader>
             <div className="flex-grow min-h-0 overflow-hidden">
                 <div className="h-full overflow-y-auto">
-                  {employees.length > 0 ? (
+                  {filteredEmployees.length > 0 ? (
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                         <TableRow>
@@ -236,7 +242,7 @@ export default function EmployeeManagerPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {employees.map((employee, index) => (
+                        {filteredEmployees.map((employee, index) => (
                           <TableRow key={employee.id} className={cn(index % 2 === 0 ? 'bg-card' : 'bg-muted/50', "hover:bg-primary/10")}>
                             <TableCell className="font-medium px-2 text-xs">{employee.employeeId}</TableCell>
                             <TableCell className="px-2 text-xs">{employee.name}</TableCell>
@@ -258,9 +264,9 @@ export default function EmployeeManagerPage() {
                     <div className="h-full flex items-center justify-center p-6">
                       <DataPlaceholder
                         icon={Briefcase}
-                        title="No Employees Found"
-                        message="Get started by adding your first employee."
-                        action={<Button onClick={handleOpenAddModal}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Button>}
+                        title={searchTerm ? "No Employees Found" : "No Employees Added Yet"}
+                        message={searchTerm ? "Try adjusting your search term." : "Get started by adding your first employee."}
+                        action={!searchTerm ? (<Button onClick={handleOpenAddModal}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Button>) : undefined}
                       />
                     </div>
                   )}
