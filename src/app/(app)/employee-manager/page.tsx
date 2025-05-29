@@ -34,6 +34,7 @@ import {
     AlertDialogHeader as AlertDialogHeaderComponent,
     AlertDialogTitle as AlertDialogTitleComponent,
   } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input'; // Added Input import
 import { Label } from '@/components/ui/label';
 import { cn } from "@/lib/utils";
 import { DataPlaceholder } from '@/components/common/data-placeholder';
@@ -212,8 +213,8 @@ export default function EmployeeManagerPage() {
                 </div>
                 <div className="flex w-full sm:w-auto items-center space-x-4">
                     <SearchInput
-                        placeholder="Search by ID, Name, Dept, Designation..."
-                        className="w-full" 
+                        placeholder="Search by ID, Name, Department, Designation..."
+                        className="w-full sm:w-auto md:w-80"
                         value={searchTerm}
                         onChange={setSearchTerm}
                     />
@@ -424,3 +425,5 @@ export default function EmployeeManagerPage() {
     </div>
   );
 }
+
+    
