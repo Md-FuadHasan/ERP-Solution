@@ -1,246 +1,413 @@
 
 'use client';
-import type React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as SettingsCardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2, UserCog } from 'lucide-react'; // Removed WarehouseIcon, Truck, UserCheck
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { CompanyDetailsForm, type CompanyDetailsFormValues } from '@/components/forms/company-details-form';
-import { TaxSettingsForm, type TaxSettingsFormValues } from '@/components/forms/tax-settings-form';
-// Removed SalespersonForm import
-import { DataPlaceholder } from '@/components/common/data-placeholder';
-import type { CompanyProfile, Manager } from '@/types'; // Removed Warehouse, Supplier, Salesperson
-import { MOCK_MANAGERS } from '@/types';
-import { SETTINGS_TABS } from '@/lib/constants';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription as FormDialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { useData } from '@/context/DataContext';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Database } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc,
-  AlertDialogFooter as AlertDialogFooterComponent,
-  AlertDialogHeader as AlertDialogHeaderComponent,
-  AlertDialogTitle as AlertDialogTitleComponent,
-} from "@/components/ui/alert-dialog";
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Grid } from '@/components/ui/grid'; // Assuming a Grid component for layout
+
+import { 
+  Settings as SettingsIcon,
+  Bell,
+  Shield, 
+  Brush, 
+  Database, 
+  Link as LinkIcon
+} from 'lucide-react';
+
 
 export default function SettingsPage() {
-  const {
-    companyProfile,
-    updateCompanyProfile,
-    // Removed salespeople related context items
-    isLoading: isDataLoading,
-    // warehouses // No longer needed here
-  } = useData();
+  const [settings, setSettings] = useState({
+    general: {
+      companyName: '',
+      timezone: '',
+      defaultCurrency: '',
+      dateFormat: '',
+    },
+    notifications: {
+      emailNotifications: false,
+      pushNotifications: false,
+      lowStockAlerts: false,
+      paymentReminders: false,
+      systemMaintenance: false,
+      notificationEmail: '',
+    },
+    security: {
+      twoFactorAuth: false,
+      strongPasswordPolicy: false,
+      autoSessionTimeout: false,
+      sessionDuration: 30,
+      maxLoginAttempts: 5,
+    },
+    appearance: {
+      theme: 'light',
+      sidebarPosition: 'left',
+      compactMode: false,
+      enableAnimations: false,
+    },
+    system: {
+      backupFrequency: '',
+      logRetention: 90,
+      automaticUpdates: false,
+      maintenanceMode: false,
+    },
+    integrations: {
+      emailService: {
+        enableEmail: false,
+        smtpServer: '',
+        port: null,
+      },
+      paymentGateway: {
+        enablePayments: false,
+        provider: '',
+      },
+      apiSettings: {
+        enableApi: false,
+        rateLimit: 1000,
+        apiKey: '', // Assuming there's an API key to generate/display
+      },
+    },
+  });
 
-  const [managers, setManagers] = useState<Manager[]>([]);
-  const [isUserManagerModalOpen, setIsUserManagerModalOpen] = useState(false);
-  const [editingManager, setEditingManager] = useState<Manager | null>(null);
-  const [managerName, setManagerName] = useState('');
-  const [managerEmail, setManagerEmail] = useState('');
-  const [managerRole, setManagerRole] = useState('');
+  const handleInputChange = (section, field, value) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      [section]: {
+        ...prevSettings[section],
+        [field]: value,
+      },
+    }));
+  };
 
-  // Removed state for Salesperson form and delete confirmation
-  // const [isSalespersonFormModalOpen, setIsSalespersonFormModalOpen] = useState(false);
-  // const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null);
-  // const [salespersonToDelete, setSalespersonToDelete] = useState<Salesperson | null>(null);
+  const handleToggleChange = (section, field, checked) => {
+    handleInputChange(section, field, checked);
+  };
 
-  const { toast } = useToast();
+  const handleSelectChange = (section, field, value) => {
+    handleInputChange(section, field, value);
+  };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedManagers = localStorage.getItem('invoiceflow_managers');
-        setManagers(storedManagers ? JSON.parse(storedManagers) : MOCK_MANAGERS);
-      } catch (error) {
-        console.error("Failed to load managers from localStorage on init", error);
-        setManagers(MOCK_MANAGERS);
-      }
-    }
-  }, []);
+  const handleNumberInputChange = (section, field, value) => {
+    handleInputChange(section, field, Number(value));
+  };
+  
+  const handleGenerateApiKey = () => {
+      // Logic to generate API key
+      console.log("Generate API Key clicked");
+      // Update state with generated key
+      // setSettings(prevSettings => ({
+      //   ...prevSettings,
+      //   integrations: {
+      //     ...prevSettings.integrations,
+      //     apiSettings: {
+      //       ...prevSettings.integrations.apiSettings,
+      //       apiKey: 'YOUR_GENERATED_KEY',
+      //     },
+      //   },
+      // }));
+    };
 
+   const handleDatabaseMaintenance = () => {
+       // Logic for database maintenance
+       console.log("Database Maintenance clicked");
+   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && managers.length > 0) {
-      try {
-        localStorage.setItem('invoiceflow_managers', JSON.stringify(managers));
-      } catch (error) {
-        console.error("Failed to save managers to localStorage", error);
-      }
-    } else if (typeof window !== 'undefined' && managers.length === 0) {
-        if (localStorage.getItem('invoiceflow_managers')) {
-             localStorage.removeItem('invoiceflow_managers');
-        }
-    }
-  }, [managers]);
-
-
-  const handleCompanyDetailsSubmit = useCallback((data: CompanyDetailsFormValues) => {
-    if (companyProfile) {
-      updateCompanyProfile(data);
-      toast({ title: "Company Details Updated", description: "Your company information has been saved." });
-    }
-  }, [companyProfile, updateCompanyProfile, toast]);
-
-  const handleTaxSettingsSubmit = useCallback((data: TaxSettingsFormValues) => {
-    if (companyProfile) {
-      updateCompanyProfile({
-        vatRate: data.vatRate,
-        taxRate: data.taxRate,
-        excessTaxRate: data.excessTaxRate
-      });
-      toast({ title: "Tax Settings Updated", description: "Your tax configurations have been saved." });
-    }
-  }, [companyProfile, updateCompanyProfile, toast]);
-
-  const handleAddManager = useCallback(() => {
-    setEditingManager(null); setManagerName(''); setManagerEmail(''); setManagerRole('');
-    setIsUserManagerModalOpen(true);
-  }, []);
-
-  const handleEditManager = useCallback((manager: Manager) => {
-    setEditingManager(manager); setManagerName(manager.name); setManagerEmail(manager.email); setManagerRole(manager.role);
-    setIsUserManagerModalOpen(true);
-  }, []);
-
-  const handleDeleteManager = useCallback((managerId: string) => {
-    setManagers(prevManagers => prevManagers.filter(m => m.id !== managerId));
-    toast({ title: "Manager Removed", description: "The manager has been removed."});
-  }, [toast]);
-
-  const handleManagerFormSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!managerName || !managerEmail || !managerRole) {
-      toast({ title: "Missing Information", description: "Please fill all manager details.", variant: "destructive" });
-      return;
-    }
-    if (editingManager) {
-      setManagers(prevManagers => prevManagers.map(m => m.id === editingManager.id ? { ...editingManager, name: managerName, email: managerEmail, role: managerRole } : m));
-      toast({ title: "Manager Updated", description: `${managerName}'s details updated.`});
-    } else {
-      setManagers(prevManagers => [{ id: `MGR-${Date.now()}`, name: managerName, email: managerEmail, role: managerRole }, ...prevManagers]);
-      toast({ title: "Manager Added", description: `${managerName} added.`});
-    }
-    setIsUserManagerModalOpen(false);
-  }, [managerName, managerEmail, managerRole, editingManager, toast]);
-
-  // Removed Salesperson form handlers
-  // const handleAddSalesperson = useCallback(() => { setEditingSalesperson(null); setIsSalespersonFormModalOpen(true); }, []);
-  // const handleEditSalesperson = useCallback((salesperson: Salesperson) => { setEditingSalesperson(salesperson); setIsSalespersonFormModalOpen(true); }, []);
-  // const handleSalespersonFormSubmit = useCallback((data: SalespersonFormValues) => { ... }, []);
-  // const handleDeleteSalespersonConfirm = useCallback((salesperson: Salesperson) => { setSalespersonToDelete(salesperson); }, []);
-  // const confirmDeleteSalesperson = useCallback(() => { ... }, []);
-
-  if (isDataLoading || !companyProfile) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="shrink-0">
-          <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
-        </div>
-        <Tabs defaultValue="company" className="w-full flex-grow min-h-0 flex flex-col">
-           <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar">
-            {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5">
-                <tab.icon className="h-4 w-4" /> {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="flex-grow min-h-0 overflow-y-auto">
-            <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
-          </div>
-        </Tabs>
-      </div>
-    );
-  }
+  const handleSaveChanges = () => {
+    console.log('Saving changes:', settings);
+    // Implement saving logic here (e.g., API call)
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="shrink-0">
-        <PageHeader title="Settings" description="Manage your company profile, tax settings, users, and data storage." />
+    <div className="flex flex-col h-full p-6">
+      <div className="flex justify-between items-center mb-6">
+        <PageHeader
+          title="Settings"
+          description="Manage your system preferences and configurations."
+        />
+        <Button onClick={handleSaveChanges}>Save Changes</Button>
       </div>
 
-      <div className="flex-grow min-h-0">
-        <Tabs defaultValue="company" className="w-full h-full flex flex-col">
-          <TabsList className="flex w-full overflow-x-auto pb-1 mb-6 shrink-0 hide-scrollbar">
-            {SETTINGS_TABS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-3 py-1.5">
-                <tab.icon className="h-4 w-4" /> {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* General Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <SettingsIcon className="mr-2 h-5 w-5 text-primary" />
+              General Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div>
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input id="companyName" value={settings.general.companyName} onChange={(e) => handleInputChange('general', 'companyName', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="timezone">Timezone</Label>
+              <Select value={settings.general.timezone} onValueChange={(value) => handleSelectChange('general', 'timezone', value)}>
+                <SelectTrigger id="timezone">
+                  <SelectValue placeholder="Select a timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="utc">UTC</SelectItem>
+                  {/* Add more timezone options */}
+                </SelectContent>
+              </Select>
+            </div>
+             <div>
+              <Label htmlFor="defaultCurrency">Default Currency</Label>
+              <Select value={settings.general.defaultCurrency} onValueChange={(value) => handleSelectChange('general', 'defaultCurrency', value)}>
+                <SelectTrigger id="defaultCurrency">
+                  <SelectValue placeholder="Select a currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sar">SAR (﷼)</SelectItem>
+                  {/* Add more currency options */}
+                </SelectContent>
+              </Select>
+            </div>
+             <div>
+              <Label htmlFor="dateFormat">Date Format</Label>
+              <Select value={settings.general.dateFormat} onValueChange={(value) => handleSelectChange('general', 'dateFormat', value)}>
+                <SelectTrigger id="dateFormat">
+                  <SelectValue placeholder="Select a date format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mm/dd/yyyy">MM/DD/YYYY</SelectItem>
+                   {/* Add more date format options */}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex-grow min-h-0 overflow-y-auto">
-            <TabsContent value="company" className="mt-0">
-              <Card>
-                <CardHeader><CardTitle>Company Details</CardTitle><SettingsCardDescription>Update your company's name, address, and contact information.</SettingsCardDescription></CardHeader>
-                <CardContent><CompanyDetailsForm initialData={companyProfile} onSubmit={handleCompanyDetailsSubmit} /></CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="tax" className="mt-0">
-              <Card>
-                <CardHeader><CardTitle>Tax Settings</CardTitle><SettingsCardDescription>Configure VAT and other tax rates for your invoices.</SettingsCardDescription></CardHeader>
-                <CardContent><TaxSettingsForm initialData={companyProfile} onSubmit={handleTaxSettingsSubmit} /></CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="users" className="mt-0">
-              <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex-grow"><CardTitle>App User Management</CardTitle><SettingsCardDescription>Add, edit, or remove managers with custom roles.<br/><small className="text-destructive">Note: User roles are for reference. Specific permissions are not yet implemented.</small></SettingsCardDescription></div>
-                  <Button onClick={handleAddManager} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Manager</Button>
-                </CardHeader>
-                <CardContent>
-                  {managers.length > 0 ? (
-                    <div className="rounded-lg border overflow-x-auto"><Table><TableHeader className="bg-muted"><TableRow><TableHead className="min-w-[150px] px-2">Name</TableHead><TableHead className="min-w-[200px] px-2">Email</TableHead><TableHead className="min-w-[120px] px-2">Role</TableHead><TableHead className="text-right min-w-[100px] px-2">Actions</TableHead></TableRow></TableHeader><TableBody>{managers.map((manager, index) => (<TableRow key={manager.id} className={cn(index % 2 !== 0 ? 'bg-muted/30' : 'bg-card', "hover:bg-primary/10")}><TableCell className="px-2">{manager.name}</TableCell><TableCell className="px-2">{manager.email}</TableCell><TableCell className="px-2">{manager.role}</TableCell><TableCell className="text-right px-2"><div className="flex justify-end items-center gap-1"><Button variant="ghost" size="icon" onClick={() => handleEditManager(manager)} className="hover:text-primary"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDeleteManager(manager.id)} className="hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></div></TableCell></TableRow>))}</TableBody></Table></div>
-                  ) : (<DataPlaceholder title="No App Managers" message="Add managers to help manage your application settings and users." action={<Button onClick={handleAddManager} className="w-full max-w-xs mx-auto sm:w-auto sm:max-w-none sm:mx-0"><PlusCircle className="mr-2 h-4 w-4" /> Add Manager</Button>}/>)}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            {/* Salespeople Tab Content Removed */}
-            <TabsContent value="storage" className="mt-0">
-              <Card>
-                <CardHeader><CardTitle>Data Storage Configuration</CardTitle><SettingsCardDescription>Settings for connecting to local storage or SQL database systems.</SettingsCardDescription></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3 rounded-md border border-green-400 bg-green-50 p-4 text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-300"><Database className="h-6 w-6 text-green-500 dark:text-green-400" /><div><p className="font-medium">Using Local Storage</p><p className="text-sm">Currently, all application data is being stored in your browser's local storage. Changes are persisted across sessions on this device.</p></div></div>
-                  <p className="text-muted-foreground">Future versions may allow connecting to persistent cloud database solutions like PostgreSQL, MySQL, or SQL Server for multi-user access and robust data management.</p>
-                  <Button disabled className="w-full sm:w-auto">Configure Cloud Database (Coming Soon)</Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </div>
-        </Tabs>
+        {/* Notifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Bell className="mr-2 h-5 w-5 text-primary" />
+              Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="emailNotifications">Email Notifications</Label>
+              <Switch id="emailNotifications" checked={settings.notifications.emailNotifications} onCheckedChange={(checked) => handleToggleChange('notifications', 'emailNotifications', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pushNotifications">Push Notifications</Label>
+              <Switch id="pushNotifications" checked={settings.notifications.pushNotifications} onCheckedChange={(checked) => handleToggleChange('notifications', 'pushNotifications', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="lowStockAlerts">Low Stock Alerts</Label>
+              <Switch id="lowStockAlerts" checked={settings.notifications.lowStockAlerts} onCheckedChange={(checked) => handleToggleChange('notifications', 'lowStockAlerts', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="paymentReminders">Payment Reminders</Label>
+              <Switch id="paymentReminders" checked={settings.notifications.paymentReminders} onCheckedChange={(checked) => handleToggleChange('notifications', 'paymentReminders', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="systemMaintenance">System Maintenance</Label>
+              <Switch id="systemMaintenance" checked={settings.notifications.systemMaintenance} onCheckedChange={(checked) => handleToggleChange('notifications', 'systemMaintenance', checked)} />
+            </div>
+            <div>
+              <Label htmlFor="notificationEmail">Notification Email</Label>
+              <Input id="notificationEmail" type="email" value={settings.notifications.notificationEmail} onChange={(e) => handleInputChange('notifications', 'notificationEmail', e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Shield className="mr-2 h-5 w-5 text-primary" />
+              Security
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+             <div className="flex items-center justify-between">
+              <Label htmlFor="twoFactorAuth">Two-Factor Authentication</Label>
+              <Switch id="twoFactorAuth" checked={settings.security.twoFactorAuth} onCheckedChange={(checked) => handleToggleChange('security', 'twoFactorAuth', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="strongPasswordPolicy">Strong Password Policy</Label>
+              <Switch id="strongPasswordPolicy" checked={settings.security.strongPasswordPolicy} onCheckedChange={(checked) => handleToggleChange('security', 'strongPasswordPolicy', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="autoSessionTimeout">Auto Session Timeout</Label>
+              <Switch id="autoSessionTimeout" checked={settings.security.autoSessionTimeout} onCheckedChange={(checked) => handleToggleChange('security', 'autoSessionTimeout', checked)} />
+            </div>
+            <div>
+              <Label htmlFor="sessionDuration">Session Duration (minutes)</Label>
+              <Input id="sessionDuration" type="number" value={settings.security.sessionDuration} onChange={(e) => handleNumberInputChange('security', 'sessionDuration', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+              <Input id="maxLoginAttempts" type="number" value={settings.security.maxLoginAttempts} onChange={(e) => handleNumberInputChange('security', 'maxLoginAttempts', e.target.value)} />
+            </div>
+            <Button variant="outline" className="mt-2" onClick={() => console.log('Change Password clicked')}>Change Password</Button>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Brush className="mr-2 h-5 w-5 text-primary" />
+              Appearance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+             <div>
+              <Label htmlFor="theme">Theme</Label>
+              <Select value={settings.appearance.theme} onValueChange={(value) => handleSelectChange('appearance', 'theme', value)}>
+                <SelectTrigger id="theme">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                   {/* Add more themes */}
+                </SelectContent>
+              </Select>
+            </div>
+             <div>
+              <Label htmlFor="sidebarPosition">Sidebar Position</Label>
+              <Select value={settings.appearance.sidebarPosition} onValueChange={(value) => handleSelectChange('appearance', 'sidebarPosition', value)}>
+                <SelectTrigger id="sidebarPosition">
+                  <SelectValue placeholder="Select position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+             <div className="flex items-center justify-between">
+              <Label htmlFor="compactMode">Compact Mode</Label>
+              <Switch id="compactMode" checked={settings.appearance.compactMode} onCheckedChange={(checked) => handleToggleChange('appearance', 'compactMode', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="enableAnimations">Enable Animations</Label>
+              <Switch id="enableAnimations" checked={settings.appearance.enableAnimations} onCheckedChange={(checked) => handleToggleChange('appearance', 'enableAnimations', checked)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Database className="mr-2 h-5 w-5 text-primary" />
+              System
+            </CardTitle>
+          </CardHeader>
+           <CardContent className="grid gap-4">
+             <div>
+              <Label htmlFor="backupFrequency">Backup Frequency</Label>
+              <Select value={settings.system.backupFrequency} onValueChange={(value) => handleSelectChange('system', 'backupFrequency', value)}>
+                <SelectTrigger id="backupFrequency">
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                   {/* Add more frequencies */}
+                </SelectContent>
+              </Select>
+            </div>
+             <div>
+              <Label htmlFor="logRetention">Log Retention (days)</Label>
+              <Input id="logRetention" type="number" value={settings.system.logRetention} onChange={(e) => handleNumberInputChange('system', 'logRetention', e.target.value)} />
+            </div>
+             <div className="flex items-center justify-between">
+              <Label htmlFor="automaticUpdates">Automatic Updates</Label>
+              <Switch id="automaticUpdates" checked={settings.system.automaticUpdates} onCheckedChange={(checked) => handleToggleChange('system', 'automaticUpdates', checked)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="maintenanceMode">Maintenance Mode</Label>
+              <Switch id="maintenanceMode" checked={settings.system.maintenanceMode} onCheckedChange={(checked) => handleToggleChange('system', 'maintenanceMode', checked)} />
+            </div>
+             <Button variant="outline" className="mt-2" onClick={handleDatabaseMaintenance}>Database Maintenance</Button>
+           </CardContent>
+        </Card>
+
+        {/* Integrations */}
+        <Card className="lg:col-span-3"> {/* Span across 3 columns on large screens */}
+           <CardHeader>
+            <CardTitle className="flex items-center">
+              <LinkIcon className="mr-2 h-5 w-5 text-primary" />
+              Integrations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Email Service */}
+            <div>
+              <h4 className="text-md font-medium mb-2">Email Service</h4>
+               <div className="flex items-center justify-between mb-4">
+                <Label htmlFor="enableEmail">Enable Email</Label>
+                <Switch id="enableEmail" checked={settings.integrations.emailService.enableEmail} onCheckedChange={(checked) => handleToggleChange('integrations', 'emailService', { ...settings.integrations.emailService, enableEmail: checked })} />
+              </div>
+              <div className="grid gap-2">
+                 <div>
+                   <Label htmlFor="smtpServer">SMTP Server</Label>
+                   <Input id="smtpServer" value={settings.integrations.emailService.smtpServer} onChange={(e) => handleInputChange('integrations', 'emailService', { ...settings.integrations.emailService, smtpServer: e.target.value })} />
+                 </div>
+                 <div>
+                   <Label htmlFor="smtpPort">Port</Label>
+                   <Input id="smtpPort" type="number" value={settings.integrations.emailService.port || ''} onChange={(e) => handleNumberInputChange('integrations', 'emailService', { ...settings.integrations.emailService, port: e.target.value === '' ? null : Number(e.target.value) })} />
+                 </div>
+              </div>
+            </div>
+
+             {/* Payment Gateway */}
+            <div>
+              <h4 className="text-md font-medium mb-2">Payment Gateway</h4>
+              <div className="flex items-center justify-between mb-4">
+                <Label htmlFor="enablePayments">Enable Payments</Label>
+                <Switch id="enablePayments" checked={settings.integrations.paymentGateway.enablePayments} onCheckedChange={(checked) => handleToggleChange('integrations', 'paymentGateway', { ...settings.integrations.paymentGateway, enablePayments: checked })} />
+              </div>
+              <div className="grid gap-2">
+                 <div>
+                    <Label htmlFor="paymentProvider">Provider</Label>
+                    <Select value={settings.integrations.paymentGateway.provider} onValueChange={(value) => handleSelectChange('integrations', 'paymentGateway', { ...settings.integrations.paymentGateway, provider: value })}>
+                      <SelectTrigger id="paymentProvider">
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stripe">Stripe</SelectItem>
+                        <SelectItem value="paypal">PayPal</SelectItem>
+                         {/* Add more providers */}
+                      </SelectContent>
+                    </Select>
+                 </div>
+              </div>
+            </div>
+
+             {/* API Settings */}
+            <div>
+              <h4 className="text-md font-medium mb-2">API Settings</h4>
+               <div className="flex items-center justify-between mb-4">
+                <Label htmlFor="enableApi">Enable API</Label>
+                <Switch id="enableApi" checked={settings.integrations.apiSettings.enableApi} onCheckedChange={(checked) => handleToggleChange('integrations', 'apiSettings', { ...settings.integrations.apiSettings, enableApi: checked })} />
+              </div>
+               <div className="grid gap-2">
+                 <div>
+                    <Label htmlFor="rateLimit">Rate Limit (req/min)</Label>
+                    <Input id="rateLimit" type="number" value={settings.integrations.apiSettings.rateLimit} onChange={(e) => handleNumberInputChange('integrations', 'apiSettings', { ...settings.integrations.apiSettings, rateLimit: Number(e.target.value) })} />
+                 </div>
+                 <Button variant="outline" className="mt-2" onClick={handleGenerateApiKey}>Generate API Key</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
-
-      <Dialog open={isUserManagerModalOpen} onOpenChange={setIsUserManagerModalOpen}>
-        <DialogContent className="w-[90vw] max-w-md"><DialogHeader><DialogTitle>{editingManager ? 'Edit Manager' : 'Add New Manager'}</DialogTitle><FormDialogDescription>{editingManager ? 'Update manager details.' : 'Enter details for the new manager.'}</FormDialogDescription></DialogHeader><form onSubmit={handleManagerFormSubmit} className="space-y-4 py-4"><div><Label htmlFor="managerName">Name</Label><Input id="managerName" value={managerName} onChange={(e) => setManagerName(e.target.value)} placeholder="Full Name" /></div><div><Label htmlFor="managerEmail">Email</Label><Input id="managerEmail" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} placeholder="email@example.com" /></div><div><Label htmlFor="managerRole">Role</Label><Input id="managerRole" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} placeholder="e.g., Invoice Clerk, Sales Manager" /><p className="text-xs text-muted-foreground mt-1">Note: Roles are descriptive. Specific permissions will be implemented later.</p></div><DialogFooter className="flex flex-col sm:flex-row gap-2"><Button type="button" variant="outline" onClick={() => setIsUserManagerModalOpen(false)} className="w-full sm:w-auto">Cancel</Button><Button type="submit" className="w-full sm:w-auto">{editingManager ? 'Save Changes' : 'Add Manager'}</Button></DialogFooter></form></DialogContent>
-      </Dialog>
-
-      {/* Salesperson Modals Removed */}
-      {/* <Dialog open={isSalespersonFormModalOpen} ... /> */}
-      {/* <AlertDialog open={!!salespersonToDelete} ... /> */}
     </div>
   );
 }
