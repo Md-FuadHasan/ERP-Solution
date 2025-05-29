@@ -40,32 +40,9 @@ import { cn } from "@/lib/utils";
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { useToast } from '@/hooks/use-toast';
 import { SearchInput } from '@/components/common/search-input';
-import type { Employee } from '@/types'; // Assuming Employee type might come from here or be defined locally
-import { useData } from '@/context/DataContext'; // Assuming useData provides employees and CRUD
+import type { Employee } from '@/types';
+import { useData } from '@/context/DataContext';
 
-
-// Interface for Employee (if not already defined globally)
-// interface Employee {
-//   id: string;
-//   employeeId: string;
-//   name: string;
-//   nationality: string;
-//   department: string;
-//   designation: string;
-//   joiningDate: string;
-//   nationalId: string;
-//   iqamaNumber?: string;
-//   iqamaExpiryDate?: string;
-//   passportNumber?: string;
-//   passportExpiryDate?: string;
-//   mobileNumber: string;
-//   email?: string;
-//   salary: string;
-//   salaryNumber: string;
-//   medicalInsuranceNumber: string;
-//   socialInsuranceNumber: string;
-//   status?: string; // e.g., 'Active', 'On Leave', 'Terminated'
-// }
 
 const initialEmployeeFormState: Employee = {
   id: '', employeeId: '', name: '', nationality: '', department: '', designation: '',
@@ -125,8 +102,15 @@ export default function EmployeeManagerPage() {
       toast({ title: "Employee Updated", description: `${formData.name}'s details have been updated.` });
     } else {
       const newEmployeeId = formData.employeeId || `EMP${String(Date.now()).slice(-4)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-      const newEmployeeWithGeneratedId: Employee = { ...formData, id: Date.now().toString(), employeeId: newEmployeeId };
-      addEmployee(newEmployeeWithGeneratedId as Omit<Employee, 'id'>);
+      // Ensure all fields from Employee type are present, even if some are optional in the form initially
+      const newEmployeeWithGeneratedId: Employee = {
+        ...initialEmployeeFormState, // Start with all fields from the base state
+        ...formData,                // Overlay with current form data
+        id: Date.now().toString(),  // Generate a unique ID for the employee object itself
+        employeeId: newEmployeeId,  // Use the generated or provided employee ID
+        status: formData.status || 'Active', // Default status if not set
+      };
+      addEmployee(newEmployeeWithGeneratedId);
       toast({ title: "Employee Added", description: `${newEmployeeWithGeneratedId.name} has been successfully added.` });
     }
     setIsFormModalOpen(false);
@@ -143,12 +127,15 @@ export default function EmployeeManagerPage() {
   }, [employeeToDelete, deleteEmployee, toast]);
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter(employee =>
-        employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (employee.department && employee.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (employee.designation && employee.designation.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    return employees.filter(employee => {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return (
+            employee.name.toLowerCase().includes(lowerSearchTerm) ||
+            employee.employeeId.toLowerCase().includes(lowerSearchTerm) ||
+            (employee.department && employee.department.toLowerCase().includes(lowerSearchTerm)) ||
+            (employee.designation && employee.designation.toLowerCase().includes(lowerSearchTerm))
+        );
+    });
   }, [employees, searchTerm]);
 
 
@@ -225,10 +212,12 @@ export default function EmployeeManagerPage() {
                     <CardDescription>Overview of all current employees.</CardDescription>
                 </div>
                 <div className="flex w-full sm:w-auto items-center space-x-4">
-                    <SearchInput placeholder="Search employees..." className="w-full sm:flex-initial sm:w-64" value={searchTerm} onChange={setSearchTerm} />
-                    <Button variant="outline" className="w-full sm:w-auto shrink-0">
-                        <Filter className="mr-2 h-4 w-4" /> Filter
-                    </Button>
+                    <SearchInput 
+                        placeholder="Search by ID, Name, Dept, Designation..." 
+                        className="w-full sm:w-72" 
+                        value={searchTerm} 
+                        onChange={setSearchTerm} 
+                    />
                 </div>
               </div>
             </CardHeader>
