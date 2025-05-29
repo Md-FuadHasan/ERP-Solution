@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,28 +40,32 @@ import { cn } from "@/lib/utils";
 import { DataPlaceholder } from '@/components/common/data-placeholder';
 import { useToast } from '@/hooks/use-toast';
 import { SearchInput } from '@/components/common/search-input';
+import type { Employee } from '@/types'; // Assuming Employee type might come from here or be defined locally
+import { useData } from '@/context/DataContext'; // Assuming useData provides employees and CRUD
 
-interface Employee {
-  id: string;
-  employeeId: string;
-  name: string;
-  nationality: string;
-  department: string;
-  designation: string;
-  joiningDate: string;
-  nationalId: string;
-  iqamaNumber?: string;
-  iqamaExpiryDate?: string;
-  passportNumber?: string;
-  passportExpiryDate?: string;
-  mobileNumber: string;
-  email?: string;
-  salary: string;
-  salaryNumber: string;
-  medicalInsuranceNumber: string;
-  socialInsuranceNumber: string;
-  status?: string;
-}
+
+// Interface for Employee (if not already defined globally)
+// interface Employee {
+//   id: string;
+//   employeeId: string;
+//   name: string;
+//   nationality: string;
+//   department: string;
+//   designation: string;
+//   joiningDate: string;
+//   nationalId: string;
+//   iqamaNumber?: string;
+//   iqamaExpiryDate?: string;
+//   passportNumber?: string;
+//   passportExpiryDate?: string;
+//   mobileNumber: string;
+//   email?: string;
+//   salary: string;
+//   salaryNumber: string;
+//   medicalInsuranceNumber: string;
+//   socialInsuranceNumber: string;
+//   status?: string; // e.g., 'Active', 'On Leave', 'Terminated'
+// }
 
 const initialEmployeeFormState: Employee = {
   id: '', employeeId: '', name: '', nationality: '', department: '', designation: '',
@@ -70,10 +74,9 @@ const initialEmployeeFormState: Employee = {
   salary: '', salaryNumber: '', medicalInsuranceNumber: '', socialInsuranceNumber: '',
 };
 
-const Progress = ({ value }: { value: number }) => <div className="h-2 w-full bg-blue-500 rounded" style={{ width: `${value}%` }}></div>;
 
 export default function EmployeeManagerPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const { employees, addEmployee, updateEmployee, deleteEmployee, isLoading } = useData();
   const [activeTab, setActiveTab] = useState('employee-directory');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -83,9 +86,9 @@ export default function EmployeeManagerPage() {
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState(''); // Added for SearchInput
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
   };
@@ -118,13 +121,13 @@ export default function EmployeeManagerPage() {
     }
 
     if (editingEmployee) {
-      setEmployees(prevEmployees => prevEmployees.map(emp => emp.id === editingEmployee.id ? { ...formData, id: editingEmployee.id } : emp));
+      updateEmployee({ ...formData, id: editingEmployee.id });
       toast({ title: "Employee Updated", description: `${formData.name}'s details have been updated.` });
     } else {
       const newEmployeeId = formData.employeeId || `EMP${String(Date.now()).slice(-4)}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-      const newEmployee: Employee = { ...formData, id: Date.now().toString(), employeeId: newEmployeeId };
-      setEmployees(prevEmployees => [newEmployee, ...prevEmployees]);
-      toast({ title: "Employee Added", description: `${newEmployee.name} has been successfully added.` });
+      const newEmployeeWithGeneratedId: Employee = { ...formData, id: Date.now().toString(), employeeId: newEmployeeId };
+      addEmployee(newEmployeeWithGeneratedId as Omit<Employee, 'id'>);
+      toast({ title: "Employee Added", description: `${newEmployeeWithGeneratedId.name} has been successfully added.` });
     }
     setIsFormModalOpen(false);
     setFormData(initialEmployeeFormState);
@@ -133,18 +136,20 @@ export default function EmployeeManagerPage() {
 
   const confirmDelete = useCallback(() => {
     if (employeeToDelete) {
-      setEmployees(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
+      deleteEmployee(employeeToDelete.id);
       toast({ title: "Employee Deleted", description: `${employeeToDelete.name} has been removed.` });
       setEmployeeToDelete(null);
     }
-  }, [employeeToDelete, toast]);
+  }, [employeeToDelete, deleteEmployee, toast]);
 
-  const filteredEmployees = employees.filter(employee =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (employee.department && employee.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (employee.designation && employee.designation.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(employee =>
+        employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (employee.department && employee.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (employee.designation && employee.designation.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [employees, searchTerm]);
 
 
   return (
@@ -169,7 +174,7 @@ export default function EmployeeManagerPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{employees.length}</div>
-             <p className="text-xs text-muted-foreground">+{Math.max(0, employees.length - 200)} from target</p>
+             <p className="text-xs text-muted-foreground">Count of all active and inactive staff</p>
           </CardContent>
         </Card>
         <Card>
@@ -199,14 +204,14 @@ export default function EmployeeManagerPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">0%</div> {/* Placeholder */}
-            <p className="text-xs text-muted-foreground">No data</p> {/* Placeholder */}
+            <p className="text-xs text-muted-foreground">Monthly placeholder</p> {/* Placeholder */}
          </CardContent>
         </Card>
       </div>
 
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-grow flex flex-col px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8">
-        <TabsList className="grid w-full grid-cols-3 mb-4 shrink-0">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 mb-4 shrink-0">
           <TabsTrigger value="employee-directory">Employee Directory</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
           <TabsTrigger value="hr-analytics">HR Analytics</TabsTrigger>
@@ -219,9 +224,9 @@ export default function EmployeeManagerPage() {
                     <CardTitle>Employee List</CardTitle>
                     <CardDescription>Overview of all current employees.</CardDescription>
                 </div>
-                <div className="flex w-full sm:w-auto gap-4"> {/* Changed gap-2 to gap-4 */}
-                    <SearchInput placeholder="Search employees..." className="w-full sm:w-64" value={searchTerm} onChange={setSearchTerm} />
-                    <Button variant="outline" className="w-full sm:w-auto">
+                <div className="flex w-full sm:w-auto items-center space-x-4">
+                    <SearchInput placeholder="Search employees..." className="w-full sm:flex-initial sm:w-64" value={searchTerm} onChange={setSearchTerm} />
+                    <Button variant="outline" className="w-full sm:w-auto shrink-0">
                         <Filter className="mr-2 h-4 w-4" /> Filter
                     </Button>
                 </div>
@@ -229,7 +234,11 @@ export default function EmployeeManagerPage() {
             </CardHeader>
             <div className="flex-grow min-h-0 overflow-hidden">
                 <div className="h-full overflow-y-auto">
-                  {filteredEmployees.length > 0 ? (
+                  {isLoading ? (
+                     <div className="p-6">
+                       <DataPlaceholder icon={Briefcase} title="Loading Employees..." message="Please wait while employee data is being fetched." />
+                     </div>
+                  ) : filteredEmployees.length > 0 ? (
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-primary text-primary-foreground">
                         <TableRow>
