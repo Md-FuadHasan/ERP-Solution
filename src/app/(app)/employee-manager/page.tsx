@@ -5,7 +5,6 @@ import { useState, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -212,11 +211,11 @@ export default function EmployeeManagerPage() {
                     <CardDescription>Overview of all current employees.</CardDescription>
                 </div>
                 <div className="flex w-full sm:w-auto items-center space-x-4">
-                    <SearchInput 
-                        placeholder="Search by ID, Name, Dept, Designation..." 
-                        className="w-full sm:w-72" 
-                        value={searchTerm} 
-                        onChange={setSearchTerm} 
+                    <SearchInput
+                        placeholder="Search by ID, Name, Dept, Designation..."
+                        className="w-full" 
+                        value={searchTerm}
+                        onChange={setSearchTerm}
                     />
                 </div>
               </div>
@@ -425,4 +424,3 @@ export default function EmployeeManagerPage() {
     </div>
   );
 }
-
