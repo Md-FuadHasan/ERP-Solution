@@ -1,36 +1,42 @@
 
-'use client';
-import { PageHeader } from '@/components/layout/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { SlidersHorizontal } from 'lucide-react';
+import React from 'react';
 
-export default function SystemToolsPage() {
+const SystemToolsPage = () => {
   return (
-    <div className="flex flex-col h-full">
-      <PageHeader
-        title="System Tools"
-        description="Access administrative tools for system maintenance and configuration."
-      />
-      <Card className="flex-grow">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <SlidersHorizontal className="mr-2 h-6 w-6 text-primary" />
-            Administrative Tools
-          </CardTitle>
-          <CardDescription>
-            Manage data backups, imports/exports, and system health.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center p-4 border-2 border-dashed border-border rounded-lg">
-            <SlidersHorizontal className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold text-foreground">System Tools Coming Soon</h3>
-            <p className="text-muted-foreground max-w-md">
-              This area will provide functionalities for data backup & restore, data import/export utilities, system diagnostics, and advanced configurations.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-semibold mb-6">System Tools</h1>
+
+      {/* System Maintenance Section */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-medium mb-4">System Maintenance</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          {/* Placeholder for maintenance options */}
+          <p>System maintenance settings and actions will go here.</p>
+          {/* Examples: Backup frequency, Log retention, Manual backup trigger */}
+        </div>
+      </section>
+
+      {/* Reporting & AI Tools Section */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-medium mb-4">Reporting & AI Tools</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          {/* Placeholder for reporting and AI options */}
+          <p>Configuration and usage of reporting and AI tools will go here.</p>
+          {/* Examples: AI model settings, Report generation interface */}
+        </div>
+      </section>
+
+      {/* Data Management Section */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-medium mb-4">Data Management</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          {/* Placeholder for data management options */}
+          <p>Tools for data import, export, and management will go here.</p>
+          {/* Examples: Data import, Data export, Database optimization */}
+        </div>
+      </section>
     </div>
   );
-}
+};
+
+export default SystemToolsPage;
