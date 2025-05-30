@@ -11,10 +11,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'; // Fixed this import
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as FormDialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/layout/page-header';
@@ -204,9 +204,9 @@ const QuotationManagementPage = () => {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Quotation Details: {quotationToView?.id}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               Detailed information for quotation sent to {quotationToView?.customerName}.
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           {quotationToView && (
             <div className="space-y-3 py-4 text-sm max-h-[60vh] overflow-y-auto">
@@ -239,9 +239,9 @@ const QuotationManagementPage = () => {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingQuotation ? 'Edit Quotation' : 'Create New Quotation'}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               {editingQuotation ? 'Update details for this quotation.' : 'Fill in the details to create a new quotation.'}
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-center text-muted-foreground">Quotation Form Component will go here.</p>
@@ -261,9 +261,9 @@ const QuotationManagementPage = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Send Quotation: {quotationToSend?.id}</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               Prepare to send quotation to {quotationToSend?.customerName}.
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-center text-muted-foreground">Email sending options/preview will go here.</p>
@@ -280,9 +280,9 @@ const QuotationManagementPage = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>
+            <FormDialogDescription>
               Are you sure you want to delete quotation {quotationToDelete?.id} for {quotationToDelete?.customerName}? This action cannot be undone.
-            </DialogDescription>
+            </FormDialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
@@ -296,4 +296,3 @@ const QuotationManagementPage = () => {
 
 export default QuotationManagementPage;
 
-    
